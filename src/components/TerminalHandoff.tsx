@@ -257,10 +257,23 @@ const TerminalHandoff = forwardRef<HandoffHandle>(function TerminalHandoff(_, re
         at(0.1, () => setPhase("back"));
         at(0.34, () => h.classList.add("is-dark"));
         at(1.05, () => window.scrollTo(0, panelTop(2)));
-        at(1.2, () => {
-          h.classList.remove("is-dark");
-          setRevealed(true); // the room is back; the glass may now be written on
-        });
+        at(1.2, () => h.classList.remove("is-dark"));
+        /* The room comes up first, and the phosphor after it.
+        
+           These used to happen in the same frame, and the blackout takes 0.55s
+           to lift - so for most of that half second the brightest thing on
+           screen was a green command line hanging in front of a machine that
+           was still black. It read as a glow stick in a dark room rather than
+           as a terminal someone had left running. Letting the case and the
+           glass arrive first and lighting the session up against them puts the
+           two in the right order: the room, then what is on its screen.
+        
+           1.74s is deliberate rather than "a bit later": the blackout is
+           removed at 1.2 and takes 0.55s to lift, so this is the first moment
+           the room is all the way back. The phosphor then warms up against a
+           machine that is already there, which is the order a real one comes
+           back in. */
+        at(1.74, () => setRevealed(true));
         // the machine is back, the old session still on its glass
         at(1.85, () => setPhase("type"));
         at(1.85 + tb + 0.34, () => {

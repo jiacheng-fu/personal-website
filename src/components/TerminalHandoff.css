@@ -205,6 +205,9 @@
    unmounted so the RAG section keeps its state and comes back intact if the
    move is cancelled.
    --------------------------------------------------------------------------- */
+/* `.a2-log` covers the banner, the scrollback and the run in progress in one
+   selector now that they all live in the same scrolling column. */
+.rag.is-handoff .a2-log,
 .rag.is-handoff .a2-boot,
 .rag.is-handoff .a2-prompt,
 .rag.is-handoff .a2-ingest,
@@ -214,6 +217,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .rag.is-handoff .a2-log,
   .rag.is-handoff .a2-boot,
   .rag.is-handoff .a2-prompt,
   .rag.is-handoff .a2-ingest,
@@ -253,9 +257,14 @@
 .handoff.is-back.is-dark .handoff__cmd {
   opacity: 0;
 }
-.handoff.is-back:not(.is-dark) .handoff__cmd {
-  opacity: 1;
-}
+/* There used to be a `:not(.is-dark)` companion here forcing the command line
+   to opacity 1 the instant the blackout began to lift. It outranked the
+   `.is-in` rules below on specificity, so `revealed` - the whole mechanism for
+   deciding WHEN the glass may be written on - could not move it: the session
+   lit up the moment the black started to fade, against a machine that was
+   still most of the way black, and read as a green glow hanging in an empty
+   room. Visibility on the way back is `.is-in` / `.is-pending`'s job, and the
+   `.is-dark` rule above still wins while the room is covered. */
 
 /* The index lends its titles to the overlay for the trip back into the glass;
    without this both would be on screen at once for the whole flight. */

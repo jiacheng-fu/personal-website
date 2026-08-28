@@ -1687,6 +1687,67 @@ html {
 }
 
 /* ---- on-screen: the performance ---- */
+/* ---------------------------------------------------------------------------
+   The session log
+
+   One scrolling column that owns the whole glass. The banner, every command,
+   every line of output and the run in progress are all in here in the order
+   they happened, and the newest is at the bottom - which is the only way a
+   terminal has ever worked. Nothing in this section replaces anything.
+   --------------------------------------------------------------------------- */
+.a2-log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  /* the log is pinned to the bottom of the glass while it is short, so a fresh
+     session types at the foot of the screen rather than floating mid-air */
+  justify-content: flex-end;
+  scrollbar-width: none;
+}
+.a2-log::-webkit-scrollbar {
+  display: none;
+}
+/* once it overflows, flex-end would clip the top off - the oldest lines have
+   to be reachable by scrolling, not cropped */
+.a2-log > * {
+  flex: 0 0 auto;
+}
+
+/* Inside the log, nothing owns a pane of its own. `.a2-perf` and its parts
+   were written to fill a fixed screen - flex: 1, min-height: 0, their own
+   scrollbars - and in a scrolling session that resolves to zero height, which
+   is exactly what happened to the answer: printed, laid out, and collapsed to
+   nothing between the last output line and the prompt. In here they are
+   content-height and the session does the scrolling. */
+.a2-log .a2-perf,
+.a2-log .a2-frags,
+.a2-log .a2-speech {
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: visible;
+}
+
+.a2-line {
+  white-space: pre-wrap;
+  /* wrapped output hangs under its own label rather than resetting to the
+     margin, so the column of labels down the left stays a column */
+  padding-left: 10ch;
+  text-indent: -10ch;
+  word-break: break-word;
+  color: var(--ph-dim);
+  line-height: 1.5;
+}
+.a2-line--cmd {
+  color: var(--ph);
+}
+/* a menu entry that has scrolled into history: printed, not pressable */
+.a2-boot__spent {
+  opacity: 0.5;
+}
+
 .a2-perf {
   display: flex;
   flex-direction: column;
