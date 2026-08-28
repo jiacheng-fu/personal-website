@@ -1,0 +1,250 @@
+/* ---------------------------------------------------------------------------
+   Feed shredder
+
+   Own file on purpose: the RAG section is being built in App.css by someone
+   else right now, and nothing here needs to reach into it.
+
+   The layer sits inside `.feed` and fills it, so it inherits that box's
+   position and width for free - no measuring, and it stays correct when the
+   note resizes with the viewport.
+   --------------------------------------------------------------------------- */
+
+/* Sized in JS: as wide as the run-up to the machine's near edge, and clipped
+   there. A strip that reaches the edge is CUT OFF rather than faded, which is
+   what makes it look swallowed instead of overlaid. Height is generous so the
+   drop and the throw are not clipped vertically as well. */
+.shred {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: hidden;
+  /* Strips curl on the X axis; without a perspective that rotation is a flat
+     vertical squash and reads as a wipe rather than paper. */
+  perspective: 900px;
+  pointer-events: none;
+}
+
+/* Width/height come from JS so each strip keeps the NOTE's box, not the wider
+   clipping container's. Origin is the right edge: that edge leads, so it is
+   what meets the machine and what the edge-on squeeze collapses toward. */
+.shred__strip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 100% 50%;
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+/* Every strip holds a COMPLETE copy of the note; the clip on the strip is what
+   makes it a strip. Identical copies are what keep the text aligned across the
+   cuts - the same reason a real shredded page still reads. */
+.shred__paper {
+  position: absolute;
+  inset: 0;
+  padding: 0.9rem 1rem 0.8rem;
+  background: #fbf8f1;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  box-shadow:
+    0 14px 30px rgba(22, 21, 15, 0.14),
+    0 1px 0 rgba(255, 255, 255, 0.8) inset;
+  font-family: var(--font-mono);
+  overflow: hidden;
+}
+
+/* A cut edge catches light on one side and shadows on the other. Two hairlines
+   are enough to stop the strips reading as flat rectangles. */
+.shred__strip::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0.5) 0 1px,
+    rgba(22, 21, 15, 0.13) 1px 2px,
+    transparent 2px calc(100% - 2px),
+    rgba(22, 21, 15, 0.13) calc(100% - 2px) calc(100% - 1px),
+    rgba(255, 255, 255, 0.42) calc(100% - 1px) 100%
+  );
+}
+
+.shred__label {
+  margin: 0 0 0.55rem;
+  font-size: 0.6rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+/* Matches the textarea it replaces: same display face, same ruled baseline, so
+   the swap from live note to replica is invisible. */
+.shred__text {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  line-height: 1.35;
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: repeating-linear-gradient(
+    transparent 0 calc(1.35em - 1px),
+    var(--line) calc(1.35em - 1px) 1.35em
+  );
+}
+
+/* Reduced motion: no strips, no curl - the note is just taken. */
+.shred--plain {
+  position: absolute;
+  inset: 0;
+  animation: shred-take 0.26s ease forwards;
+}
+@keyframes shred-take {
+  to {
+    opacity: 0;
+    transform: translate(40px, -18px) scale(0.94);
+  }
+}
+
+/* While shredding, the live form is hidden but must keep its box: the strips
+   are positioned against it. Its own paper is hidden too, or it would show
+   through the gaps between strips. */
+.feed.is-shredding {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.feed.is-shredding > *:not(.shred) {
+  visibility: hidden;
+}
+
+/* ---------------------------------------------------------------------------
+   The tumble
+
+   A vase caught by a shoulder: struck, it swings up onto its edge, HANGS there
+   a moment where it looks like it is going over, drops back through vertical,
+   overshoots, and rocks itself still.
+
+   Everything that makes it read as weight is in the timing, not the angle:
+
+   - the hang. 16% -> 26% barely moves, which is the whole "it almost went"
+     beat. Take that out and 8 degrees is just a fast wobble.
+   - per-keyframe easing. The rise decelerates (fighting gravity), the fall
+     accelerates into the rebound. One ease across the whole thing would make
+     a heavy object feel spring-loaded.
+   - decay by roughly half each swing, so it settles instead of stopping.
+
+   The pivot is measured onto `.a2m` by FeedShred - see the note there for why
+   this class cannot just live on the drawing itself.
+   --------------------------------------------------------------------------- */
+.a2m.is-jolted {
+  animation: a2-tumble 1383ms both;
+}
+
+/* Damping decays the AMPLITUDE and leaves the period alone - a pendulum's
+   tempo does not depend on how far it swings. Getting that backwards is what
+   made earlier passes speed up as they calmed down and then simply quit.
+
+   Five swings at 225ms each without exception, amplitude falling by about a
+   third every time (9.6 -> 7.2 -> 5.0 -> 3.4 -> 2.3). It ends while there is
+   still a visible swing left rather than trailing off into a twitch.
+
+   Easing is by position - ease IN falling toward upright, ease OUT climbing
+   away from it - so speed peaks at every crossing and dies at every extreme.
+   The pivot changes hands on each crossing, where rotation is the identity and
+   the swap cannot be seen.
+
+   GENERATED from an amplitude/period table - change the table, not these
+   keyframes. Current: SPEED 1.2x over the original timing. */
+@keyframes a2-tumble {
+  0.0% {
+    /* struck - leaves at speed, climbs against gravity */
+    transform-origin: var(--tip-r, 96%) var(--tip-y, 100%);
+    transform: rotate(0.0deg);
+    animation-timing-function: cubic-bezier(0.25, 1, 0.5, 1);
+  }
+  21.692% {
+    /* apex 1 */
+    transform-origin: var(--tip-r, 96%) var(--tip-y, 100%);
+    transform: rotate(9.6deg);
+    animation-timing-function: cubic-bezier(0.32, 0, 0.67, 0);
+  }
+  29.826% {
+    transform-origin: var(--tip-r, 96%) var(--tip-y, 100%);
+    transform: rotate(0.0deg);
+    animation-timing-function: cubic-bezier(0.32, 0, 0.67, 0);
+  }
+  29.827% {
+    /* pivot changes hands */
+    transform-origin: var(--tip-l, 6%) var(--tip-y, 100%);
+    transform: rotate(0.0deg);
+    animation-timing-function: cubic-bezier(0.33, 1, 0.68, 1);
+  }
+  37.961% {
+    /* apex 2 */
+    transform-origin: var(--tip-l, 6%) var(--tip-y, 100%);
+    transform: rotate(-7.2deg);
+    animation-timing-function: cubic-bezier(0.32, 0, 0.67, 0);
+  }
+  46.095% {
+    transform-origin: var(--tip-l, 6%) var(--tip-y, 100%);
+    transform: rotate(0.0deg);
+    animation-timing-function: cubic-bezier(0.32, 0, 0.67, 0);
+  }
+  46.096% {
+    /* pivot changes hands */
+    transform-origin: var(--tip-r, 96%) var(--tip-y, 100%);
+    transform: rotate(0.0deg);
+    animation-timing-function: cubic-bezier(0.33, 1, 0.68, 1);
+  }
+  54.23% {
+    /* apex 3 */
+    transform-origin: var(--tip-r, 96%) var(--tip-y, 100%);
+    transform: rotate(5.0deg);
+    animation-timing-function: cubic-bezier(0.32, 0, 0.67, 0);
+  }
+  62.364% {
+    transform-origin: var(--tip-r, 96%) var(--tip-y, 100%);
+    transform: rotate(0.0deg);
+    animation-timing-function: cubic-bezier(0.32, 0, 0.67, 0);
+  }
+  62.365% {
+    /* pivot changes hands */
+    transform-origin: var(--tip-l, 6%) var(--tip-y, 100%);
+    transform: rotate(0.0deg);
+    animation-timing-function: cubic-bezier(0.33, 1, 0.68, 1);
+  }
+  70.499% {
+    /* apex 4 */
+    transform-origin: var(--tip-l, 6%) var(--tip-y, 100%);
+    transform: rotate(-3.4deg);
+    animation-timing-function: cubic-bezier(0.32, 0, 0.67, 0);
+  }
+  78.633% {
+    transform-origin: var(--tip-l, 6%) var(--tip-y, 100%);
+    transform: rotate(0.0deg);
+    animation-timing-function: cubic-bezier(0.32, 0, 0.67, 0);
+  }
+  78.634% {
+    /* pivot changes hands */
+    transform-origin: var(--tip-r, 96%) var(--tip-y, 100%);
+    transform: rotate(0.0deg);
+    animation-timing-function: cubic-bezier(0.33, 1, 0.68, 1);
+  }
+  86.768% {
+    /* apex 5 */
+    transform-origin: var(--tip-r, 96%) var(--tip-y, 100%);
+    transform: rotate(2.3deg);
+    animation-timing-function: cubic-bezier(0.32, 0, 0.67, 0);
+  }
+  100.0% {
+    /* at rest */
+    transform-origin: var(--tip-r, 96%) var(--tip-y, 100%);
+    transform: rotate(0.0deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .a2m.is-jolted { animation: none; }
+}

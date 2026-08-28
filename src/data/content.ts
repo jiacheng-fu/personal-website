@@ -62,10 +62,32 @@ export const skills = [
  * the game's own background art from its repo. Horizon and CarStatus need
  * footage recorded - neither can be captured from here (one is a Unity
  * build, the other a CLI against a live car). */
-export const projects = [
+/** `clip` is an mp4 and wins when present; `still` is the fallback frame, and
+ *  also the poster the video shows before its first frame decodes. Neither is
+ *  required - a project with no reel keeps the numeral instead. */
+export type Reel = { clip?: string; still?: string };
+export type Project = {
+  title: string;
+  reel: Reel;
+  years: string;
+  repo: string;
+  blurb: string;
+  stack: string[];
+};
+
+export const projects: Project[] = [
+  {
+    title: "Axle",
+    reel: { clip: "/reels/axle.mp4", still: "/shots/carscout.jpg" },
+    years: "2026 — now",
+    repo: "https://github.com/jiacheng-fu/axle",
+    blurb:
+      "AI-powered used-car search — describe what you want in plain English and it finds, ranks, and compares real listings from nearby dealers. Deployed on AWS.",
+    stack: ["Python", "FastAPI", "AWS Lambda", "React"],
+  },
   {
     title: "Project Horizon",
-    reel: {},
+    reel: { clip: "/reels/horizon.mp4", still: "/shots/horizon.jpg" },
     years: "2023 — now",
     repo: "https://github.com/jiacheng-fu/project-horizon",
     blurb:
@@ -74,7 +96,7 @@ export const projects = [
   },
   {
     title: "Wild West Party Game",
-    reel: { still: "/shots/wild-west.jpg" },
+    reel: { clip: "/reels/wild-west.mp4", still: "/shots/wild-west.jpg" },
     years: "2024",
     repo: "https://github.com/jiacheng-fu/wild-west-party-game",
     blurb:
@@ -83,7 +105,10 @@ export const projects = [
   },
   {
     title: "CarStatus",
-    reel: {},
+    /* The CLI needs a live car on the Smartcar account, so this reel is the
+       real index.js run against a stub SDK: the program, its formatting and
+       its "not available" branch are genuine, the vehicle is sample data. */
+    reel: { clip: "/reels/carstatus.mp4", still: "/shots/carstatus-term.jpg" },
     years: "2026",
     repo: "https://github.com/jiacheng-fu/CarStatus",
     blurb:

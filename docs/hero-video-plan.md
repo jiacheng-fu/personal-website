@@ -1,3 +1,9 @@
+> **ABANDONED (2026-08-26).** This plan was not carried out and the code that
+> implemented it (`HeroFilm.tsx`) plus its keyframe still are parked in
+> `media/abandoned-hero/`. None of `public/reels/hero-{intro,hold,exit}.mp4`
+> were ever generated. Brian is doing a full hero pass separately; kept for
+> reference only. Do not wire this up expecting the assets to exist.
+
 # Hero video plan — "the van and the robot"
 
 Status: PLANNING. No generations run, no credits spent. 10 free credits on the

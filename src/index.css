@@ -10,6 +10,19 @@
   --line: rgba(22, 21, 15, 0.14);
 
   --font-display: "Instrument Serif", Georgia, serif;
+  /* Neo-grotesk, added for the hero. The site's display face is a SERIF, which
+     cannot carry the Swiss/industrial poster direction the hero is set in, so
+     one grotesk joins the system rather than replacing anything - it serves
+     both the giant type and the small UI labels, keeping the family count at
+     one sans + one mono. */
+  --font-grotesk: "Inter Tight", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  /* The poster face, separate from the UI grotesk above. Archivo carries a
+     real WIDTH axis (75-100 loaded), which is the only way to satisfy the
+     reference's three demands at once: the word spans the full measure, the
+     caps stay tall, and the stems stay THIN. Condensing is what buys the
+     height - faking it by pushing the weight up is what read as "too thick",
+     because a normal-width face has to drop its cap height to fit the line. */
+  --font-poster: "Archivo", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);

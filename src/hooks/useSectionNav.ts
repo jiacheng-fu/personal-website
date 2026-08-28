@@ -1,3 +1,5 @@
+import { isNavLocked } from "../lib/transitions";
+import { isClipBusy } from "../lib/transitions";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /* ---------------------------------------------------------------------------
@@ -18,7 +20,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const DURATION = 850; // ms per section jump
 const WHEEL_MIN = 6; // ignore trackpad jitter
-const COOLDOWN = 90; // extra ms after arrival before another gesture counts
+/* Was a 300 ms dead time after arriving. Removed with the rest of the
+   cooldown system: the animation itself already holds `busy`, and anything
+   longer only made the page feel unresponsive. */
+const COOLDOWN = 0;
+/* Ceiling on how long a gate may hold the nav. Longer than the slowest scene
+   we ship (the ~4.5 s transition clip, the ~4 s terminal handoff) so it never
+   cuts a healthy one short: it exists only to guarantee the page cannot be
+   stranded by a gate that fails or hangs. */
+const GATE_FAILSAFE = 12000;
 
 /** Ease-in-out cubic: leaves rest gently, arrives gently. */
 function ease(t: number) {
@@ -53,6 +63,10 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
 
   const goTo = useCallback(
     (target: number, animate = true) => {
+      /* A transition still on screen owns the page. Checked here rather than
+         in each handler because every move - wheel, key, touch, progress dot -
+         comes through goTo. */
+      if (isNavLocked()) return;
       const i = Math.max(0, Math.min(count - 1, target));
       const from = window.scrollY;
       const to = sectionTop(i);
@@ -66,11 +80,28 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
       const held = gateRef.current?.(indexRef.current, i);
       if (held) {
         busy.current = true;
-        held.then(() => {
+        /* The nav must NEVER be left locked by a gate.
+           `busy` is only cleared when the held move lands, so a gate that
+           REJECTS - or one that simply never settles, which is easy to write
+           when the resolver hangs off an animation callback that might not
+           fire - stranded the page: every later wheel, key and swipe was
+           dropped and scrolling looked completely dead until a reload.
+
+           Land on EITHER outcome, once, with a failsafe on top for the
+           never-settles case. */
+        let landed = false;
+        const land = () => {
+          if (landed) return;
+          landed = true;
           setIndex(i);
           window.scrollTo(0, sectionTop(i));
           window.setTimeout(() => (busy.current = false), COOLDOWN);
+        };
+        held.then(land, (err) => {
+          console.error("[nav] gate rejected; landing anyway", err);
+          land();
         });
+        window.setTimeout(land, GATE_FAILSAFE);
         return;
       }
 
@@ -95,20 +126,36 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
 
   useEffect(() => {
     if (!enabled) return;
-
     const onWheel = (e: WheelEvent) => {
       // Let anything genuinely scrollable (a long card, a code block) keep its
       // own scroll; only hijack when the page itself would move.
       if ((e.target as HTMLElement)?.closest?.("[data-scrollable]")) return;
       e.preventDefault();
-      if (busy.current || Math.abs(e.deltaY) < WHEEL_MIN) return;
+      /* No cooldown, no gesture debouncing. There used to be a quiet-period
+         rule here meant to stop one flick walking through several sections,
+         and it was the thing breaking scrolling: it only answered an event
+         that FOLLOWED a pause, but a trackpad fires continuously while a
+         finger moves - and people keep scrolling when nothing happens - so
+         the pause never arrived and the nav went dead for as long as anyone
+         kept trying. A mouse wheel hit it too, via the same timestamp.
+
+         `busy` is the only lock now: while a move or a scene is running,
+         input is ignored; the moment it is free, the next event moves. */
+      /* `busy` covers the move itself; isClipBusy() covers the rest of the
+         transition - the overlay fade and the section arriving under it. A
+         gesture during 1->2 must not start 2->3 while it is still playing
+         out. No cooldown beyond that: the instant the scene is off screen,
+         the next input moves. */
+      if (busy.current || isClipBusy() || Math.abs(e.deltaY) < WHEEL_MIN) return;
       goTo(indexRef.current + (e.deltaY > 0 ? 1 : -1));
     };
 
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
-      const next = { ArrowDown: 1, PageDown: 1, " ": 1, ArrowUp: -1, PageUp: -1 }[e.key];
+      /* TEMP (debug): Space is on loan to the transition scrubber, so it is
+         not listed here. Restore `" ": 1` to give it back. See lib/debugPause.ts. */
+      const next = { ArrowDown: 1, PageDown: 1, ArrowUp: -1, PageUp: -1 }[e.key];
       if (next) {
         e.preventDefault();
         if (!busy.current) goTo(indexRef.current + next);

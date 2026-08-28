@@ -1,0 +1,307 @@
+/* ---------------------------------------------------------------------------
+   RAG -> Projects handoff
+
+   Own file, like the other pieces of this section: App.css is being worked in
+   by someone else and nothing here needs to reach into it.
+
+   The layer is fixed and covers everything, including the nav and the progress
+   dots - the room going dark has to take the whole room, or the page chrome
+   floats in a void while the machine goes out.
+   --------------------------------------------------------------------------- */
+
+.handoff {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+}
+.handoff.is-on {
+  opacity: 1;
+  visibility: visible;
+}
+.handoff.is-out {
+  opacity: 0;
+  /* brisk: the titles underneath are already in place, so this is a same-place
+     cross-fade, not a reveal - and the index's build-in needs the clear air */
+  transition: opacity 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ------------------------------ the blackout ----------------------------- */
+
+/* #050505 is the projects panel's own ground, so when the lines land there is
+   nothing to cross-fade - the overlay and the section are already the same
+   colour and the handover is invisible. */
+.handoff__black {
+  position: absolute;
+  inset: 0;
+  background: #050505;
+  opacity: 0;
+  transition: opacity 0.5s cubic-bezier(0.4, 0, 0.6, 1);
+}
+.handoff.is-dark .handoff__black {
+  opacity: 1;
+}
+
+/* ------------------------------ the command ------------------------------ */
+
+.handoff__cmd {
+  position: absolute;
+  display: flex;
+  align-items: baseline;
+  gap: 0.45em;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: #6cff8e;
+  white-space: nowrap;
+  transition: opacity 0.3s ease;
+}
+.handoff__cmd.is-done .handoff__cursor {
+  opacity: 0;
+}
+/* the prompt is part of the machine, so it goes out with the machine rather
+   than hanging in the black while the lines fly */
+.handoff.is-dark .handoff__cmd {
+  opacity: 0;
+  transition: opacity 0.28s ease;
+}
+.handoff__caret {
+  opacity: 0.75;
+}
+
+/* Typed by revealing the string rather than by re-rendering it a character at
+   a time: one animated property, no React work per keystroke. */
+/* Revealed by width rather than re-rendered a character at a time: one
+   animated property, no React work per keystroke. The length comes from the
+   command itself so either direction types its own line correctly. */
+.handoff__typed {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  width: 0;
+  animation: hd-type var(--type-dur, 1s) steps(var(--cmd-len, 9), end) forwards;
+}
+@keyframes hd-type {
+  to {
+    /* the glyphs plus the letter-spacing each one carries - a bare Nch clips
+       the final character */
+    width: calc(var(--cmd-len, 9) * (1ch + 0.04em));
+  }
+}
+/* scrollback: already typed, no animation */
+.handoff__typed--static {
+  width: auto;
+  animation: none;
+}
+
+.handoff__cursor {
+  width: 0.55em;
+  height: 1em;
+  background: #6cff8e;
+  animation: hd-blink 0.9s steps(1) infinite;
+}
+@keyframes hd-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* -------------------------------- the lines ------------------------------ */
+
+/* Each line is positioned at its DESTINATION and held at its source by a
+   transform. Releasing the transform is what makes it fly, and it means the
+   landing is pixel-exact on the real title underneath rather than a guess. */
+.handoff__line {
+  position: absolute;
+  transform-origin: 0 0;
+  opacity: 0;
+  line-height: 1;
+  white-space: nowrap;
+  will-change: transform, opacity;
+}
+.handoff__line.is-in {
+  opacity: 1;
+  transition: opacity 0.22s ease;
+}
+.handoff__line.is-moving {
+  transition:
+    transform 1.05s cubic-bezier(0.62, 0, 0.24, 1),
+    opacity 0.22s ease;
+}
+
+/* Both layers carry the SAME font-size - the serif's final one - and sit at
+   the same origin. The wrapper's scale is what makes the mono layer render at
+   true terminal size to begin with, so the text grows rather than being
+   swapped for a bigger copy. */
+.handoff__mono,
+.handoff__serif {
+  display: block;
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-size: inherit;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.handoff__mono {
+  font-family: var(--font-mono);
+  color: #6cff8e;
+  letter-spacing: 0.04em;
+  opacity: 1;
+  transition: opacity 0.34s ease;
+}
+
+.handoff__serif {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  /* the ink the index is actually set in, on its own black */
+  color: #ece9e2;
+  opacity: 0;
+  transition: opacity 0.4s ease 0.16s;
+}
+
+/* the ink swaps during the flight, not at either end of it */
+.handoff__line.is-serif .handoff__mono {
+  opacity: 0;
+}
+.handoff__line.is-serif .handoff__serif {
+  opacity: 1;
+}
+.handoff__line.is-mono .handoff__mono {
+  opacity: 1;
+}
+.handoff__line.is-mono .handoff__serif {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .handoff__typed {
+    animation: none;
+    width: 9ch;
+  }
+  .handoff__cursor {
+    animation: none;
+  }
+  .handoff__line,
+  .handoff__line.is-moving {
+    transition: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Clearing the glass
+
+   Owned here rather than in App.css: the handoff is what needs the screen
+   empty, so the rule that empties it lives with the handoff. Faded rather than
+   unmounted so the RAG section keeps its state and comes back intact if the
+   move is cancelled.
+   --------------------------------------------------------------------------- */
+.rag.is-handoff .a2-boot,
+.rag.is-handoff .a2-prompt,
+.rag.is-handoff .a2-ingest,
+.rag.is-handoff .a2-progress {
+  opacity: 0;
+  transition: opacity 0.24s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rag.is-handoff .a2-boot,
+  .rag.is-handoff .a2-prompt,
+  .rag.is-handoff .a2-ingest,
+  .rag.is-handoff .a2-progress {
+    transition: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Coming back up
+
+   The black is already over the page when the move starts, so it must appear
+   with no fade at all - `is-instant` kills the transition for exactly one
+   frame's worth of class juggling, then it is removed so the reveal can ease.
+   --------------------------------------------------------------------------- */
+.handoff.is-instant .handoff__black {
+  transition: none;
+}
+.handoff.is-back .handoff__black {
+  /* slower on the way back: this is a room coming up, not going out */
+  transition: opacity 0.55s cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+/* The new command waits with its cursor blinking before it is typed. */
+.handoff__cmd.is-pending .handoff__typed {
+  animation: none;
+  width: 0;
+}
+.handoff__cmd.is-pending .handoff__cursor {
+  opacity: 1;
+}
+
+
+
+/* On the way back the command line belongs to the machine again, so it must
+   NOT be hidden by the blackout rule that hides it on the way down. */
+.handoff.is-back.is-dark .handoff__cmd {
+  opacity: 0;
+}
+.handoff.is-back:not(.is-dark) .handoff__cmd {
+  opacity: 1;
+}
+
+/* The index lends its titles to the overlay for the trip back into the glass;
+   without this both would be on screen at once for the whole flight. */
+.wx.is-lifting .wx__title {
+  opacity: 0;
+}
+
+/* Coming back, the scrollback and the new prompt only appear once the room is
+   actually there to hold them. */
+.handoff__cmd.is-pending .handoff__typed { animation: none; width: 0; }
+.handoff.is-back .handoff__cmd { opacity: 0; transition: opacity 0.3s ease; }
+.handoff.is-back .handoff__cmd.is-in,
+.handoff.is-back .handoff__cmd.is-pending { opacity: 1; }
+.handoff.is-back.is-dark .handoff__cmd { opacity: 0; }
+
+/* Nothing is written on a glass that is not on screen yet. */
+.handoff__cmd.is-hidden { opacity: 0 !important; }
+
+/* Going down, the ink swaps early: the type is small and in the glass, so it
+   should already look like output before it starts growing. Going up it is the
+   mirror - it leaves the index full size and must still READ as the index for
+   most of the trip, turning to phosphor only as it reaches the screen. */
+.handoff.is-back .handoff__mono {
+  transition: opacity 0.34s ease 0.52s;
+}
+.handoff.is-back .handoff__serif {
+  transition: opacity 0.34s ease 0.46s;
+}
+
+/* ---------------------------------------------------------------------------
+   Going back, the type is IN the room
+
+   Down, the lines fly over the blackout - they have left the machine and are
+   on their way to being the page, so they belong on top of it.
+
+   Up is the opposite and the z-order has to be too. Once the room is dark the
+   session is inside a machine nobody can see, so the blackout is put ABOVE the
+   type: the lines dim out as the dark comes in, sit hidden while the page
+   moves, and are revealed with the machine rather than waiting on top of the
+   black for it to arrive. Painted over the blackout they showed up a good half
+   second before the room they are supposed to be sitting in.
+   --------------------------------------------------------------------------- */
+.handoff.is-back .handoff__black {
+  z-index: 3;
+}
+.handoff.is-back .handoff__line,
+.handoff.is-back .handoff__cmd {
+  z-index: 1;
+}

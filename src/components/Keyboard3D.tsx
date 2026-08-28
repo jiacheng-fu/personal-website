@@ -1,13 +1,14 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { Text3D } from "@react-three/drei";
+import { Text3D, Environment, Lightformer } from "@react-three/drei";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three-stdlib";
 import { LEGENDS } from "../data/legends";
+import { CAP_NOTES } from "../data/capNotes";
 import { studioMatcap } from "../data/matcap";
 import { useKeycapGeometry, capGeometry, HEIGHT_RATIO } from "../data/keycapGeometry";
 import { legendGeometry, legendExtrude, brandLogo } from "../data/legendGeometry";
-import { playPress, playRelease, playStageLight } from "../data/keySound";
+import { playPress, playRelease } from "../data/keySound";
 
 /* ---------------------------------------------------------------------------
    Layout
@@ -19,7 +20,17 @@ import { playPress, playRelease, playStageLight } from "../data/keySound";
    --------------------------------------------------------------------------- */
 
 type CapAction = "github" | "email" | "linkedin" | "source" | "wave";
-type Cap = { label: string; w: number; blank?: boolean; action?: CapAction };
+type Cap = {
+  label: string;
+  w: number;
+  blank?: boolean;
+  action?: CapAction;
+  /** The physical key that presses this cap, as a `KeyboardEvent.code`.
+   *  `code` is POSITIONAL, not the character produced, so a Dvorak or AZERTY
+   *  typist presses the key in the same place on their board and gets the same
+   *  cap here - which is the whole point of mirroring a QWERTY layout. */
+  code?: string;
+};
 
 /* Proportioned like a 60% board. The left column GROWS as it descends -
    1u number row, 1.5u tab, 1.75u caps, 2.25u shift - and the right column
@@ -35,26 +46,47 @@ type Cap = { label: string; w: number; blank?: boolean; action?: CapAction };
    on one of Brian's resumes or in this repo. */
 const ROW_W = 12;
 
-const row = (left: number, right: number, labels: string[]): Cap[] =>
+const row = (left: number, right: number, labels: string[], codes: string[]): Cap[] =>
   labels.map((label, i) => ({
     label,
     w: i === 0 ? left : i === labels.length - 1 ? right : 1,
+    code: codes[i],
   }));
 
 const ROWS: { caps: Cap[] }[] = [
   // number row: 1u through, wide "backspace" on the right
-  { caps: row(1, 2, ["C++", "C#", "Java", "Python", "TypeScript", "JavaScript", "Swift", "Haskell", "Bash", "SQL", "HTML"]) },
+  {
+    caps: row(1, 2,
+      ["C++", "C#", "Java", "Python", "TypeScript", "JavaScript", "Swift", "Haskell", "Bash", "SQL", "HTML"],
+      ["Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9", "Digit0", "Backspace"]),
+  },
   // tab row
-  { caps: row(1.5, 1.5, ["CSS", "React", "Next.js", "Vite", "Node", "npm", "Deno", "Vercel", "Three.js", "WebGL", "Unity"]) },
+  {
+    caps: row(1.5, 1.5,
+      ["CSS", "React", "Next.js", "Vite", "Node", "npm", "Deno", "Vercel", "Three.js", "WebGL", "Unity"],
+      ["Tab", "KeyQ", "KeyW", "KeyE", "KeyR", "KeyT", "KeyY", "KeyU", "KeyI", "KeyO", "KeyP"]),
+  },
   // caps row, ending on the wide "enter"
-  { caps: row(1.75, 2.25, ["FastAPI", "Poetry", "PyTorch", "OpenRouter", "PostgreSQL", "Supabase", "DynamoDB", "AWS Lambda", "API Gateway", "Docker"]) },
+  {
+    caps: row(1.75, 2.25,
+      ["FastAPI", "Poetry", "PyTorch", "OpenRouter", "PostgreSQL", "Supabase", "DynamoDB", "AWS Lambda", "API Gateway", "Docker"],
+      ["CapsLock", "KeyA", "KeyS", "KeyD", "KeyF", "KeyG", "KeyH", "KeyJ", "KeyK", "Enter"]),
+  },
   // shift row: the two widest caps on the board bracket it
-  { caps: row(2.25, 2.75, ["VHDL", "Linux", "Vim", "Git", "GitHub Actions", "Playwright", "LLVM", "SystemRDL", "SystemVerilog"]) },
+  {
+    caps: row(2.25, 2.75,
+      ["VHDL", "Linux", "Vim", "Git", "GitHub Actions", "Playwright", "LLVM", "SystemRDL", "SystemVerilog"],
+      ["ShiftLeft", "KeyZ", "KeyX", "KeyC", "KeyV", "KeyB", "KeyN", "KeyM", "ShiftRight"]),
+  },
   {
     caps: [
       { label: "GitHub", w: 1.5, action: "github" },
       { label: "Email", w: 1.5, action: "email" },
-      { label: "shipped, not read about", w: 6, blank: true, action: "wave" },
+      /* no legend: an empty label prints nothing and shows no caption, but the
+         cap still presses, still sounds, and still fires the wave */
+      /* TEMP (debug): `code: "Space"` lifted while the transition scrubber owns
+         the key. Restore it to bring the wave easter egg back. */
+      { label: "", w: 6, blank: true, action: "wave" },
       { label: "Source", w: 1.5, action: "source" },
       { label: "LinkedIn", w: 1.5, action: "linkedin" },
     ],
@@ -98,6 +130,29 @@ const FLAT_Q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0
 const FLAT_POS = new THREE.Vector3(0, -1.15, 1.0);
 const POSE_POS = new THREE.Vector3(0, 0.55, 0);
 
+/* ---------------------------------------------------------------------------
+   Hero pose (daylight)
+
+   The section pose stands the board almost upright inside a spotlight. The
+   hero is a different picture entirely: an object being PRESENTED, tilted on
+   a diagonal with its top face pitched toward the viewer so you read it as a
+   keyboard at a glance, lit like a product shot on a warm off-white page.
+
+   Less tip than the section (the face leans back rather than standing up),
+   about twenty degrees of roll for the diagonal, and a touch of yaw so one
+   long side edge shows and the thing has a thickness.
+   --------------------------------------------------------------------------- */
+const HERO_TIP = 1.12;
+const HERO_ROLL = -0.35;
+const HERO_YAW = -0.2;
+const HERO_LEAN = -0.12;
+const HERO_Q = new THREE.Quaternion()
+  .setFromAxisAngle(new THREE.Vector3(1, 0, 0), HERO_LEAN)
+  .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), HERO_YAW))
+  .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), HERO_ROLL))
+  .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), HERO_TIP));
+const HERO_POS = new THREE.Vector3(0, 0, 0);
+
 /* Everything the whole board shares per frame; Key legends read the lamp so
    the unlit logo materials cannot glow before the spotlight is on. */
 /* `ready` is false until the board has finished standing up. A stray mouse
@@ -124,13 +179,10 @@ const STRIKE = 0.2;
 const WAVE = { at: 0 };
 
 /** Someone who asked for less motion gets none of the parallax. */
-const STILL =
   typeof window !== "undefined" &&
   window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
 // scratch, so the parallax allocates nothing per frame
-const parQ = new THREE.Quaternion();
-const parE = new THREE.Euler();
 
 type Placed = Cap & { x: number; z: number; row: number; capW: number };
 
@@ -222,9 +274,40 @@ function legendPlane(cap: Cap) {
   return { w: capW * (LEGENDS[cap.label]?.img ? 0.94 : 0.78), d: (U - GAP) * 0.7 };
 }
 
+/* `?dpr=1` / `?dpr=1.75` / `?dpr=2` forces the render scale, so the board can
+   be A/B'd on a real Retina display without a rebuild. Unset = the normal
+   [1, 2] range. Debug aid; absent from normal URLs. */
+/* `?aniso=N` forces the anisotropic filter level on the keycap legend
+   textures. Debug aid: the board is seen at a steep oblique angle, which is
+   where this setting decides how sharp the logos read. */
+/* `?legend=N` sets the legend texture's short side. The marks are SVG PATHS
+   (24x24 viewBox) rasterised through Path2D, so the source art has no
+   resolution limit - whatever this is set to is the real ceiling on how crisp
+   a keycap logo can be. Debug knob for measuring where that ceiling bites. */
+const LEGEND_PX_OVERRIDE: number | null = (() => {
+  if (typeof location === "undefined") return null;
+  const v = new URLSearchParams(location.search).get("legend");
+  const n = v === null ? NaN : Number(v);
+  return Number.isFinite(n) && n >= 64 && n <= 2048 ? n : null;
+})();
+
+const ANISO_OVERRIDE: number | null = (() => {
+  if (typeof location === "undefined") return null;
+  const v = new URLSearchParams(location.search).get("aniso");
+  const n = v === null ? NaN : Number(v);
+  return Number.isFinite(n) && n >= 1 && n <= 16 ? n : null;
+})();
+
+const DPR_OVERRIDE: number | null = (() => {
+  if (typeof location === "undefined") return null;
+  const v = new URLSearchParams(location.search).get("dpr");
+  const n = v === null ? NaN : Number(v);
+  return Number.isFinite(n) && n > 0 && n <= 4 ? n : null;
+})();
+
 function legendTexture(cap: Cap): THREE.CanvasTexture | null {
   if (!cap.label) return null; // blank modifier caps carry nothing
-  const S = 256;
+  const S = LEGEND_PX_OVERRIDE ?? 256;
   // Canvas aspect matches the legend plane on this cap, so wide caps get
   // wide textures and nothing ever stretches.
   const plane = legendPlane(cap);
@@ -291,7 +374,7 @@ function legendTexture(cap: Cap): THREE.CanvasTexture | null {
 
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 8;
+  tex.anisotropy = ANISO_OVERRIDE ?? 8;
 
   if (L?.img) {
     /* The official Accellera marks are raster only, pre-flattened to white
@@ -568,18 +651,26 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
    board feels like moving a selection through a menu.
    --------------------------------------------------------------------------- */
 
-const CARD_LOGO_SIZE = 1.7;
+const CARD_LOGO_SIZE = 1.35; // icon + name stack ~ the height of a lockup
 const CARD_TEXT_SIZE = 0.82;
 const CARD_WORDMARK_W = 3.7; // wordmarks are sized by width, not height
+/* The other side of each box. Every mark is fitted into ITS box - the largest
+   scale at which it clears both limits - so a 5:1 lockup, a 2:1 lockup and a
+   square icon all land at roughly the same visual mass instead of the widest
+   one turning into a strip and the squarest one towering. */
+const CARD_WORDMARK_H = 1.9;
+const CARD_LOGO_W = 2.2;
 /** Deep slab, like the freestanding letters in the hero plan - not signage. */
 const CARD_TEXT_DEPTH = 0.3;
 /** The floor plane. The letters STAND on it rather than hovering over it. */
 const CARD_FLOOR_Y = -5.4;
 /** Below this a fill cannot be read against the studio floor. */
 const CARD_MIN_LUM = 0.07;
-/** Turned to face right. Negative would swing the face to the left, which is
- *  away from the board it belongs to. */
-const CARD_YAW = 0.3;
+/** Extra yaw ON TOP of facing the camera. Zero: the card is billboarded every
+ *  frame (see HoverCard) so the lockup reads flat-on from wherever the camera
+ *  has been solved to, instead of being turned off toward the right by a fixed
+ *  angle that only happened to look square at one viewport. */
+const CARD_YAW = 0;
 
 /** The card sits in an unlit corner, so a brand that is black - Vercel,
  *  Next.js, Deno, Three.js, GitHub - would be an invisible silhouette against
@@ -605,7 +696,7 @@ function cardTexture(label: string, onLoad?: () => void): CardTex | null {
     new THREE.TextureLoader().load(img, (loaded) => {
       entry!.tex.image = loaded.image;
       entry!.tex.colorSpace = THREE.SRGBColorSpace;
-      entry!.tex.anisotropy = 8;
+      entry!.tex.anisotropy = ANISO_OVERRIDE ?? 8;
       entry!.tex.needsUpdate = true;
       entry!.aspect = loaded.image.width / loaded.image.height;
       onLoad?.();
@@ -679,21 +770,32 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
   const cardW = card
     ? Math.min(CARD_LOGO_SIZE * card.aspect, CARD_WORDMARK_W)
     : CARD_LOGO_SIZE;
-  const logoScale = isWordmark ? CARD_WORDMARK_W : CARD_LOGO_SIZE;
 
-  /* Everything is stacked UP from the floor, so the group's origin can sit on
-     the ground plane: caption first, mark above it. A wordmark has no caption
-     under it, so it stands on the ground itself. */
-  const solidH = useMemo(() => {
+  /* Vector marks arrive normalised so their LONGEST side is 1, which is what
+     made the cards uneven: one scalar per kind put a 5:1 lockup 0.7 tall next
+     to a square icon 1.7 tall. Measure the real box and fit it instead. */
+  const logoBox = useMemo(() => {
     const geos = logo ? logo.map((p) => p.geo) : solid ? [solid] : [];
-    if (!geos.length) return 0;
+    if (!geos.length) return null;
     const box = new THREE.Box3();
     for (const g of geos) {
       g.computeBoundingBox();
       box.union(g.boundingBox!);
     }
-    return (box.max.y - box.min.y) * logoScale;
-  }, [logo, solid, logoScale]);
+    return { w: Math.max(box.max.x - box.min.x, 1e-6), h: Math.max(box.max.y - box.min.y, 1e-6) };
+  }, [logo, solid]);
+  const logoScale = logoBox
+    ? isWordmark
+      ? Math.min(CARD_WORDMARK_W / logoBox.w, CARD_WORDMARK_H / logoBox.h)
+      : Math.min(CARD_LOGO_W / logoBox.w, CARD_LOGO_SIZE / logoBox.h)
+    : isWordmark
+      ? CARD_WORDMARK_W
+      : CARD_LOGO_SIZE;
+
+  /* Everything is stacked UP from the floor, so the group's origin can sit on
+     the ground plane: caption first, mark above it. A wordmark has no caption
+     under it, so it stands on the ground itself. */
+  const solidH = logoBox ? logoBox.h * logoScale : 0;
   const logoH = card ? cardW / card.aspect : solidH;
   const capBase = isWordmark ? 0 : CARD_TEXT_SIZE + 0.42;
   const logoY = capBase + logoH / 2;
@@ -721,7 +823,7 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
      next does not flicker it off and on.
      `punch` is the only motion left, and it fires only when SWAPPING between
      keys - a small settle that reads as the selection changing. */
-  useFrame((_, dt) => {
+  useFrame((state, dt) => {
     const g = group.current;
     if (!g) return;
     open.current += ((label ? 1 : 0) - open.current) * (1 - Math.exp(-dt * 16));
@@ -732,7 +834,19 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
     g.visible = open.current > 0.02 && !STAGE.dark && STAGE.ready;
     g.scale.setScalar(1 + p * 0.12);
     g.position.set(offset.x, CARD_FLOOR_Y, offset.z);
-    g.rotation.y = CARD_YAW + p * 0.42;
+
+    /* Billboard, yaw only. The card stands off to the LEFT of the board while
+       the camera sits near the world axis, so a card with no yaw is seen from
+       its side and the lockup skews away to the right. Aiming it at the camera
+       each frame keeps it square to the lens.
+
+       Only Y is solved: rolling it to face the camera exactly would tip the
+       letters off the floor they are standing on, and the whole conceit is
+       that these are physical objects in the studio, not a HUD. The camera is
+       barely off the horizontal, so yaw alone reads as flat-on. */
+    const cam = state.camera.position;
+    const faceYaw = Math.atan2(cam.x - g.position.x, cam.z - g.position.z);
+    g.rotation.y = faceYaw + CARD_YAW + p * 0.42;
     g.rotation.x = p * -0.1;
   });
 
@@ -866,6 +980,8 @@ function Board({
   live = true,
   onLight,
   armed = true,
+  instant = false,
+  daylight = false,
 }: {
   onHover: (label: string | null) => void;
   /** True once this is the section on screen. Going true ARMS the sequence;
@@ -880,7 +996,18 @@ function Board({
    *  whole sequence so it plays again on the next visit rather than being a
    *  one-shot that leaves the board already standing. */
   armed?: boolean;
+  /** Arm straight into the finished state - lamp on, board standing - with
+   *  no blackout, no strike and no sound. Used when the visitor scrolls back
+   *  UP into the section: the intro is for arriving, not for returning. */
+  instant?: boolean;
+  /** Hero mode. The board is the hero object on a warm off-white page rather
+   *  than a prop in a black studio, so the whole theatre comes off: no
+   *  blackout, no lamp strike, no stand-up, no floor. It is simply lit and
+   *  posed from the first frame, in daylight, and stays interactive. */
+  daylight?: boolean;
 }) {
+  const instantRef = useRef(instant);
+  instantRef.current = instant;
   const { placed, width, depth } = useMemo(buildLayout, []);
   // leftmost cap edge: the ripple's origin for per-key stagger
   const originX = useMemo(() => Math.min(...placed.map((c) => c.x)), [placed]);
@@ -889,7 +1016,6 @@ function Board({
   const ambRef = useRef<THREE.AmbientLight>(null);
   const fillRef = useRef<THREE.DirectionalLight>(null);
   const rimRef = useRef<THREE.DirectionalLight>(null);
-  const par = useRef({ x: 0, y: 0 }); // smoothed pointer, for the parallax lean
   const startAt = useRef<number | null>(live ? null : -99); // null = waiting in the dark
   const litFired = useRef(!live);
 
@@ -897,6 +1023,8 @@ function Board({
   // dark here rather than in useFrame, because the render loop is parked
   // while the section is off-screen and would never run the reset.
   useEffect(() => {
+    // Nothing to rewind in daylight - there was no sequence to play.
+    if (daylight) return;
     if (armed || !live) return;
     startAt.current = null;
     litFired.current = false;
@@ -909,7 +1037,7 @@ function Board({
       g.quaternion.copy(FLAT_Q);
       g.position.copy(FLAT_POS);
     }
-  }, [armed, live, onLight]);
+  }, [armed, live, onLight, daylight]);
 
   /* Timeline (seconds from trigger, wall-clock so frame stalls cannot slow
      the choreography - a dropped frame skips ahead instead of dragging):
@@ -919,16 +1047,39 @@ function Board({
 
      It used ease-out cubic, whose velocity is at its MAXIMUM on frame one -
      the board snapped off the table from a dead stop. */
-  useFrame((state, dt) => {
+  useFrame((state) => {
     const g = boardGroup.current;
     if (!g) return;
 
     const now = state.clock.elapsedTime;
+
+    /* Daylight short-circuits the whole timeline. There is no room to darken
+       and no lamp to throw, so the stage is simply declared open on frame one
+       and the board sits in its pose. This runs BEFORE the `armed` bail-out:
+       the hero is the landing section and must be lit whether or not anything
+       has armed it, and STAGE is module-level shared state, so leaving lamp at
+       0 here would black out the legends. */
+    if (daylight) {
+      STAGE.lamp = 1;
+      STAGE.dark = false;
+      STAGE.ready = true;
+      g.quaternion.copy(HERO_Q);
+      g.position.copy(HERO_POS);
+      return;
+    }
+
     if (!armed) return; // rewound and off-screen; nothing to draw
 
     if (startAt.current === null && live) {
-      // armed, but the room stays dark for a while yet
-      startAt.current = now;
+      if (instantRef.current) {
+        // returning from below: already lit, already standing, no theatre
+        startAt.current = -99;
+        litFired.current = true;
+        onLight?.(true);
+      } else {
+        // armed, but the room stays dark for a while yet
+        startAt.current = now;
+      }
     }
     const t = startAt.current === null ? -1 : startAt.current === -99 ? 99 : now - startAt.current;
 
@@ -952,7 +1103,7 @@ function Board({
       if (!litFired.current) {
         litFired.current = true;
         onLight?.(true);
-        playStageLight();
+        // the strike used to click (playStageLight); Brian wants the lamp silent
       }
     }
     STAGE.dark = lamp < 0.04;
@@ -982,22 +1133,22 @@ function Board({
     g.quaternion.slerpQuaternions(FLAT_Q, FINAL_Q, u);
     g.position.lerpVectors(FLAT_POS, POSE_POS, u);
 
-    /* A few degrees of lean toward the pointer. premultiply, so it acts on
-       the finished pose in WORLD space - composed the other way it would go
-       through the board's own tumbled frame and read as a wobble instead of
-       parallax. Deliberately tiny: it should register as the board being a
-       real object in the room, not as an effect. */
-    if (!STILL) {
-      const k = 1 - Math.exp(-dt * 3.5); // slow follow, no snapping
-      par.current.x += (state.pointer.x - par.current.x) * k;
-      par.current.y += (state.pointer.y - par.current.y) * k;
-      parE.set(par.current.y * 0.045, par.current.x * 0.06, 0);
-      g.quaternion.premultiply(parQ.setFromEuler(parE));
-      g.position.x += par.current.x * 0.16;
-      g.position.y += par.current.y * 0.09;
-    }
+    /* No pointer parallax. The board used to lean a few degrees toward the
+       pointer; it read nicely but made the resting pose depend on where the
+       mouse was, and the section's transition clip has exactly one start
+       frame. Removed rather than frozen (Brian, 2026-08-26). */
   });
-  const [active, setActive] = useState<string | null>(null);
+  /* A STACK, not a single slot.
+     Two keys can be down at once - two fingers on the physical keyboard, or a
+     finger and the mouse pointer - and a lone `active` string cannot describe
+     that. It made releasing either key blank the board while the other was
+     still held.
+
+     Most-recently-pressed wins, and releasing it falls back to whatever is
+     still down rather than to nothing. Order matters, so this is an array and
+     not a Set. */
+  const [held, setHeld] = useState<string[]>([]);
+  const active = held.length ? held[held.length - 1] : null;
 
   // Text legends need the webfont, which is very likely still loading on first
   // paint. Rebuild once it lands so those five keys are not drawn in fallback
@@ -1026,25 +1177,38 @@ function Board({
   );
   useEffect(() => () => caseGeo.dispose(), [caseGeo]);
 
-  const enter = useCallback(
-    (label: string) => {
-      setActive(label);
-      onHover(label);
-    },
-    [onHover]
-  );
-  const leave = useCallback(
-    (label: string) => {
-      setActive((cur) => (cur === label ? null : cur));
-      onHover(null);
-    },
-    [onHover]
-  );
+  /* Re-entering a label already held moves it to the top rather than adding a
+     duplicate: hovering a key you are already holding down should not need two
+     releases to clear. */
+  const enter = useCallback((label: string) => {
+    setHeld((h) => (h[h.length - 1] === label ? h : [...h.filter((x) => x !== label), label]));
+  }, []);
 
-  const clear = useCallback(() => {
-    setActive(null);
-    onHover(null);
-  }, [onHover]);
+  const leave = useCallback((label: string) => {
+    setHeld((h) => (h.includes(label) ? h.filter((x) => x !== label) : h));
+  }, []);
+
+  const clear = useCallback(() => setHeld([]), []);
+
+  /* One place tells the parent what is selected, derived from the stack.
+     Reporting it from inside enter/leave is what caused the original bug: a
+     release fired `onHover(null)` unconditionally, wiping the caption even
+     when another key was still down. */
+  useEffect(() => {
+    onHover(active);
+  }, [active, onHover]);
+
+  /* A key held while the tab loses focus never delivers its keyup, so it would
+     stay down forever - visibly stuck, and blocking the fallback. Same when the
+     section is left mid-press. Drop everything on the way out. */
+  useEffect(() => {
+    const drop = () => setHeld([]);
+    window.addEventListener("blur", drop);
+    return () => {
+      window.removeEventListener("blur", drop);
+      drop();
+    };
+  }, [armed]);
 
   const runAction = useCallback((a: CapAction) => {
     switch (a) {
@@ -1066,6 +1230,90 @@ function Board({
     }
   }, []);
 
+  /* ---------------------------------------------------------------------
+     Physical keyboard
+
+     The board mirrors an ANSI layout, so the obvious thing is to let the real
+     one drive it: press D and the cap sitting in D's position goes down. Keyed
+     on `KeyboardEvent.code`, so it is the PHYSICAL position that matches, not
+     the character - the point is the shape of the board, not the alphabet.
+     --------------------------------------------------------------------- */
+  const byCode = useMemo(() => {
+    const m = new Map<string, Placed>();
+    for (const cap of placed) if (cap.code) m.set(cap.code, cap);
+    return m;
+  }, [placed]);
+
+  useEffect(() => {
+    // Only while this is the section on screen. Otherwise typing anywhere else
+    // on the page would be quietly driving a board nobody is looking at.
+    if (!armed) return;
+
+    /* Enter and Space ACTIVATE whatever holds focus, and after clicking a
+       progress dot that is still the dot - so a Space meant for the board
+       would have jumped the section instead. Links and buttons are treated as
+       off-limits for the same reason fields are. */
+    const busyElsewhere = () => {
+      const el = document.activeElement as HTMLElement | null;
+      return (
+        !!el &&
+        (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(el.tagName))
+      );
+    };
+
+    const down = (e: KeyboardEvent) => {
+      // Auto-repeat would re-trigger the press sound many times a second.
+      if (e.repeat || busyElsewhere()) return;
+      /* Never answer a shortcut. Cmd+R, Ctrl+C and friends must pass straight
+         through - lighting up "Git" because someone copied something would be
+         a bug, not an easter egg. */
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      const cap = byCode.get(e.code);
+      if (!cap) return;
+
+      /* useSectionNav also listens on window, and it reads Space as "next
+         section". Both listeners sit on the same node, so preventDefault is
+         not enough and registration order would decide the winner. This one
+         runs in the CAPTURE phase and stops the event dead, so while the board
+         is the thing on screen the spacebar belongs to the board.
+
+         Only keys the board actually claims are stopped. Arrows, PageUp and
+         PageDown are untouched and still move between sections. */
+      e.preventDefault();
+      e.stopImmediatePropagation();
+
+      if (cap.action === "wave") {
+        playPress();
+        runAction("wave");
+        return;
+      }
+
+      playPress();
+      enter(cap.label);
+
+      /* CapsLock reports a keydown when the light goes ON and the matching
+         keyup only when it goes OFF again, so waiting for the release would
+         leave this cap stuck down until the user toggled it back. Let it up on
+         its own. */
+      if (e.code === "CapsLock") window.setTimeout(() => leave(cap.label), 260);
+    };
+
+    const up = (e: KeyboardEvent) => {
+      const cap = byCode.get(e.code);
+      if (!cap || e.code === "CapsLock") return;
+      playRelease();
+      if (cap.action !== "wave") leave(cap.label);
+    };
+
+    window.addEventListener("keydown", down, true);
+    window.addEventListener("keyup", up, true);
+    return () => {
+      window.removeEventListener("keydown", down, true);
+      window.removeEventListener("keyup", up, true);
+    };
+  }, [armed, byCode, enter, leave, runAction]);
+
   const activeCap = active ? placed.find((p) => p.label === active) : null;
   /* Sits off the board's lower-left corner, derived from the board size so it
      stays put if the layout changes. The board is posed on its corner, so
@@ -1084,7 +1332,37 @@ function Board({
 
       <HoverCard label={activeCap && !activeCap.blank ? activeCap.label : null} offset={cardAt} />
 
+      {/* ------------------------------ daylight ------------------------------
+          A product-shot rig for the hero: broad soft key from the upper left
+          (matching where the light falls on the photographed hand), a gentle
+          front fill so the legends stay readable, and a procedural
+          environment for the reflections.
+
+          The environment is built from Lightformers rather than an HDR preset
+          on purpose - drei's presets fetch from a third-party CDN at runtime,
+          and a black anodised case with NO environment reads as flat grey
+          plastic. This gives it something to reflect without a network call
+          or an external dependency in the critical path. */}
+      {daylight && (
+        <>
+          <ambientLight intensity={1.15} color="#fbf8f2" />
+          <directionalLight position={[-5, 8, 7]} intensity={2.1} color="#fffaf2" />
+          <directionalLight position={[6, 2, 6]} intensity={0.55} color="#eef1f6" />
+          <Environment resolution={192}>
+            {/* the big soft source overhead, standing in for a window */}
+            <Lightformer intensity={2.4} form="rect" scale={[14, 8, 1]} position={[-4, 9, 6]} target={[0, 0, 0]} color="#ffffff" />
+            {/* a low bounce, so the underside of the case is not dead black */}
+            <Lightformer intensity={0.7} form="rect" scale={[12, 6, 1]} position={[3, -6, 5]} target={[0, 0, 0]} color="#f3f1ed" />
+            {/* a narrow strip to draw a highlight down one edge and give the
+                anodising somewhere to catch */}
+            <Lightformer intensity={1.5} form="rect" scale={[1.4, 9, 1]} position={[7, 3, 2]} target={[0, 0, 0]} color="#ffffff" />
+          </Environment>
+        </>
+      )}
+
       {/* the studio rig: everything starts dark and the sequence ramps it */}
+      {!daylight && (
+      <>
       <ambientLight ref={ambRef} intensity={0} color="#dfe3ea" />
       {/* Further from the board and swung toward the camera. Inverse-square
           falloff is much flatter when the lamp is far relative to the object,
@@ -1111,6 +1389,8 @@ function Board({
         <planeGeometry args={[80, 80]} />
         <meshStandardMaterial color="#121214" roughness={0.95} metalness={0.04} />
       </mesh>
+      </>
+      )}
 
       <group ref={boardGroup} quaternion={FINAL_Q} position={[0, 0.55, 0]} onPointerMissed={clear}>
         <mesh geometry={caseGeo} position={[0, -0.34, 0]} castShadow>
@@ -1149,22 +1429,58 @@ function Board({
 export default function Keyboard3D({
   paused = false,
   active = true,
+  instant = false,
+  daylight = false,
   onLight,
 }: {
   paused?: boolean;
   active?: boolean;
+  /** open on the finished state instead of playing the intro */
+  instant?: boolean;
+  /** Hero mode: daylight on a warm page, no studio theatre. See Board. */
+  daylight?: boolean;
   onLight?: (on: boolean) => void;
 }) {
   const [label, setLabel] = useState<string | null>(null);
 
   return (
-    <div className="kb">
+    <div className={`kb ${daylight ? "kb--daylight" : ""}`}>
       <Canvas
         className="kb__canvas"
         shadows
-        dpr={[1, 1.75]}
+        /* Was capped at 1.75. On a Retina panel that renders ~14% fewer
+           pixels per axis than the display can show (measured: a 3241x1823
+           buffer where the screen could take 3705x2084), which is why the
+           keycaps and their logos read soft. The cap is a RANGE, so weak
+           GPUs still fall back down it; there is no cost on machines that
+           cannot afford it. */
+        /* Render at the display's own pixel density. 1.75 meant a Retina
+           panel was fed 87.5% of the pixels it can show and upscaled the
+           rest, which is what made the keycap logos read soft.
+
+           Measured at 1800x1013 DPR 2, logo edge energy (higher = crisper):
+               1.75  16.36     <- was
+               2.00  20.05     <- now, +22.5%
+               2.50  21.00
+               3.00  23.19     (+41.7%, but 16.4 MP of buffer)
+
+           Stopping at the display's own density: past that is supersampling,
+           which keeps gaining but costs battery and heat on a laptop for a
+           board that is already at native resolution. `?dpr=` overrides it
+           if that is ever worth revisiting.
+
+           NOT the bottleneck, measured and ruled out: the legend textures
+           (256 vs 512 vs 1024 px changed nothing - the marks are SVG paths,
+           already oversampled), and anisotropic filtering (8 vs 1: -0.1%). */
+        dpr={DPR_OVERRIDE ?? [1, 2]}
         frameloop={paused ? "never" : "always"}
-        camera={{ position: [0, 5.5, 6.7], fov: 26 }}
+        /* The hero looks at the board almost square-on from further back: it
+           is a product being presented to the reader, not an object found on
+           a table by a lamp, and the section's raked overhead view reads as
+           the latter. The longer lens also keeps the case edges near-parallel,
+           which is what makes it sit against Swiss type instead of fighting
+           it with a wide-angle flare. */
+        camera={daylight ? { position: [0, 1.2, 11.5], fov: 22 } : { position: [0, 5.5, 6.7], fov: 26 }}
         gl={{ alpha: true, antialias: true }}
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
@@ -1178,12 +1494,31 @@ export default function Keyboard3D({
             light cone are painted by the section CSS behind this transparent
             canvas; the scene contributes the lit board, floor pool, shadow.
             Lights live inside Board so the switch-on sequence can drive them. */}
-        <Board onHover={setLabel} live={active} onLight={onLight} armed={active && !paused} />
+        <Board
+          onHover={setLabel}
+          live={active}
+          onLight={onLight}
+          armed={active && !paused}
+          instant={instant}
+          daylight={daylight}
+        />
       </Canvas>
 
+      {/* In the hero the hovered key is reported by the spec column, which is
+          already the page's place for technical readout - a second caption
+          floating under the board would be the same information twice. */}
+      {!daylight && (
       <p className="kb__caption" aria-live="polite">
-        {label ?? "Hover a key."}
+        {label ? (
+          <>
+            <b>{label}</b>
+            <span>{CAP_NOTES[label]}</span>
+          </>
+        ) : (
+          "Hover a key."
+        )}
       </p>
+      )}
 
     </div>
   );

@@ -1,0 +1,96 @@
+{
+  "generated_from": "resume/Brian_Fu_Resume_Updated.html",
+  "chunks": [
+    {
+      "id": 0,
+      "section": "About",
+      "title": "Contact & basics",
+      "dates": "",
+      "text": "Jiacheng (Brian) Fu Austin, TX Permanent U.S. Resident brian.fu123321@gmail.com linkedin.com/in/jiachengfu github.com/jiacheng-fu Brian goes by Brian; his legal first name is Jiacheng. Brian lives in Austin, Texas. Contact him or reach him by email at brian.fu123321@gmail.com. He studies Computer Science at Texas A&M University and graduates in December 2027."
+    },
+    {
+      "id": 1,
+      "section": "Overview",
+      "title": "Career at a glance",
+      "dates": "",
+      "text": "Overview of Brian's experience and background. Companies and employers Brian has worked at: ThingsX and United Micro Technology. Jobs and internships Brian has worked: ThingsX as Application Security Engineer / Full-Stack Engineer (Jun 2026 - Present); United Micro Technology as LLVM Compiler Intern (May 2025 - Aug 2025); United Micro Technology as Software Engineering Intern (Jun 2024 - Aug 2024). Projects Brian has built: Axle (Jan 2026 - Present), Wild West Party Game (Sep 2024), Project Horizon (Aug 2023 - Present). Education: Texas A&M University, Bachelor of Science in Computer Science, Minor in Mathematics (GPA: 3.87/4.00) (Expected Dec 2027)."
+    },
+    {
+      "id": 2,
+      "section": "Education",
+      "title": "Texas A&M University - College Station, TX",
+      "dates": "Expected Dec 2027",
+      "text": "Brian studies at Texas A&M University (Expected Dec 2027). Texas A&M University - College Station, TX. Bachelor of Science in Computer Science, Minor in Mathematics (GPA: 3.87/4.00) Relevant Coursework: Data Structures & Algorithms, Design & Analysis of Algorithms, Object-Oriented Design, Programming Languages, Computer Organization, Discrete Structures (In Progress: Machine Learning, Computer Systems, Foundations of Software Engineering)"
+    },
+    {
+      "id": 3,
+      "section": "Experience",
+      "title": "ThingsX (Part-Time Contract)",
+      "dates": "Jun 2026 - Present",
+      "text": "Brian worked at ThingsX as Application Security Engineer / Full-Stack Engineer (Jun 2026 - Present). ThingsX (Part-Time Contract). Application Security Engineer / Full-Stack Engineer Own features end to end on a production multi-tenant B2B SaaS platform (TypeScript, Deno, PostgreSQL, React, REST APIs), from schema migration through the API layer to the operator-facing UI. Deliver frontend and UX work across the dashboard and reporting console: sortable data tables, chart rendering and label-overlap fixes, report filter behavior, account status displays, and role/session state handling. Remediated 50+ production vulnerabilities across access-control, injection, and race-condition classes, including a cross-tenant authorization gap fixed by moving privileged-function authorization server-side onto session auth, proved by reproducing the exploit in reverse and regression-tested so the entire bug class fails the build. Built a 13-stage, one-command CI/CD pipeline enforced by a pre-push git hook (typecheck, builds, unit tests, negative Row-Level Security probes, data-integrity invariants), and eliminated a job-queue data-loss bug with exactly-once TOCTOU guards, verified under 20-way parallel load."
+    },
+    {
+      "id": 4,
+      "section": "Experience",
+      "title": "United Micro Technology",
+      "dates": "May 2025 - Aug 2025",
+      "text": "Brian worked at United Micro Technology as LLVM Compiler Intern (May 2025 - Aug 2025). United Micro Technology. LLVM Compiler Intern Implemented instruction selection rules, register allocation paths, and lowering strategies in the LLVM C++ backend, and assessed vector instruction extensions for NPU-integrated workloads. Enabled accurate early-stage architectural modeling by translating ISA specifications into processor description files. Delivered the technical report on backend design tradeoffs steering future vDSP ASIP compiler work."
+    },
+    {
+      "id": 5,
+      "section": "Experience",
+      "title": "United Micro Technology",
+      "dates": "Jun 2024 - Aug 2024",
+      "text": "Brian worked at United Micro Technology as Software Engineering Intern (Jun 2024 - Aug 2024). United Micro Technology. Software Engineering Intern Built a Python ingestion system that normalized third-party vendor register descriptions into the company's internal SystemRDL representation, cutting the effort to onboard externally acquired IP by an estimated 60-70%. Extended the open-source SystemRDL toolchain with custom Jinja2-templated exporters emitting synthesizable RTL, C headers, and documentation directly in the company's internal file structure, and embedded the CLI in the production chip design flow. Packaged the tool with Poetry for reproducible installs and shipped it to 200+ engineers who used it daily for register development, verification prep, and documentation."
+    },
+    {
+      "id": 6,
+      "section": "Projects",
+      "title": "Axle - Personal Project",
+      "dates": "Jan 2026 - Present",
+      "text": "Brian built Axle (Jan 2026 - Present). Axle - Personal Project. Creator and Full-Stack Developer (React, TypeScript, Python, FastAPI, PostgreSQL, AWS, REST APIs) Built and own an AI-powered used-car platform end to end as sole author: React/Vite frontend, FastAPI backend, PostgreSQL, and auth, from TAMUhack prototype to deployed product (d1j3m9qdbgs5ik.cloudfront.net). Converted free-form user input into validated structured JSON via an LLM pipeline (OpenRouter) with schema sanitization, a 40-entry feature-alias map, fuzzy matching, and two-tier model routing with automatic failover. Designed a 10-level progressive constraint-relaxation algorithm over a weighted scoring engine so the system returns ranked, relevant matches even when no listing satisfies every criterion. Held API usage within a 1,000-call/month free tier via multi-tier caching across memory, disk, and AWS DynamoDB (NoSQL, TTL-expiring), deployed serverless on AWS Lambda and API Gateway with a CloudFront/S3 frontend."
+    },
+    {
+      "id": 7,
+      "section": "Projects",
+      "title": "Wild West Party Game - HowdyHack 2024",
+      "dates": "Sep 2024",
+      "text": "Brian built Wild West Party Game (Sep 2024). Wild West Party Game - HowdyHack 2024. Frontend Developer (Next.js, TypeScript, React) Shipped the frontend for a live multiplayer party game in 24 hours: inter-scene mechanics, transitions, and UI for a functional live-service prototype with real-time connectivity across distinct client states."
+    },
+    {
+      "id": 8,
+      "section": "Projects",
+      "title": "Project Horizon - Personal Project",
+      "dates": "Aug 2023 - Present",
+      "text": "Brian built Project Horizon (Aug 2023 - Present). Project Horizon - Personal Project. Independent Developer (C#, Unity Engine) Built a narrative exploration game solo in C#/Unity, owning the full development cycle: a branching storyline system with multiple outcomes, core mechanics, state management, player progression, and UX."
+    },
+    {
+      "id": 9,
+      "section": "Skills",
+      "title": "Languages",
+      "dates": "",
+      "text": "Languages skills Brian knows: C++, Java, Python, TypeScript, JavaScript, C#, SQL (PostgreSQL, PL/pgSQL), Bash, Haskell, HTML, CSS"
+    },
+    {
+      "id": 10,
+      "section": "Skills",
+      "title": "Full-Stack",
+      "dates": "",
+      "text": "Full-Stack skills Brian knows: React, Next.js, Vite, Node.js, Deno, FastAPI, REST API design, PostgreSQL schema design and migrations, authentication and authorization, caching, responsive UI"
+    },
+    {
+      "id": 11,
+      "section": "Skills",
+      "title": "Systems & Infrastructure",
+      "dates": "",
+      "text": "Systems & Infrastructure skills Brian knows: Git, GitHub Actions, CI/CD, Docker, concurrency and TOCTOU testing, distributed job queues, LLVM compiler backends, SystemRDL/RTL code generation, LLM integration, Unity"
+    },
+    {
+      "id": 12,
+      "section": "Skills",
+      "title": "Cloud & Security",
+      "dates": "",
+      "text": "Cloud & Security skills Brian knows: AWS (Lambda, API Gateway, DynamoDB, IAM), Supabase (PostgREST, Auth), Vercel, Row-Level Security, threat modeling, OWASP vulnerability classes, exploit-regression validation"
+    }
+  ]
+}

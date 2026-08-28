@@ -30,10 +30,25 @@ A custom WebGL fragment shader paints a flowing, iridescent field that warps tow
 
 ```bash
 npm install
-npm run dev      # start the dev server
+npm run dev      # start the dev server on :5173 and open the tab in Chrome
+npm run stop     # stop it and close that tab again
+npm run restart  # same as dev
 npm run build    # typecheck + production build
 npm run preview  # preview the production build
+npm run dev:vite # bare `vite`, no launcher
 ```
+
+`npm run dev` goes through `dev.cjs`, which frees port 5173 before starting and
+passes `--strictPort`. Plain `vite` does not fail when a dev server from an
+earlier session is still running - it prints "Port 5173 is in use, trying
+another one" and moves to 5174, so the URL changes between sessions and an open
+tab quietly points at a server that no longer exists. (One had been running here
+for over a day.) The launcher only ever kills a process whose command line is
+THIS project's vite; anything else holding the port is reported and left alone.
+
+Add `-- --no-open` / `-- --no-close`, or set `DEV_OPEN=0`, to leave the browser
+alone. Tab handling is macOS + Chrome; elsewhere opening falls back to the
+default browser and closing is skipped.
 
 ## Customize
 

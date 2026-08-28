@@ -29,11 +29,14 @@ function webglAvailable() {
 export default function KeyboardSection({
   skills,
   active = false,
+  skipIntro = false,
   onLight,
 }: {
   skills: string[];
   /** True while this is the section on screen; drives the reveal + rewind. */
   active?: boolean;
+  /** Skip the intro and open on the lit, posed board (entered from below). */
+  skipIntro?: boolean;
   onLight?: (on: boolean) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -90,7 +93,12 @@ export default function KeyboardSection({
         {load ? (
           <ErrorBoundary onError={() => setFailed(true)}>
             <Suspense fallback={<KeyboardSkeleton />}>
-              <Keyboard3D paused={!visible || !active} active={active && !reduce} onLight={onLight} />
+              <Keyboard3D
+                paused={!visible || !active}
+                active={active && !reduce}
+                instant={skipIntro}
+                onLight={onLight}
+              />
             </Suspense>
           </ErrorBoundary>
         ) : (

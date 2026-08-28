@@ -28,3 +28,16 @@ Thumbs.db
 .vscode/
 .idea/
 .vercel
+
+# Resume source. Personal contact details - never commit to a public repo.
+# The RAG corpus is generated FROM these at build time (scripts/gen-corpus.cjs).
+resume/
+
+# Tool and scratch artefacts, not part of the site
+.playwright-mcp/
+repro-*.png
+
+# Parked work: superseded generations and 4K masters, kept locally per the
+# "park, never delete" rule. ~160 MB of draft video that the built site never
+# loads - see media/README before deciding to track any of it.
+media/

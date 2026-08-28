@@ -4,7 +4,11 @@
 }
 
 .shell {
-  width: min(1560px, 92vw);
+  /* Cap scales with the display instead of stopping dead at 1560px, which
+     left ~500px of empty gutter each side on a 2560px monitor. The ceiling
+     still exists so ultrawides do not stretch layout past a usable measure;
+     prose blocks keep their own ch-based caps regardless. */
+  width: min(2200px, 92vw);
   margin: 0 auto;
 }
 
@@ -74,6 +78,7 @@
 /* ---------- hero ---------- */
 .hero {
   min-height: 100svh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -884,6 +889,21 @@
   aspect-ratio: auto;
   max-height: none;
 }
+/* The transition clip is 16:9 and shown with object-fit: cover. Rendering
+   the board on a 16:9 surface that covers the viewport - instead of the
+   viewport's own aspect - makes the camera's framing identical to the clip's
+   at any window size, so the cut into the clip is pixel-exact. Desktop
+   only; phones keep the fitted board (no clip there anyway). */
+@media (min-width: 720px) {
+  .panel--void .kb {
+    inset: auto;
+    left: 50%;
+    top: 50%;
+    width: max(var(--frame-w, 100vw), calc(var(--frame-h, 100dvh) * 16 / 9));
+    height: max(var(--frame-h, 100dvh), calc(var(--frame-w, 100vw) * 9 / 16));
+    transform: translate(-50%, -50%);
+  }
+}
 .panel--void .kb-host {
   margin-top: 0;
 }
@@ -900,10 +920,17 @@
   z-index: 2;
   margin: 0;
 }
+/* Top-right, opposite the logo card at bottom-left: with the tilted board
+   between them the three read as a % sign. */
 .panel--void .kb__caption {
   left: auto;
-  right: min(5vw, 3rem);
-  bottom: 6vh;
+  /* + the cover surface's overhang, or this measures from an edge that is
+     off-screen (see --frame-overhang-x in lib/transitions.ts) */
+  right: calc(min(5vw, 3rem) + var(--frame-overhang-x, 0px));
+  top: 14vh;
+  bottom: auto;
+  z-index: 3;
+  text-align: right;
 }
 
 /* the sound toggle, sitting just under the caption */
@@ -962,7 +989,14 @@
 
 .panel {
   position: relative;
+  /* svh is the SMALL viewport height - the viewport as it is when browser UI
+     is showing. In fullscreen there IS no browser UI, and svh can stay at the
+     smaller value, so every panel ends up short and the page stops before the
+     bottom of the screen - showing the light body background (--bg #f3f1ed)
+     as a pale band. dvh tracks the viewport that is actually there. svh is
+     kept first as the fallback for browsers without dvh. */
   height: 100svh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -1009,6 +1043,7 @@ html {
   .panel {
     height: auto;
     min-height: 100svh;
+    min-height: 100dvh;
     padding-block: 4rem;
   }
 }
@@ -1478,4 +1513,1002 @@ html {
 @keyframes cue-pulse {
   0%, 100% { transform: scaleY(1); opacity: 1; }
   50%      { transform: scaleY(0.4); opacity: 0.4; }
+}
+
+/* ---------------------------------------------------------------------------
+   RAG section - performed on a 3D Apple ][-style machine
+
+   The machine is three.js (Apple2Scene.tsx); what lives here is the glass.
+   .a2-crt is a fixed 620x470 DOM surface projected onto the 3D monitor face
+   by drei's <Html transform> - fixed pixels because the projection supplies
+   the scale. The same surface renders flat (.a2-flat) when WebGL is absent.
+   --------------------------------------------------------------------------- */
+.rag {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-block: clamp(0.5rem, 2vh, 1.5rem);
+}
+.rag .section__label {
+  align-self: flex-start;
+  margin-bottom: clamp(0.7rem, 1.8vh, 1.4rem);
+}
+.rag__foot {
+  margin-top: clamp(0.6rem, 1.6vh, 1.2rem);
+  text-align: center;
+  max-width: 90ch;
+}
+
+/* ---- scene host: the illustrated stage ---- */
+.rag__scene {
+  position: relative;
+  width: 100%;
+  height: min(74vh, 860px);
+}
+.a2m {
+  position: absolute;
+  inset: 0;
+  /* the machine is placed to match the clip, which may run past this box */
+  overflow: visible;
+}
+/* One transform fits the whole machine to the stage. */
+.a2m__stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  transition: transform 0.9s var(--ease-out);
+  will-change: transform;
+}
+.a2m__svg {
+  display: block;
+}
+/* the live terminal, placed on the drawn monitor face */
+.a2m__screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 600px;
+  height: 400px;
+  transform-origin: 0 0;
+}
+.a2m__led {
+  fill: #4a4335;
+}
+.a2m__led--on {
+  fill: #4ddf72;
+  filter: drop-shadow(0 0 5px rgba(77, 223, 114, 0.9));
+}
+.a2m__led--busy {
+  fill: #e0a33c;
+  filter: drop-shadow(0 0 5px rgba(224, 163, 60, 0.9));
+  animation: rag-blink 1s ease-in-out infinite;
+}
+
+/* ---- the glass ---- */
+.a2-crt {
+  --ph: #6cff8e; /* phosphor */
+  --ph-dim: rgba(108, 255, 142, 0.55);
+  --ph-faint: rgba(108, 255, 142, 0.22);
+  --crt: #061007;
+  position: relative;
+  overflow: hidden;
+  width: 600px;
+  height: 400px;
+  background: radial-gradient(120% 100% at 50% 45%, #0b1c0d 0%, var(--crt) 78%);
+  border-radius: 12px;
+  padding: 0.95rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  font-family: "VT323", var(--font-mono);
+  font-size: 1.18rem;
+  line-height: 1.32;
+  color: var(--ph);
+  text-shadow: 0 0 6px var(--ph-faint), 0 0 1px var(--ph);
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.75);
+  cursor: none;
+}
+.a2-crt.is-powered {
+  animation: a2-flicker 4.6s infinite;
+}
+@keyframes a2-flicker {
+  0%, 100% { opacity: 1; }
+  97% { opacity: 1; }
+  98% { opacity: 0.93; }
+}
+
+/* glass overlays */
+.a2-crt__scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.28) 0px,
+    rgba(0, 0, 0, 0.28) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  mix-blend-mode: multiply;
+}
+.a2-crt__vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(105% 90% at 50% 50%, transparent 62%, rgba(0, 0, 0, 0.5));
+  border-radius: inherit;
+}
+
+@keyframes rag-blink {
+  50% { opacity: 0.25; }
+}
+
+/* ---- on-screen: boot ---- */
+.a2-boot__title {
+  letter-spacing: 0.08em;
+  font-size: 1.25em;
+}
+.a2-boot__sub {
+  color: var(--ph-dim);
+  margin-bottom: 0.8em;
+}
+.a2-boot__line {
+  margin-top: 0.15em;
+}
+.a2-boot__line--dim {
+  color: var(--ph-dim);
+}
+.a2-boot__line b {
+  color: var(--ph);
+  font-weight: 400;
+}
+.a2-boot__menu {
+  list-style: none;
+  margin: 0.35em 0 0;
+  padding: 0;
+}
+.a2-boot__menu button {
+  font: inherit;
+  color: var(--ph);
+  text-shadow: inherit;
+  background: none;
+  border: 0;
+  padding: 0.05em 0;
+  cursor: none;
+  text-align: left;
+}
+.a2-boot__menu button span {
+  color: var(--ph-dim);
+}
+.a2-boot__menu button:hover {
+  background: var(--ph);
+  color: var(--crt);
+  text-shadow: none;
+}
+
+/* ---- on-screen: the performance ---- */
+.a2-perf {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+.a2-perf__query {
+  color: var(--ph-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.a2-perf__direction {
+  margin-top: 0.1em;
+}
+.a2-perf__terms {
+  color: var(--ph-dim);
+}
+.a2-perf__expanded {
+  opacity: 0.6;
+}
+.a2-ingest {
+  color: var(--ph);
+  font-size: 0.86em;
+  margin-top: auto;
+}
+.a2-ingest + .a2-prompt {
+  margin-top: 0.2em;
+}
+.a2-frag.is-visitor {
+  border-style: dashed;
+}
+
+.a2-frags {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  /* 1fr divides the field between however many fragments there are, which is
+     right for thirteen and unreadable by the time a visitor has fed in ten
+     notes of their own - every row a clipped sliver. A floor on the row
+     height keeps a fragment legible however many there are, and the field
+     scrolls past the fold instead of compressing into one. */
+  grid-auto-rows: minmax(2.1em, 1fr);
+  gap: 6px;
+  margin-top: 0.5em;
+  overflow-y: auto;
+}
+.a2-frag {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--ph-faint);
+  padding: 0.15em 0.4em;
+  font-size: 0.72em;
+  line-height: 1.25;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.4em;
+  min-height: 0;
+}
+.a2-frag.is-picked {
+  border-color: var(--ph);
+  box-shadow: 0 0 10px var(--ph-faint), inset 0 0 10px rgba(108, 255, 142, 0.08);
+}
+.a2-frag.is-dead {
+  opacity: 0.3;
+}
+.a2-frag__bar {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 2px;
+  background: var(--ph);
+  transform-origin: left;
+  transition: transform 0.8s var(--ease-out);
+}
+.a2-frag__title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--ph-dim);
+}
+.a2-frag.is-picked .a2-frag__title {
+  color: var(--ph);
+}
+.a2-frag__score {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+/* a visitor note's score carries a freshness prior the matched terms alone
+   don't explain, so the row says so */
+.a2-frag__fresh {
+  opacity: 0.7;
+  letter-spacing: 0.06em;
+}
+
+.a2-scanline {
+  position: absolute;
+  inset-inline: -2%;
+  top: 0;
+  height: 3px;
+  background: var(--ph);
+  box-shadow: 0 0 16px var(--ph);
+  opacity: 0.65;
+  z-index: 2;
+  animation: rag-scan 1.3s var(--ease-out) forwards;
+}
+@keyframes rag-scan {
+  from { top: 0; }
+  to { top: 100%; }
+}
+
+.a2-speech {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin-top: 0.4em;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ph-faint) transparent;
+}
+.a2-speech__text {
+  white-space: pre-wrap;
+  max-width: 58ch;
+}
+.a2-speech__text.is-quote {
+  color: var(--ph-dim);
+  font-size: 0.85em;
+}
+.a2-speech__source {
+  margin-top: 0.6em;
+  padding-top: 0.4em;
+  border-top: 1px dashed var(--ph-faint);
+  font-size: 0.8em;
+  color: var(--ph);
+}
+.a2-speech__stats {
+  margin-top: 0.5em;
+  color: var(--ph-dim);
+  font-size: 0.8em;
+}
+.a2-caret {
+  display: inline-block;
+  width: 0.55em;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--ph);
+  animation: rag-blink 0.85s steps(2) infinite;
+}
+.a2-briefing {
+  margin-top: 0.6em;
+  font-size: 0.78em;
+}
+.a2-briefing summary {
+  color: var(--ph-dim);
+  cursor: none;
+  width: fit-content;
+}
+.a2-briefing summary:hover {
+  color: var(--ph);
+}
+.a2-briefing pre {
+  margin-top: 0.4em;
+  max-height: 9em;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--ph-faint);
+  padding: 0.5em 0.6em;
+  font-family: inherit;
+  font-size: 0.95em;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ph-dim);
+}
+
+/* prompt + status lines pinned to the bottom of the glass */
+.a2-prompt {
+  margin-top: auto;
+  display: flex;
+  align-items: baseline;
+  gap: 0.45em;
+  padding-top: 0.4em;
+}
+.a2-prompt input {
+  flex: 1;
+  font: inherit;
+  color: var(--ph);
+  text-shadow: inherit;
+  background: none;
+  border: 0;
+  outline: none;
+  caret-color: var(--ph);
+  text-transform: uppercase;
+}
+.a2-prompt input::placeholder {
+  color: var(--ph-faint);
+}
+.a2-status {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1em;
+  padding-top: 0.25em;
+  border-top: 1px solid var(--ph-faint);
+  margin-top: 0.35em;
+  font-size: 0.72em;
+  color: var(--ph-dim);
+}
+.a2-status button {
+  font: inherit;
+  color: var(--ph);
+  background: none;
+  border: 0;
+  cursor: none;
+  text-shadow: inherit;
+  white-space: nowrap;
+}
+.a2-status button:hover {
+  background: var(--ph);
+  color: var(--crt);
+  text-shadow: none;
+}
+
+/* ---- small screens ---- */
+@media (max-height: 860px) {
+  .rag__scene {
+    height: min(74vh, 620px);
+  }
+}
+@media (max-width: 640px) {
+  .a2-frags {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ---- keycap caption: name on one line, a plain-words note under it ---- */
+.kb__caption b {
+  display: block;
+  font-weight: 700;
+  color: inherit;
+}
+.kb__caption span {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.8rem;
+  letter-spacing: 0;
+  text-transform: none;
+  max-width: 30ch;
+  opacity: 0.85;
+}
+/* While a key is active the note takes the idle prompt's place, under the
+   logo card. :has() lets the sibling prompt yield without any React wiring. */
+.panel--void.is-lit .field-section:has(.kb__caption b) .field-note {
+  opacity: 0;
+  transition-delay: 0s;
+}
+/* on the dark stage the note is the headline, not a footnote */
+.panel--void .kb__caption b {
+  font-size: 0.82rem;
+  letter-spacing: 0.22em;
+  color: var(--accent);
+}
+.panel--void .kb__caption span {
+  margin-top: 0.45rem;
+  margin-left: auto;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: clamp(1.5rem, 2.6vw, 2.4rem);
+  line-height: 1.15;
+  letter-spacing: -0.005em;
+  text-transform: none;
+  color: #ebe6da;
+  opacity: 1;
+  max-width: 20ch;
+  text-wrap: balance;
+}
+
+/* ---- the feed sheet: paper beside the machine ---- */
+.feed {
+  position: absolute;
+  left: 0;
+  top: 16%;
+  width: min(250px, 38vw);
+  padding: 0.9rem 1rem 0.8rem;
+  background: #fbf8f1;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  box-shadow: 0 14px 30px rgba(22, 21, 15, 0.14), 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+  z-index: 4;
+  font-family: var(--font-mono);
+}
+.feed__label {
+  font-size: 0.66rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 0.5rem;
+}
+.feed textarea {
+  width: 100%;
+  resize: none;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  line-height: 1.35;
+  color: var(--ink);
+  background: repeating-linear-gradient(transparent 0 calc(1.35em - 1px), var(--line) calc(1.35em - 1px) 1.35em);
+  border: 0;
+  outline: none;
+}
+.feed textarea::placeholder {
+  color: var(--ink-dim);
+  font-style: italic;
+}
+.feed__row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+.feed__hint {
+  font-size: 0.62rem;
+  line-height: 1.4;
+  color: var(--ink-dim);
+}
+.feed button {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  color: var(--bg);
+  background: var(--ink);
+  border: 0;
+  border-radius: 3px;
+  padding: 0.4rem 0.7rem;
+  cursor: none;
+  transition: background 0.3s var(--ease-out), opacity 0.3s;
+}
+.feed button:hover {
+  background: var(--accent);
+}
+.feed button:disabled {
+  opacity: 0.35;
+}
+@media (max-width: 720px) {
+  .feed {
+    display: none;
+  }
+}
+
+/* ---- clean-plate rendering for the transition clips (?frame=...) ---- */
+.rag.is-framing .section__label,
+.rag.is-framing .rag__foot {
+  visibility: hidden;
+}
+html:has(.rag.is-framing) .nav,
+html:has(.rag.is-framing) .dots,
+html:has(.rag.is-framing) .cursor {
+  visibility: hidden !important;
+}
+.rag.is-framing .a2m__stage {
+  transition: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Section-transition clips
+   --------------------------------------------------------------------------- */
+.transition {
+  position: fixed;
+  inset: 0;
+  z-index: 40; /* below the nav and dots, which persist through a clip */
+  /* transparent: if a first frame is ever late to decode, the live page
+     shows through instead of a black flash */
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+  /* a dissolve, not a cut: the clip's first frames equal the live page, so
+     the only thing that changes across this is sharpness */
+  transition: opacity 0.4s ease-out;
+}
+.transition.is-on {
+  opacity: 1;
+  pointer-events: auto;
+}
+.transition video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  /* the seam correction (TransitionPlayer) scales about the centre.
+     Deliberately NO will-change/backface-visibility: those force the video
+     onto its own composited layer for the clip's whole life, which changes
+     how it is rasterised against the live DOM underneath it - the last
+     thing wanted at a landing that has to match the page exactly. */
+  transform-origin: 50% 50%;
+}
+
+/* ---- the machine waking up after the clip ---- */
+/* chrome stays out until the glass is lit; the section's own label/footnote
+   and the feed sheet fade in with it */
+.rag.is-booting .section__label,
+.rag.is-booting .rag__foot,
+.rag.is-booting .feed {
+  opacity: 0;
+  transition: none;
+}
+/* nav and dots stay put through clips and boot; only section-local text
+   comes and goes (see .is-departing / .is-booting) */
+.a2-crt--off {
+  background: #050705;
+  animation: none;
+}
+.a2-crt--off > * {
+  visibility: hidden;
+}
+/* power-on: a bright line that blooms open into the full glass */
+.a2-crt--bloom {
+  animation: a2-bloom 0.7s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+@keyframes a2-bloom {
+  0% {
+    transform: scaleY(0.012);
+    filter: brightness(6);
+  }
+  35% {
+    transform: scaleY(1.02);
+    filter: brightness(1.8);
+  }
+  100% {
+    transform: scaleY(1);
+    filter: brightness(1);
+  }
+}
+/* the boot text: blank while the tube warms, then each line types in */
+.a2-boot--blank > * {
+  visibility: hidden;
+}
+.a2-boot--typing > * {
+  clip-path: inset(0 100% 0 0);
+  animation: a2-type 0.32s steps(24, end) forwards;
+}
+.a2-boot--typing > :nth-child(1) { animation-delay: 0s; }
+.a2-boot--typing > :nth-child(2) { animation-delay: 0.16s; }
+.a2-boot--typing > :nth-child(3) { animation-delay: 0.34s; }
+.a2-boot--typing > :nth-child(4) { animation-delay: 0.5s; }
+.a2-boot--typing > :nth-child(5) { animation-delay: 0.66s; }
+.a2-boot--typing > :nth-child(6) { animation-delay: 0.82s; animation-duration: 0.5s; }
+@keyframes a2-type {
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* clean plate of the keyboard section (?frame=kb): the neutral pose, no chrome */
+/* kb-ui: hide ONLY the furniture that floats above the transition overlay,
+   so the plate keeps the section copy the wipe is supposed to erase. */
+html.is-framing-kb-ui .nav,
+html.is-framing-kb-ui .dots,
+html.is-framing-kb-ui .cursor {
+  visibility: hidden !important;
+}
+
+html.is-framing-kb .nav,
+html.is-framing-kb .dots,
+html.is-framing-kb .cursor,
+html.is-framing-kb .kb__caption,
+html.is-framing-kb .field-note,
+html.is-framing-kb .section__label,
+html.is-framing-kb .kb__sound {
+  visibility: hidden !important;
+}
+
+/* ---- boot: the short progress bar on the blank glass ---- */
+.a2-progress {
+  position: absolute;
+  left: 1.2rem;
+  right: 1.2rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: "VT323", var(--font-mono);
+  color: var(--ph);
+  text-shadow: 0 0 6px var(--ph-faint);
+  z-index: 2;
+}
+.a2-progress__label {
+  display: block;
+  font-size: 0.95em;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.45em;
+}
+.a2-progress__track {
+  display: block;
+  height: 0.9em;
+  border: 1px solid var(--ph-dim);
+  padding: 2px;
+}
+.a2-progress__fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--ph);
+  animation: a2-progress 0.8s steps(16, end) forwards;
+}
+@keyframes a2-progress {
+  to {
+    width: 100%;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   The frame: on ultrawide displays the visitor may box the whole site into
+   a centred 16:9 area with black bars, so the 16:9 clips fit exactly.
+   --frame-left / --frame-w / --frame-h are set by lib/transitions.ts.
+   --------------------------------------------------------------------------- */
+html.is-boxed body {
+  background: #000;
+}
+html.is-boxed .app {
+  position: relative;
+  width: var(--frame-w);
+  margin-left: var(--frame-left);
+  overflow: hidden;
+  background: var(--bg);
+}
+html.is-boxed .nav,
+html.is-boxed .transition {
+  left: var(--frame-left);
+  width: var(--frame-w);
+  right: auto;
+}
+html.is-boxed .dots {
+  right: calc(var(--frame-left) + 1.6rem);
+}
+html.is-boxed .grain {
+  left: var(--frame-left);
+  width: var(--frame-w);
+}
+
+/* the one-time choice on ultrawide displays */
+.framechoice {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 80;
+  width: min(420px, 90vw);
+  padding: 1.4rem 1.5rem 1.2rem;
+  background: #fbf8f1;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  box-shadow: 0 24px 60px rgba(22, 21, 15, 0.22);
+  font-family: var(--font-mono);
+}
+.framechoice__title {
+  font-size: 0.7rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 0.6rem;
+}
+.framechoice__body {
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.framechoice__row {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+.framechoice button {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: none;
+  color: var(--ink);
+  cursor: none;
+  transition: color 0.3s, border-color 0.3s;
+}
+.framechoice button:first-child {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+.framechoice button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.framechoice button:first-child:hover {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+/* the keyboard section's own text leaves before its clip plays */
+.panel--void.is-departing .section__label,
+.panel--void.is-departing .field-note,
+.panel--void.is-departing .kb__caption,
+.panel--void.is-departing .kb__sound {
+  opacity: 0 !important;
+  transition: opacity 0.2s ease-out;
+}
+.nav,
+.dots {
+  z-index: 50;
+}
+
+/* ---------------------------------------------------------------------------
+   Contact: the printout
+   The machine's last act. Continuous-feed stock, drawn flat in the Apple ][
+   section's palette; the ADDRESSES are real DOM on top of it, so they stay
+   selectable and linkable (same split as the terminal on the drawn glass).
+   --------------------------------------------------------------------------- */
+.sheet {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* A 16:9 surface that COVERS the frame - the same geometry the keyboard and
+   the machine use. The sheet therefore lands in an identical place at every
+   window size, which is the precondition for pinning a transition clip to it
+   later (docs/transition-kb-machine.md 7.5). */
+.sheet__stage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max(var(--frame-w, 100vw), calc(var(--frame-h, 100dvh) * 16 / 9));
+  height: max(var(--frame-h, 100dvh), calc(var(--frame-w, 100vw) * 9 / 16));
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  transition: transform 0.9s var(--ease-out);
+}
+/* the feed transform is applied inline; compose it with the centring */
+.sheet__stage[style] {
+  transform-origin: 50% 0;
+}
+
+.sheet__paper {
+  position: absolute;
+  height: min(78%, 620px);
+  width: auto;
+  filter: drop-shadow(0 18px 30px rgba(0, 0, 0, 0.28));
+}
+
+/* the printed block sits on the paper, sized off the same height so text and
+   stock scale together */
+.sheet__print {
+  position: relative;
+  z-index: 1;
+  width: min(52%, 430px);
+  font-family: "VT323", var(--font-mono);
+  color: #2a2418;
+  line-height: 1.5;
+}
+
+.sheet__head,
+.sheet__tail,
+.sheet__lines li {
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.16s steps(2, end), transform 0.16s steps(2, end);
+}
+.sheet__head[data-on="true"],
+.sheet__tail[data-on="true"],
+.sheet__lines li[data-on="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+.sheet__head {
+  font-size: clamp(0.95rem, 1.5vw, 1.3rem);
+  letter-spacing: 0.06em;
+  color: #6b6047;
+  margin-bottom: 0.9rem;
+}
+
+.sheet__lines {
+  list-style: none;
+  margin: 0 0 1.4rem;
+  padding: 0;
+}
+.sheet__lines li + li {
+  margin-top: 0.35rem;
+}
+.sheet__lines a {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: clamp(1.05rem, 1.85vw, 1.6rem);
+  color: #2a2418;
+  text-decoration: none;
+}
+.sheet__label {
+  letter-spacing: 0.12em;
+  color: #6b6047;
+  flex: none;
+}
+/* leader dots, the way a printed table of contents runs the eye across */
+.sheet__dots {
+  flex: 1;
+  align-self: center;
+  height: 1px;
+  background-image: radial-gradient(currentColor 40%, transparent 41%);
+  background-size: 6px 1px;
+  background-repeat: repeat-x;
+  opacity: 0.4;
+}
+.sheet__value {
+  flex: none;
+  border-bottom: 1px solid transparent;
+}
+.sheet__lines a:hover .sheet__value,
+.sheet__lines a:focus-visible .sheet__value {
+  border-bottom-color: currentColor;
+}
+/* the head strikes the line it is over */
+.sheet__lines a:hover .sheet__label {
+  color: var(--accent);
+}
+
+.sheet__tail {
+  font-family: var(--font-mono);
+  font-size: clamp(0.56rem, 0.78vw, 0.7rem);
+  line-height: 1.7;
+  letter-spacing: 0.04em;
+  color: #7a6f57;
+}
+.sheet__tail a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* the contact panel is paper, not void */
+.panel--sheet {
+  background: #ded6bf;
+}
+
+@media (max-width: 720px) {
+  .sheet__stage {
+    position: relative;
+    left: auto;
+    top: auto;
+    width: 100%;
+    height: auto;
+    transform: none;
+    padding-block: 3rem;
+  }
+  .sheet__paper {
+    height: auto;
+    width: 118%;
+  }
+  .sheet__print {
+    width: min(72%, 340px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet__stage,
+  .sheet__head,
+  .sheet__tail,
+  .sheet__lines li {
+    transition: none;
+  }
+}
+
+/* ---- the sheet's own coordinate box -------------------------------------
+   Paper and print share one box with the drawing's aspect, so the text sits
+   at fixed PROPORTIONS of the stock at every viewport - the same discipline
+   the machine's terminal uses on its glass, and what a transition clip would
+   need to pin to. */
+.sheet__box {
+  position: relative;
+  height: min(78%, 620px);
+  aspect-ratio: 620 / 460;
+}
+.sheet__box .sheet__paper {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+}
+/* a printout starts at the top margin and leaves the rest of the stock blank,
+   rather than floating in the middle of the sheet */
+.sheet__box .sheet__print {
+  position: absolute;
+  left: 16.5%;
+  top: 15%;
+  width: 68%;
+}
+
+/* ---- chrome over paper ---------------------------------------------------
+   .nav is fixed and uses mix-blend-mode: difference, which reads correctly on
+   the dark sections but washes out to near-invisible on the printout's paper.
+   On this panel it goes to plain dark ink instead. */
+html:has(.panel--sheet.is-active) .nav {
+  mix-blend-mode: normal;
+  color: #3a3225;
+}
+html:has(.panel--sheet.is-active) .nav__links a,
+html:has(.panel--sheet.is-active) .nav__sound {
+  color: #6b6047;
+}
+html:has(.panel--sheet.is-active) .nav__links a:hover,
+html:has(.panel--sheet.is-active) .nav__sound:hover {
+  color: #2a2418;
+}
+html:has(.panel--sheet.is-active) .dots__dot {
+  border-color: rgba(42, 36, 24, 0.42);
+}
+html:has(.panel--sheet.is-active) .dots__dot[aria-current="true"],
+html:has(.panel--sheet.is-active) .dots__dot.is-on {
+  background: var(--accent);
+  border-color: var(--accent);
 }

@@ -4,11 +4,17 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node dev.cjs",
+    "dev:vite": "vite",
+    "stop": "node dev.cjs stop",
+    "restart": "node dev.cjs restart",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "rag:eval": "esbuild scripts/rag-eval.ts --bundle --format=esm --platform=node --loader:.json=json --outfile=node_modules/.cache/rag-eval.mjs --log-level=error && node node_modules/.cache/rag-eval.mjs",
+    "rag:gates": "esbuild scripts/engine-gates.ts --bundle --format=esm --platform=node --external:@mlc-ai/web-llm --outfile=node_modules/.cache/engine-gates.mjs --log-level=error && node node_modules/.cache/engine-gates.mjs"
   },
   "dependencies": {
+    "@mlc-ai/web-llm": "^0.2.84",
     "@react-three/drei": "^9.122.0",
     "@react-three/fiber": "^8.18.0",
     "motion": "^11.15.0",
