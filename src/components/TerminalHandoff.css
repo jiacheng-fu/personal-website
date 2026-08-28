@@ -205,9 +205,8 @@
    unmounted so the RAG section keeps its state and comes back intact if the
    move is cancelled.
    --------------------------------------------------------------------------- */
-/* `.a2-log` covers the banner, the scrollback and the run in progress in one
-   selector now that they all live in the same scrolling column. */
-.rag.is-handoff .a2-log,
+/* UP: the overlay redraws the whole session over a machine that is not on
+   screen yet, so the real glass is blanked and stays blanked. */
 .rag.is-handoff .a2-boot,
 .rag.is-handoff .a2-prompt,
 .rag.is-handoff .a2-ingest,
@@ -216,12 +215,53 @@
   transition: opacity 0.24s ease;
 }
 
+/* DOWN: the session is not cleared, it is typed into.
+ 
+   Only the live prompt goes, and only because the overlay draws one in its
+   place - two cursors blinking on one line is worse than none. Everything
+   already printed stays exactly where it is while the command is typed
+   underneath it. */
+.rag.is-continuing .a2-prompt,
+.rag.is-continuing .a2-ingest,
+.rag.is-continuing .a2-progress {
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+
+/* Enter: the session slides up by the height of the output about to print.
+   The tube's own `overflow: hidden` does the clipping, so the top of the
+   session genuinely leaves the screen rather than fading out on it - which is
+   the difference between a terminal scrolling and a div being hidden. */
+.rag.is-continuing .a2-boot,
+.rag.is-continuing .a2-perf {
+  transition: transform 0.32s cubic-bezier(0.33, 1, 0.68, 1);
+}
+.rag.is-continuing.is-scrolled .a2-boot,
+.rag.is-continuing.is-scrolled .a2-perf {
+  transform: translateY(calc(-1 * var(--handoff-scroll, 0px)));
+}
+
+/* The command is typed on the prompt's own line and then rides the same
+   scroll up with everything else. Same duration and curve as the session
+   above, so the line it was typed on and the line it lands on move together. */
+.handoff__cmd.is-unscrolled {
+  transform: translateY(var(--handoff-scroll, 0px));
+}
+.handoff__cmd {
+  transition:
+    opacity 0.3s ease,
+    transform 0.32s cubic-bezier(0.33, 1, 0.68, 1);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .rag.is-handoff .a2-log,
   .rag.is-handoff .a2-boot,
   .rag.is-handoff .a2-prompt,
   .rag.is-handoff .a2-ingest,
-  .rag.is-handoff .a2-progress {
+  .rag.is-handoff .a2-progress,
+  .rag.is-continuing .a2-prompt,
+  .rag.is-continuing .a2-boot,
+  .rag.is-continuing .a2-perf,
+  .handoff__cmd {
     transition: none;
   }
 }

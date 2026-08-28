@@ -46,6 +46,8 @@ type Phase = "idle" | "type" | "print" | "fly" | "out" | "back";
 const CMD_DOWN = "ls ~/work";
 const CMD_BACK = "./ragsetup.py";
 const MONO = 13;
+/* One printed line, matching the spacing the output is set on. */
+const LINE = MONO * 1.9;
 
 /* Seconds.
 
@@ -131,7 +133,9 @@ const TerminalHandoff = forwardRef<HandoffHandle>(function TerminalHandoff(_, re
     clearAll();
     setNavLocked(false);
     h.classList.remove("is-on", "is-dark", "is-out", "is-instant", "is-back");
-    document.querySelector(".rag")?.classList.remove("is-handoff");
+    const rag = document.querySelector<HTMLElement>(".rag");
+    rag?.classList.remove("is-handoff", "is-continuing", "is-scrolled");
+    document.documentElement.style.removeProperty("--handoff-scroll");
     setPhase("idle");
     setRevealed(false);
     setLines(null);
@@ -149,6 +153,11 @@ const TerminalHandoff = forwardRef<HandoffHandle>(function TerminalHandoff(_, re
    *  somewhere nobody could see. */
   const measure = (dir: "down" | "up") => {
     const glassEl = document.querySelector(".a2m__screen");
+    /* The live prompt is where a person would actually be typing, so it is
+       what the typed command is anchored to. Falling back to a fraction of the
+       glass keeps the scene working while the machine is still booting and the
+       prompt has not been drawn yet. */
+    const promptEl = document.querySelector(".a2-prompt");
     const titles = [...document.querySelectorAll<HTMLElement>(".wx__title")];
     if (!glassEl || titles.length < projects.length) return null;
 
@@ -156,6 +165,31 @@ const TerminalHandoff = forwardRef<HandoffHandle>(function TerminalHandoff(_, re
     const landAt = panelTop(down ? 3 : 2);
     const gr = glassEl.getBoundingClientRect();
     const g = down ? { x: gr.left, y: gr.top } : afterScroll(gr, landAt);
+
+    /* Where the output lands, in the terminal's own coordinates.
+    
+       The handoff used to wipe the glass and type onto a blank screen a third
+       of the way down it, which is the one thing a terminal never does - the
+       session was simply gone, and `ls ~/work` arrived in a void. Now the
+       command is typed AT the prompt, on top of whatever the machine already
+       had on it, and the four names print underneath. There is no room
+       underneath, of course; that is what the scroll is for. */
+    const pr = down ? promptEl?.getBoundingClientRect() : null;
+    /* Down: anchored to the live prompt, because the session is still on the
+       glass and the command has to land on the line the cursor is really on.
+    
+       Up: NOT anchored to it. There the overlay redraws the whole session from
+       scratch on a blank glass and then types a NEW command underneath the
+       output - anchoring to the prompt put that new line below the prompt,
+       which on this machine is the status bar. It keeps the original placement,
+       a third of the way down, which leaves room under the output for the
+       command that follows it. */
+    const anchor = pr
+      ? { x: pr.left, y: pr.top }
+      : {
+          x: g.x + gr.width * 0.055,
+          y: g.y + gr.height * 0.32 + (projects.length - 1) * LINE,
+        };
 
     return projects.map((p, i) => {
       const r = titles[i].getBoundingClientRect();
@@ -168,8 +202,10 @@ const TerminalHandoff = forwardRef<HandoffHandle>(function TerminalHandoff(_, re
       const t = down ? afterScroll(r, landAt) : { x: r.left, y: r.top };
       return {
         label: p.title,
-        termX: g.x + gr.width * 0.055,
-        termY: g.y + gr.height * 0.32 + i * (MONO * 1.9),
+        termX: anchor.x,
+        /* the last name comes to rest on the line the prompt was on, so the
+           output fills the space the session just scrolled out of */
+        termY: anchor.y - (projects.length - 1 - i) * LINE,
         idxX: t.x - off.x,
         idxY: t.y - off.y,
         scale0: MONO / size,
@@ -193,10 +229,24 @@ const TerminalHandoff = forwardRef<HandoffHandle>(function TerminalHandoff(_, re
       reset(h);
       setNavLocked(true);
 
-      /* Now clear the glass: the boot menu and the live prompt are still on it,
-         and printing over them reads as two terminals fighting rather than one
-         answering. Faded, not unmounted - the section is not ours. */
-      document.querySelector(".rag")?.classList.add("is-handoff");
+      /* Going down the glass is NOT cleared. The session stays exactly where
+         it was and the command is typed at the foot of it, because that is
+         what typing into a terminal looks like; only the live prompt itself
+         goes, and only because the overlay is about to draw one in its place.
+         The scroll distance is published as a custom property so the section's
+         own stylesheet can move the content and the overlay can move its
+         command by the same amount. */
+      const ragEl = document.querySelector<HTMLElement>(".rag");
+      /* On the ROOT, not on `.rag`. The overlay is a fixed layer at the top of
+         the document and not a descendant of the section, so a property set on
+         the section never reaches it - the command lost its offset, was drawn
+         four lines high and typed itself straight through the boot menu. Both
+         subtrees read it from here. */
+      document.documentElement.style.setProperty(
+        "--handoff-scroll",
+        `${projects.length * LINE}px`
+      );
+      ragEl?.classList.add("is-continuing");
 
       setDir("down");
       setLines(next);
@@ -205,7 +255,13 @@ const TerminalHandoff = forwardRef<HandoffHandle>(function TerminalHandoff(_, re
       h.classList.add("is-on");
 
       const tt = typeDur(CMD_DOWN);
-      at(tt, () => setPhase("print"));
+      at(tt, () => {
+        /* Enter. The session slides up by exactly the height of the output
+           about to be printed, the top of it clipped away by the tube, and the
+           names arrive in the space it left. */
+        ragEl?.classList.add("is-scrolled");
+        setPhase("print");
+      });
       at(tt + T.print + T.hold, () => h.classList.add("is-dark"));
       at(tt + T.print + T.hold + T.flyGap, () => setPhase("fly"));
       return new Promise<void>((res) =>
@@ -239,6 +295,9 @@ const TerminalHandoff = forwardRef<HandoffHandle>(function TerminalHandoff(_, re
 
       reset(h);
       setNavLocked(true);
+      /* Coming back the overlay IS the screen - it redraws the whole session
+         from scratch over a machine that is not there yet - so here the real
+         glass does stay blanked. */
       document.querySelector(".rag")?.classList.add("is-handoff");
       setDir("up");
       setLines(next);
@@ -327,12 +386,17 @@ const TerminalHandoff = forwardRef<HandoffHandle>(function TerminalHandoff(_, re
           <div
             className={`handoff__cmd ${typing ? "" : "is-done"} ${
               back ? (!revealed ? "is-hidden" : typing ? "is-in" : "is-pending") : ""
-            }`}
+            } ${!back && typing ? "is-unscrolled" : ""}`}
             style={{
               left: lines[0].termX,
+              /* Down: one line above the first name, which after the scroll is
+                 four lines above where the prompt was. While it is still being
+                 typed `is-unscrolled` holds it down at the prompt, so the
+                 command is typed where the cursor really is and then rides up
+                 with the rest of the session. */
               top: back
                 ? lines[lines.length - 1].termY + MONO * 2.4
-                : lines[0].termY - MONO * 2.6,
+                : lines[0].termY - LINE,
             }}
           >
             <span className="handoff__caret">]</span>

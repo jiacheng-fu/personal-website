@@ -7,7 +7,6 @@ import {
   subscribe,
   preload,
   generate,
-  MODEL_ID,
   type EngineState,
 } from "../lib/ragEngine";
 
@@ -197,22 +196,6 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
   /* documents the visitor has fed in this session */
   const [fed, setFed] = useState(0);
   const [ingested, setIngested] = useState<string | null>(null);
-  /* The session as a terminal keeps it.
-  
-     A terminal never replaces its screen - it prints another line and what was
-     there goes up. This section used to swap the boot menu out for a
-     performance view and swap it back, which is the one thing a terminal
-     cannot do, and it made the machine read as a picture of a terminal rather
-     than as one.
-  
-     `printed` is what the run in progress has said so far; `scrollback` is
-     every line before it, frozen. Past runs are text and nothing else - a real
-     terminal's history is inert - so only the newest run is still animating,
-     and the cost of a long session is a string array. */
-  const [scrollback, setScrollback] = useState<string[]>([]);
-  const [printed, setPrinted] = useState<string[]>([]);
-  const logRef = useRef<HTMLDivElement>(null);
-  const print = (...lines: string[]) => setPrinted((p) => [...p, ...lines]);
   const ingestTimer = useRef<number>(0);
 
   const abortRef = useRef<AbortController | null>(null);
@@ -260,37 +243,6 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
     []
   );
 
-  /* Always looking at the bottom of the log, like a terminal that has just
-     printed. Runs on every line so the view keeps up with output arriving
-     mid-animation, not only when a run ends. */
-  useEffect(() => {
-    const el = logRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [printed, scrollback, answer, act]);
-
-  /* What a finished run leaves behind: its own lines, the fragments it kept
-     rendered as a bar you can read in text, and the answer. Everything the
-     live view showed, in the form a terminal would have left it in. */
-  const freeze = (r: Run | null, a: Answer | null, lines: string[]): string[] => {
-    const out = [...lines];
-    if (r) {
-      const best = Math.max(...r.retrieval.top.map((t) => t.score), 0.001);
-      for (const s of r.retrieval.top) {
-        if (s.score <= 0) continue;
-        const bar = "#".repeat(Math.max(1, Math.round((s.score / best) * 12))).padEnd(12, ".");
-        out.push(
-          `  ${String(s.chunk.id).padStart(2, "0")}  ${s.score.toFixed(2).padStart(5)}  ${bar}  ${s.chunk.section}/${s.chunk.title}`.slice(0, 78)
-        );
-      }
-    }
-    if (a?.text) {
-      out.push("");
-      for (const para of a.text.split("\n")) out.push(para);
-    }
-    out.push("");
-    return out;
-  };
-
   const ask = (q: string) => {
     const query = q.trim();
     if (!query) return;
@@ -301,13 +253,7 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
     const ac = new AbortController();
     abortRef.current = ac;
 
-    /* the run before this one stops being alive and becomes history */
-    setScrollback((sb) => [...sb, ...freeze(run, answer, printed)].slice(-400));
-    setPrinted([`] ${query}`]);
-
-    const t0 = performance.now();
     const retrieval = retrieve(query, 4);
-    const ms = performance.now() - t0;
     const prompt = assemblePrompt(query, retrieval.top);
     const thisRun = { query, retrieval, prompt };
     setRun(thisRun);
@@ -318,38 +264,11 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
     /* Real work takes microseconds; the screen replays it at human speed. */
     const at = (ms: number, fn: () => void) =>
       timersRef.current.push(window.setTimeout(fn, reduce ? 0 : ms));
-    /* The spew. Everything below is a real number this run just produced -
-       the terms that survived tokenizing, what the thesaurus added and at what
-       weight, how long the scoring took, what cleared the evidence floor and
-       what went into the prompt. A command that does work prints what it did;
-       this one has more to show than most. */
-    const terms = retrieval.tokens.filter((t) => t.term);
-    const kept = retrieval.top.filter((t) => t.score > 0);
     setAct("tear");
-    print(`bm25      ${chunks.length} fragments · ${fed} of them yours`);
-    at(500, () =>
-      print(
-        `tokenize  ${terms.map((t) => (t.soft ? `${t.raw}~` : t.raw)).join(" ") || "(nothing usable)"}`,
-        ...(retrieval.expanded.length
-          ? [`expand    +${retrieval.expanded.join(" +")}  @0.45w`]
-          : [])
-      )
-    );
     at(1000, () => setAct("scan"));
-    at(1200, () => print(`score     ${chunks.length} fragments in ${ms.toFixed(2)} ms`));
     at(2400, () => {
       setOrder([...retrieval.scored].sort((a, b) => b.score - a.score || a.chunk.id - b.chunk.id));
       setAct("fuse");
-      print(
-        hasEvidence(retrieval)
-          ? `keep      ${kept.length} above the ${MIN_EVIDENCE.toFixed(2)} floor · best ${kept[0]?.score.toFixed(2)}`
-          : `miss      nothing above the ${MIN_EVIDENCE.toFixed(2)} floor`
-      );
-    });
-    at(3100, () => {
-      if (!hasEvidence(retrieval)) return;
-      const chars = userMessage(prompt).length;
-      print(`brief     ${prompt.contextBlocks.length} passages · ${chars} chars`);
     });
     at(3400, () => {
       setAct("speak");
@@ -362,7 +281,6 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
        can't answer never reaches the model. No tokens, no GPU, no chance to
        hallucinate - the refusal is canned. */
     if (!hasEvidence(r.retrieval)) {
-      print("model     not run — no evidence to brief it with");
       setAnswer({
         mode: "none",
         text: !r.retrieval.understood
@@ -376,11 +294,6 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
        answer must say where it came from, and that is decided here, not
        left to the model's discretion */
     const fromVisitor = r.retrieval.top.some((s) => s.chunk.section === "Visitor" && s.score >= MIN_EVIDENCE);
-    print(
-      engineState().phase === "ready" || engineState().phase === "generating"
-        ? `model     ${MODEL_ID} · temp 0.3 · max 220 tok`
-        : `model     ${engineState().phase} — falling back to raw fragments`
-    );
     const result = await generate(
       r.prompt.system,
       userMessage(r.prompt),
@@ -389,9 +302,6 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
     );
     if (signal.aborted) return;
     if (result) {
-      print(
-        `gpu       ${result.tokens} tokens in ${result.seconds.toFixed(1)}s · ${(result.tokens / Math.max(result.seconds, 0.001)).toFixed(0)} tok/s`
-      );
       setAnswer((a) => a && { ...a, stats: { tokens: result.tokens, seconds: result.seconds }, done: true });
     } else {
       const phase = engineState().phase;
@@ -487,28 +397,8 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
       data-cursor="hover"
       onClick={() => inputRef.current?.focus()}
     >
-      {/* One scrolling session. The banner is the first thing printed and
-          never leaves - it goes up the screen like everything else. */}
-      <div
-        className="a2-log"
-        ref={logRef}
-        /* Deliberately NOT `data-scrollable`. That attribute is a blanket
-           opt-out - useSectionNav hands the wheel to anything carrying it and
-           never asks again - and putting it on a pane that covers the whole
-           glass meant a visitor with the pointer over the machine could not
-           leave the section at all. The log keeps the wheel only while its own
-           history still has somewhere to go, and gives the gesture back at
-           either end. Stopping propagation is what withholds it from the nav;
-           the browser does the actual scrolling either way. */
-        onWheel={(e) => {
-          const el = e.currentTarget;
-          const room =
-            e.deltaY < 0
-              ? el.scrollTop > 0
-              : el.scrollTop + el.clientHeight < el.scrollHeight - 1;
-          if (room) e.stopPropagation();
-        }}
-      >
+      {/* boot screen */}
+      {!performing && (
         <div className={`a2-boot ${bootPhase === "typing" ? "a2-boot--typing" : ""} ${bootPhase === "off" || bootPhase === "on" || bootPhase === "loading" ? "a2-boot--blank" : ""}`}>
           <p className="a2-boot__title">FU ][ PERSONAL ARCHIVE</p>
           <p className="a2-boot__sub">RETRIEVAL TERMINAL · REV 1</p>
@@ -522,39 +412,19 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
           <ol className="a2-boot__menu">
             {SUGGESTIONS.map((s, i) => (
               <li key={s}>
-                {/* Once the session has moved on, the menu is scrollback:
-                    printed, above the cursor, and no longer a thing you can
-                    press. Leaving live buttons up there would be the giveaway
-                    that this is a web page wearing a terminal. */}
-                {scrollback.length === 0 && !performing ? (
-                  <button type="button" data-cursor="hover" onClick={() => ask(s)}>
-                    <span>{i + 1}.</span> {s.toUpperCase()}
-                  </button>
-                ) : (
-                  <span className="a2-boot__spent">
-                    <span>{i + 1}.</span> {s.toUpperCase()}
-                  </span>
-                )}
+                <button type="button" data-cursor="hover" onClick={() => ask(s)}>
+                  <span>{i + 1}.</span> {s.toUpperCase()}
+                </button>
               </li>
             ))}
           </ol>
         </div>
+      )}
 
-        {scrollback.map((l, i) => (
-          <p key={i} className={`a2-line ${l.startsWith("] ") ? "a2-line--cmd" : ""}`}>
-            {l || "\u00a0"}
-          </p>
-        ))}
-
-        {printed.map((l, i) => (
-          <p key={`p${i}`} className={`a2-line ${l.startsWith("] ") ? "a2-line--cmd" : ""}`}>
-            {l || "\u00a0"}
-          </p>
-        ))}
-
-        {/* the run in progress - the only part still moving */}
-        {performing && (
+      {/* the performance */}
+      {performing && (
         <div className="a2-perf">
+          <p className="a2-perf__query">] {run?.query.toUpperCase()}</p>
           <AnimatePresence mode="wait">
             {line && (
               <motion.p
@@ -565,17 +435,22 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.15 }}
               >
-                {/* Just the stage direction now. The terms and the expansions it
-                    used to carry are printed above by `tokenize` and `expand`,
-                    with their real weights - saying them twice made the last
-                    line of every run the longest thing on the screen. */}
                 * {line}
+                {act !== "tear" && run && (
+                  <span className="a2-perf__terms">
+                    {" "}
+                    [{run.retrieval.tokens.filter((t) => t.term).map((t) => t.raw.toUpperCase()).join(" ")}]
+                    {run.retrieval.expanded.length > 0 && (
+                      <span className="a2-perf__expanded"> +{run.retrieval.expanded.map((t) => t.toUpperCase()).join(" ")}</span>
+                    )}
+                  </span>
+                )}
               </motion.p>
             )}
           </AnimatePresence>
 
           {order && act !== "speak" && (
-            <div className="a2-frags">
+            <div className="a2-frags" data-scrollable>
               {act === "scan" && !reduce && <div className="a2-scanline" />}
               {order.map((s, i) => {
                 const picked = pickedIds.has(s.chunk.id);
@@ -612,6 +487,7 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
           {act === "speak" && (
             <motion.div
               className="a2-speech"
+              data-scrollable
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.4 }}
@@ -644,8 +520,7 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
             </motion.div>
           )}
         </div>
-        )}
-      </div>
+      )}
 
       {bootPhase === "loading" && (
         <div className="a2-progress" aria-hidden>
