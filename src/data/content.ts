@@ -61,7 +61,8 @@ export const skills = [
  * Only real material: CarScout is a capture of the live site, Wild West is
  * the game's own background art from its repo. Horizon and CarStatus need
  * footage recorded - neither can be captured from here (one is a Unity
- * build, the other a CLI against a live car).
+ * build, the other a CLI against a live car - CarStatus has since been
+ * recorded against a Smartcar Simulator car instead).
  *
  * DeskStats is the real app's own code (unmodified sources, driven by real
  * click events) recorded on this machine with live readings; only the pointer
@@ -128,15 +129,15 @@ export const projects: Project[] = [
   },
   {
     title: "CarStatus",
-    /* The CLI needs a live car on the Smartcar account, so this reel is the
-       real index.js run against a stub SDK: the program, its formatting and
-       its "not available" branch are genuine, the vehicle is sample data. */
-    reel: { clip: "/reels/carstatus.mp4", still: "/shots/carstatus-term.jpg" },
+    /* Real data, simulated car: the dashboard reading a Smartcar Simulator
+       vehicle through the live v3 API. Mid-take the car is "driven" in the
+       Simulator and the webhook-fed API moves the odometer on its own. */
+    reel: { clip: "/reels/carstatus.mp4", still: "/shots/carstatus.jpg" },
     years: "2026",
     repo: "https://github.com/jiacheng-fu/CarStatus",
     blurb:
-      "A CLI that reads a BMW's live status over the Smartcar API — odometer, fuel and battery, location.",
-    stack: ["JavaScript", "Smartcar API"],
+      "A CLI and small dashboard for a car's odometer, fuel and battery on Smartcar's v3 API, ported off the SDK that dies Dec 1, plus the webhook step Smartcar's docs leave out.",
+    stack: ["JavaScript", "Node.js", "Smartcar API"],
   },
 ];
 
