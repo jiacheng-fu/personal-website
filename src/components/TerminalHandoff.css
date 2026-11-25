@@ -51,8 +51,9 @@
   display: flex;
   align-items: baseline;
   gap: 0.45em;
-  font-family: var(--font-mono);
-  font-size: 13px;
+  /* the glass's own face and on-screen size, measured per run (TerminalHandoff.tsx) */
+  font-family: var(--ho-family, var(--font-mono));
+  font-size: var(--ho-mono, 13px);
   letter-spacing: 0.04em;
   color: #6cff8e;
   white-space: nowrap;
@@ -152,7 +153,7 @@
 }
 
 .handoff__mono {
-  font-family: var(--font-mono);
+  font-family: var(--ho-family, var(--font-mono));
   color: #6cff8e;
   letter-spacing: 0.04em;
   opacity: 1;
@@ -208,9 +209,12 @@
 /* UP: the overlay redraws the whole session over a machine that is not on
    screen yet, so the real glass is blanked and stays blanked. */
 .rag.is-handoff .a2-boot,
+.rag.is-handoff .a2-perf,
 .rag.is-handoff .a2-prompt,
 .rag.is-handoff .a2-ingest,
-.rag.is-handoff .a2-progress {
+.rag.is-handoff .a2-progress,
+.rag.is-handoff .a2-optin,
+.rag.is-handoff .a2-loadbar {
   opacity: 0;
   transition: opacity 0.24s ease;
 }
@@ -223,7 +227,12 @@
    underneath it. */
 .rag.is-continuing .a2-prompt,
 .rag.is-continuing .a2-ingest,
-.rag.is-continuing .a2-progress {
+.rag.is-continuing .a2-progress,
+/* A dialog on the glass (the LLM opt-in) and the model's load bar are not
+   session text, so they do not scroll with it - they go, with the prompt.
+   Left up, the names printed straight over the opt-in. */
+.rag.is-continuing .a2-optin,
+.rag.is-continuing .a2-loadbar {
   opacity: 0;
   transition: opacity 0.16s ease;
 }
@@ -245,7 +254,8 @@
    scroll up with everything else. Same duration and curve as the session
    above, so the line it was typed on and the line it lands on move together. */
 .handoff__cmd.is-unscrolled {
-  transform: translateY(var(--handoff-scroll, 0px));
+  /* screen pixels: the overlay is on the page, not inside the scaled glass */
+  transform: translateY(var(--handoff-scroll-screen, 0px));
 }
 .handoff__cmd {
   transition:
@@ -255,9 +265,14 @@
 
 @media (prefers-reduced-motion: reduce) {
   .rag.is-handoff .a2-boot,
+  .rag.is-handoff .a2-perf,
   .rag.is-handoff .a2-prompt,
   .rag.is-handoff .a2-ingest,
   .rag.is-handoff .a2-progress,
+  .rag.is-handoff .a2-optin,
+  .rag.is-handoff .a2-loadbar,
+  .rag.is-continuing .a2-optin,
+  .rag.is-continuing .a2-loadbar,
   .rag.is-continuing .a2-prompt,
   .rag.is-continuing .a2-boot,
   .rag.is-continuing .a2-perf,

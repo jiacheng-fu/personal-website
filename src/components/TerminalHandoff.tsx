@@ -45,9 +45,34 @@ type Phase = "idle" | "type" | "print" | "fly" | "out" | "back";
 
 const CMD_DOWN = "ls ~/work";
 const CMD_BACK = "./ragsetup.py";
+/* Fallbacks only. The real size, line and face are read off the machine's
+   glass every run (see `glassType`): the glass sits inside CSS transforms
+   whose scale changes with the window, so a fixed 13px printed `ls ~/work`
+   visibly smaller than the session it was typed into, in another font, and
+   the scroll - applied INSIDE the scaled glass - came up short, so the names
+   printed over text that had not moved out of their way (Brian, 2026-11-25). */
 const MONO = 13;
-/* One printed line, matching the spacing the output is set on. */
 const LINE = MONO * 1.9;
+
+type TermType = { mono: number; line: number; family: string; scale: number };
+
+/** The glass's on-screen text size, line pitch and face, and its scale. */
+function glassType(glass: HTMLElement): TermType {
+  const scale = glass.getBoundingClientRect().width / (glass.offsetWidth || 1) || 1;
+  const sample = document.querySelector<HTMLElement>(
+    ".a2-prompt input, .a2-prompt, .a2-boot__line, .a2-speech__text, .a2-perf__query",
+  );
+  const cs = sample ? getComputedStyle(sample) : null;
+  const fs = cs ? parseFloat(cs.fontSize) : NaN;
+  const lh = cs ? parseFloat(cs.lineHeight) : NaN;
+  if (!cs || !fs) return { mono: MONO, line: LINE, family: "", scale };
+  return {
+    mono: fs * scale,
+    line: (lh || fs * 1.32) * scale,
+    family: cs.fontFamily,
+    scale,
+  };
+}
 
 /* Seconds.
 
@@ -116,6 +141,7 @@ const TerminalHandoff = forwardRef<HandoffHandle>(function TerminalHandoff(_, re
      floating over the projects section. The prompt used to appear there from
      the first frame - green text over a black page, before the room existed. */
   const [revealed, setRevealed] = useState(false);
+  const [term, setTerm] = useState<TermType>({ mono: MONO, line: LINE, family: "", scale: 1 });
   const timers = useRef<number[]>([]);
 
   const at = (s: number, fn: () => void) =>
@@ -136,6 +162,7 @@ const TerminalHandoff = forwardRef<HandoffHandle>(function TerminalHandoff(_, re
     const rag = document.querySelector<HTMLElement>(".rag");
     rag?.classList.remove("is-handoff", "is-continuing", "is-scrolled");
     document.documentElement.style.removeProperty("--handoff-scroll");
+    document.documentElement.style.removeProperty("--handoff-scroll-screen");
     setPhase("idle");
     setRevealed(false);
     setLines(null);
@@ -152,7 +179,7 @@ const TerminalHandoff = forwardRef<HandoffHandle>(function TerminalHandoff(_, re
    *  full viewport above the fold, where it was typed, held and flown in from
    *  somewhere nobody could see. */
   const measure = (dir: "down" | "up") => {
-    const glassEl = document.querySelector(".a2m__screen");
+    const glassEl = document.querySelector<HTMLElement>(".a2m__screen");
     /* The live prompt is where a person would actually be typing, so it is
        what the typed command is anchored to. Falling back to a fraction of the
        glass keeps the scene working while the machine is still booting and the
@@ -162,6 +189,9 @@ const TerminalHandoff = forwardRef<HandoffHandle>(function TerminalHandoff(_, re
     if (!glassEl || titles.length < projects.length) return null;
 
     const down = dir === "down";
+    const tt = glassType(glassEl);
+    setTerm(tt);
+    const LINE = tt.line;
     const landAt = panelTop(down ? 3 : 2);
     const gr = glassEl.getBoundingClientRect();
     const g = down ? { x: gr.left, y: gr.top } : afterScroll(gr, landAt);
@@ -208,7 +238,7 @@ const TerminalHandoff = forwardRef<HandoffHandle>(function TerminalHandoff(_, re
         termY: anchor.y - (projects.length - 1 - i) * LINE,
         idxX: t.x - off.x,
         idxY: t.y - off.y,
-        scale0: MONO / size,
+        scale0: tt.mono / size,
         size,
       } as Line;
     });
@@ -221,6 +251,7 @@ const TerminalHandoff = forwardRef<HandoffHandle>(function TerminalHandoff(_, re
       if (!h) return Promise.resolve();
       const next = measure("down");
       if (!next) return Promise.resolve();
+      const gt = glassType(document.querySelector<HTMLElement>(".a2m__screen")!);
 
       /* reset() FIRST - it is a full teardown and removes `is-handoff` among
          everything else, so clearing the glass before it just had the glass
@@ -242,9 +273,16 @@ const TerminalHandoff = forwardRef<HandoffHandle>(function TerminalHandoff(_, re
          the section never reaches it - the command lost its offset, was drawn
          four lines high and typed itself straight through the boot menu. Both
          subtrees read it from here. */
+      /* Two lengths for one scroll: the session moves INSIDE the scaled
+         glass, so it gets the output's height in the glass's own pixels; the
+         overlay's command moves on the page, so it gets screen pixels. */
       document.documentElement.style.setProperty(
         "--handoff-scroll",
-        `${projects.length * LINE}px`
+        `${(projects.length * gt.line) / gt.scale}px`
+      );
+      document.documentElement.style.setProperty(
+        "--handoff-scroll-screen",
+        `${projects.length * gt.line}px`
       );
       ragEl?.classList.add("is-continuing");
 
@@ -365,7 +403,17 @@ const TerminalHandoff = forwardRef<HandoffHandle>(function TerminalHandoff(_, re
   const typing = phase === "type";
 
   return (
-    <div className="handoff" ref={host} aria-hidden>
+    <div
+      className="handoff"
+      ref={host}
+      aria-hidden
+      style={
+        {
+          ["--ho-mono" as string]: `${term.mono}px`,
+          ...(term.family ? { ["--ho-family" as string]: term.family } : {}),
+        } as React.CSSProperties
+      }
+    >
       {/* the room going out - covers paper, machine, nav and all */}
       <div className="handoff__black" />
 
@@ -376,7 +424,7 @@ const TerminalHandoff = forwardRef<HandoffHandle>(function TerminalHandoff(_, re
           {back && (
             <div
               className={`handoff__cmd is-done ${revealed ? "is-in" : ""}`}
-              style={{ left: lines[0].termX, top: lines[0].termY - MONO * 2.6 }}
+              style={{ left: lines[0].termX, top: lines[0].termY - term.mono * 2.6 }}
             >
               <span className="handoff__caret">]</span>
               <span className="handoff__typed handoff__typed--static">{CMD_DOWN}</span>
@@ -395,8 +443,8 @@ const TerminalHandoff = forwardRef<HandoffHandle>(function TerminalHandoff(_, re
                  command is typed where the cursor really is and then rides up
                  with the rest of the session. */
               top: back
-                ? lines[lines.length - 1].termY + MONO * 2.4
-                : lines[0].termY - LINE,
+                ? lines[lines.length - 1].termY + term.mono * 2.4
+                : lines[0].termY - term.line,
             }}
           >
             <span className="handoff__caret">]</span>
