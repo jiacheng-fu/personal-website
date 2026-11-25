@@ -462,18 +462,6 @@ export default function App() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, ease, delay: 0.2 }}
         >
-          <a
-            className="nav__mark"
-            href="#top"
-            data-cursor="hover"
-            onClick={(e) => {
-              e.preventDefault();
-              goTo(0);
-            }}
-          >
-            <span className="nav__dot" />
-            {profile.name}
-          </a>
           <div className="nav__links">
             {/* No Sound toggle: the site is silent (Brian, 2026-11-25 - the
                 keycap clicks were the last sound left). */}

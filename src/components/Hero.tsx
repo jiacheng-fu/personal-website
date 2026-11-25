@@ -39,14 +39,29 @@ const NAME_FIT = 0.92;
 const CAP = 0.727;
 /** the marker colour of the doodles (Brian: "doodle in yellow") */
 const DOODLE = "#ffd93b";
+/** The role, set right under the name as one lockup: same face and the same
+ *  rise, smaller, and a grey a step down from the name's white (Brian,
+ *  2026-11-25 - it used to sit alone in the top-left corner). Sizes are
+ *  fractions of the name's font size, so the pair scales as one. */
+const SUB_SIZE = 0.12;
+/** ... but never smaller than this on screen (CSS px), or a phone gets 11px caps */
+const SUB_MIN_PX = 15;
+/** gap from the name's baseline to the role's cap top */
+const SUB_GAP = 0.075;
+/** "left" on the name's first stem, or "center" under it. Left: centred, it
+ *  runs into the lightbulb doodle over his head. */
+const SUB_ALIGN: "center" | "left" = "left";
+/** the role rises a beat after the name */
+const SUB_LAG = 0.25;
 /** the name has the stage to itself for this long before the eruption */
 const ERUPT_AFTER_MS = 900;
 
-type Layout = {
+type Line = {
   fs: number;
   base: number;
   letters: { ch: string; x: number; x1: number; delay: number }[];
 };
+type Layout = Line & { sub: Line | null };
 
 /* Where a logo can sit on each letter, as fractions of the letter's advance
    box: the full top bar of B R F, the single stems of I, the two stems of N
@@ -66,6 +81,7 @@ export default function Hero({ active }: { active: boolean }) {
   const section = useRef<HTMLElement>(null);
   const frame = useRef<HTMLDivElement>(null);
   const probe = useRef<SVGTextElement>(null);
+  const subProbe = useRef<SVGTextElement>(null);
   const spray = useRef<HTMLDivElement>(null);
   const engine = useRef<Eruption | null>(null);
   const [layout, setLayout] = useState<Layout | null>(null);
@@ -73,6 +89,7 @@ export default function Hero({ active }: { active: boolean }) {
   const front = useRef<HTMLDivElement>(null);
   const ledges = useRef<Platform[]>([]);
   const name = profile.name.toUpperCase();
+  const role = profile.role.toUpperCase();
 
   /* Lay the name out from the font's real metrics: fit its width, then hang
      its baseline off the crown of the head. Measured once the face has
@@ -92,7 +109,7 @@ export default function Hero({ active }: { active: boolean }) {
       const target = Math.min(PHOTO.w * NAME_WIDTH, (sec.clientWidth * NAME_FIT) / s);
       const fs = (100 * target) / w100;
       p.setAttribute("font-size", String(fs));
-      const letters: Layout["letters"] = [];
+      const letters: Line["letters"] = [];
       for (let i = 0; i < name.length; i++) {
         if (name[i] === " ") continue;
         const x = p.getStartPositionOfChar(i).x;
@@ -109,7 +126,27 @@ export default function Hero({ active }: { active: boolean }) {
           y: base - fs * CAP,
         })),
       );
-      setLayout({ fs, base, letters });
+      /* the role: laid out the same way, under the name */
+      let sub: Line | null = null;
+      const sp = subProbe.current;
+      if (sp) {
+        const sfs = Math.max(fs * SUB_SIZE, SUB_MIN_PX / s);
+        sp.setAttribute("font-size", String(sfs));
+        const left = SUB_ALIGN === "left" && letters.length;
+        sp.setAttribute("x", String(left ? letters[0].x : PHOTO.w / 2));
+        sp.setAttribute("text-anchor", left ? "start" : "middle");
+        const sbase = base + fs * SUB_GAP + sfs * CAP;
+        const sl: Line["letters"] = [];
+        for (let i = 0; i < role.length; i++) {
+          if (role[i] === " ") continue;
+          const x = sp.getStartPositionOfChar(i).x;
+          const x1 = sp.getEndPositionOfChar(i).x;
+          const d = Math.abs(x + sfs * 0.3 - PHOTO.crownX) / PHOTO.w;
+          sl.push({ ch: role[i], x, x1, delay: 0.2 + SUB_LAG + d * 1.1 });
+        }
+        sub = { fs: sfs, base: sbase, letters: sl };
+      }
+      setLayout({ fs, base, letters, sub });
     };
     document.fonts.load('200 100px "Inter Tight"').then(measure, measure);
     window.addEventListener("resize", measure);
@@ -117,7 +154,7 @@ export default function Hero({ active }: { active: boolean }) {
       dead = true;
       window.removeEventListener("resize", measure);
     };
-  }, [name]);
+  }, [name, role]);
 
   /* The eruption engine lives as long as the hero does. Play mode: the
      logos come down onto the letters and his hair, and the cursor knocks
@@ -156,6 +193,7 @@ export default function Hero({ active }: { active: boolean }) {
   };
 
   const cap = layout ? layout.fs * CAP : 0;
+  const scap = layout?.sub ? layout.sub.fs * CAP : 0;
 
   return (
     <section ref={section} className={`hx ${active ? "is-in" : ""}`} onPointerDown={onPointerDown}>
@@ -191,10 +229,22 @@ export default function Hero({ active }: { active: boolean }) {
             <clipPath id="hx-slot">
               <rect x={0} y={0} width={PHOTO.w} height={layout ? layout.base + layout.fs * 0.03 : PHOTO.h} />
             </clipPath>
+            {/* the role is small enough to wash out over the sky; a tight,
+                faint shadow lifts it without changing its colour */}
+            <filter id="hx-sub-lift" x="-5%" y="-60%" width="110%" height="220%">
+              <feDropShadow dx="0" dy="1.5" stdDeviation="3" floodColor="#000" floodOpacity="0.45" />
+            </filter>
+            {/* and the role's slot, under the name's */}
+            <clipPath id="hx-slot-sub">
+              <rect x={0} y={0} width={PHOTO.w} height={layout?.sub ? layout.sub.base + layout.sub.fs * 0.03 : PHOTO.h} />
+            </clipPath>
           </defs>
           {/* measures the name; never seen */}
           <text ref={probe} className="hx__letter hx__probe" x={PHOTO.w / 2} y={PHOTO.h / 2} textAnchor="middle">
             {name}
+          </text>
+          <text ref={subProbe} className="hx__letter hx__sub hx__probe" x={PHOTO.w / 2} y={PHOTO.h / 2} textAnchor="middle">
+            {role}
           </text>
           {layout && (
             <g clipPath="url(#hx-slot)">
@@ -214,6 +264,26 @@ export default function Hero({ active }: { active: boolean }) {
                   </text>
                 </g>
               ))}
+            </g>
+          )}
+          {layout?.sub && (
+            <g filter="url(#hx-sub-lift)">
+            <g clipPath="url(#hx-slot-sub)">
+              {layout.sub.letters.map((l, i) => (
+                <g key={`${i}${l.ch}`} className="hx__glyph hx__glyph--sub" data-cursor="hover">
+                  <rect className="hx__glyphHit" x={l.x} y={layout.sub!.base - scap} width={l.x1 - l.x} height={scap} />
+                  <text
+                    className="hx__letter hx__sub"
+                    x={l.x}
+                    y={layout.sub!.base}
+                    fontSize={layout.sub!.fs}
+                    style={{ "--d": `${l.delay.toFixed(3)}s`, "--rise": `${(scap * 1.08).toFixed(1)}px` } as CSSProperties}
+                  >
+                    {l.ch}
+                  </text>
+                </g>
+              ))}
+            </g>
             </g>
           )}
         </svg>
@@ -236,11 +306,6 @@ export default function Hero({ active }: { active: boolean }) {
         {/* logos that have cleared his hair come out in front */}
         <div className="hx__layer hx__front" ref={front} aria-hidden="true" />
       </div>
-
-      {/* In the nav's own row, where its "Brian Fu" mark sits on every other
-          section - the mark is hidden on the hero (App.css), because the
-          name is already the size of the screen. Brian, 2026-11-25. */}
-      <p className="hx__role">{profile.role}</p>
 
       <div className="hx__rail hx__rail--top">
         <span>{profile.location}</span>

@@ -144,6 +144,14 @@
 .hx__probe {
   visibility: hidden;
 }
+/* the role under the name: same face, a grey a step down from the name's
+   white, and a little tracking so the small caps don't close up. One weight
+   up from the name's 200, which all but vanishes at this size over the sky. */
+.hx__sub {
+  fill: #e3e6ea;
+  font-weight: 300;
+  letter-spacing: 0.05em;
+}
 /* each letter rises out of its slot, nearest the head first (--d) */
 .hx.is-in .hx__letter:not(.hx__probe) {
   animation: hx-rise 1.15s cubic-bezier(0.2, 0.9, 0.25, 1) var(--d, 0s) both;
@@ -174,6 +182,9 @@
 }
 .hx__glyph:hover {
   transform: translateY(-6px);
+}
+.hx__glyph--sub:hover {
+  transform: translateY(-3px);
 }
 .hx__glyph:hover .hx__letter {
   font-weight: 300;
@@ -262,34 +273,9 @@
   top: clamp(64px, 9.5vh, 96px);
 }
 
-/* The role takes the nav mark's place: the same padding box as .nav, and the
-   same line height as the nav row, so it sits on the row the links sit on.
-   A step bigger than the rail. */
-.hx__role {
-  position: absolute;
-  z-index: 5;
-  top: 1.4rem;
-  left: min(5vw, 3rem);
-  height: 1.35rem;
-  margin: 0;
-  display: flex;
-  align-items: center;
-  font-family: var(--font-mono);
-  font-size: var(--hx-meta);
-  font-weight: 500;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  text-shadow: var(--hx-shadow);
-  opacity: 0;
-  transition: opacity 1s ease 0.6s;
-}
-.hx.is-in .hx__role {
-  opacity: 1;
-}
 
 @media (max-width: 640px) {
-  .hx__rail,
-  .hx__role {
+  .hx__rail {
     letter-spacing: 0.12em;
   }
 }
@@ -298,8 +284,7 @@
   .hx.is-in .hx__letter:not(.hx__probe) {
     animation: none;
   }
-  .hx__rail,
-  .hx__role {
+  .hx__rail {
     transition: none;
   }
 }

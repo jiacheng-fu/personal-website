@@ -21,25 +21,11 @@
   z-index: 50;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  /* Links only, on the right: no "Brian Fu" mark on any page (Brian,
+     2026-11-25) - the hero carries the name, and the dots are the way home. */
+  justify-content: flex-end;
   padding: 1.4rem min(5vw, 3rem);
   mix-blend-mode: difference;
-}
-.nav__mark {
-  font-family: var(--font-mono);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  font-size: 0.9rem;
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-}
-.nav__dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 12px var(--accent);
 }
 .nav__links {
   display: flex;
@@ -2358,7 +2344,6 @@ html.is-framing-hero .nav,
 html.is-framing-hero .dots,
 html.is-framing-hero .cursor,
 html.is-framing-hero .hx__rail,
-html.is-framing-hero .hx__role,
 html.is-framing-hero .hx__name,
 html.is-framing-hero .hx__spray {
   visibility: hidden !important;
@@ -2384,16 +2369,6 @@ html:has(#top.is-active) .nav__switch {
 }
 html:has(#top.is-active) .dots__dot {
   border-color: rgba(255, 255, 255, 0.85);
-}
-/* The "Brian Fu" mark (and its dot) steps aside on the hero: the name is
-   already the size of the screen, and the hero's role line takes its place
-   (Hero.css, .hx__role). Every other section keeps it as the way home. */
-html:has(#top.is-active) .nav__mark {
-  opacity: 0;
-  pointer-events: none;
-}
-.nav__mark {
-  transition: opacity 0.4s ease;
 }
 
 /* ---- boot: the short progress bar on the blank glass ---- */
