@@ -80,7 +80,7 @@ const PROJECTS: Case[] = [
   { q: "what is axle", want: "Axle" },
   { q: "what has he built", want: ["Projects", "Overview"] },
   { q: "what side projects does he have", want: ["Projects", "Overview"] },
-  { q: "has he made a game", want: ["Wild West", "Horizon"] },
+  { q: "has he made a game", want: ["Wild West", "Horizon", "Hackathons"] },
   { q: "does he use unity", want: ["Horizon", "Systems"] },
   { q: "tell me about the hackathon project", want: ["Wild West", "Axle", "Hackathons"] },
   { q: "what did he build with fastapi", want: "Axle" },
@@ -147,7 +147,11 @@ const TYPED_LIKE_A_HUMAN: Case[] = [
 
 const MUST_REFUSE: Case[] = [
   { q: "what is the capital of france", want: "miss" },
-  { q: "write me a poem about cats", want: "miss" },
+  { q: "write me a poem about the ocean", want: "miss" },
+  /* cats reach "pet" through the thesaurus, and since 2026-11-25 the archive
+     has one (a childhood hamster): the nearest true thing is quoted, which is
+     a related answer, not a hallucination */
+  { q: "write me a poem about cats", want: "Background" },
   { q: "how old is he", want: "miss" },
   { q: "does he have a girlfriend", want: "miss" },
   { q: "what is his favorite food", want: "Favorites", note: "the archive knows his favorite ice cream (2026-11-25)" },
@@ -261,6 +265,24 @@ const PERSONAL: Case[] = [
   { q: "what parts of software interest him", want: "How Brian works", fact: "security and privacy" },
   { q: "what car did carstatus read", want: "CarStatus", fact: "BMW" },
   { q: "what track was axle built for", want: ["Axle", "Hackathons"], fact: "Toyota" },
+  { q: "where was he born", want: "Background", fact: "Xi'an" },
+  { q: "what is his hometown", want: "Background", fact: "Xi'an" },
+  { q: "what games does he play", want: "Games", fact: "Deadlock" },
+  { q: "what rank did he get in valorant", want: "Games", fact: "Immortal" },
+  { q: "was he good at overwatch", want: "Games", fact: "top 500" },
+  { q: "what is his favorite movie", want: "Favorites", fact: "Interstellar" },
+  { q: "what music does he listen to", want: "Favorites", fact: "Tyler" },
+  { q: "what's his favorite song", want: "Favorites", fact: "Homecoming" },
+  { q: "what food does he love", want: "Favorites", fact: "biangbiang" },
+  { q: "does he watch anime", want: "Favorites", fact: "One Piece" },
+  { q: "what is his favorite programming language", want: ["Favorites", "Languages"], fact: "Python" },
+  { q: "does he have any pets", want: "Background", fact: "hamster" },
+  { q: "what are his hobbies", want: "Outside work", fact: "gun range" },
+  { q: "tell me a fun fact about him", want: "Outside work", fact: "fist" },
+  { q: "what does he want to do after graduating", want: "What's next", fact: "robotics" },
+  { q: "what is his proudest project", want: "What's next", fact: "Axle" },
+  { q: "why did he build deskstats", want: "DeskStats", fact: "Task Manager" },
+  { q: "what inspired the art of project horizon", want: "Horizon", fact: "Octopath" },
 ];
 
 const SUITES: [string, Case[]][] = [

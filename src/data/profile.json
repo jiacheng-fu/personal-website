@@ -171,6 +171,87 @@
     "iceCream": {
       "value": "cookies and cream",
       "source": "brian"
+    },
+    "music": {
+      "value": "Tyler, the Creator and Kanye West; favorite song: Homecoming",
+      "source": "brian"
+    },
+    "movie": {
+      "value": "Interstellar, his favorite movie of all time",
+      "source": "brian"
+    },
+    "anime": {
+      "value": "used to watch One Piece, stopped over its pacing",
+      "source": "brian"
+    },
+    "food": {
+      "value": "Xi'an's carbs: jianbing guozi, roujiamo, yangrou paomo, biangbiang noodles; and Texas barbecue",
+      "source": "brian"
+    },
+    "programmingLanguage": {
+      "value": "Python: easy, simple, lots of built-in functions, no braces to type (he knows it is slow and interpreted)",
+      "source": "brian"
+    }
+  },
+  "background": {
+    "bornIn": {
+      "value": "Xi'an, China; moved to Austin, Texas",
+      "source": "brian"
+    },
+    "favoritePlace": {
+      "value": "Xi'an, where he was born: an unshakable, golden nostalgia nothing will beat",
+      "source": "brian"
+    },
+    "howHeGotIntoProgramming": {
+      "value": "he enjoyed fixing problems, and software engineering came naturally as technology evolved",
+      "source": "brian"
+    }
+  },
+  "gaming": {
+    "nowPlaying": {
+      "value": "Deadlock",
+      "source": "brian"
+    },
+    "valorant": {
+      "value": "used to play; peaked at Immortal 2",
+      "source": "brian"
+    },
+    "overwatch": {
+      "value": "top 500 on tank in Overwatch 1",
+      "source": "brian"
+    },
+    "whyShooters": {
+      "value": "he is mechanically skilled",
+      "source": "brian"
+    },
+    "artStyle": {
+      "value": "loves 2.5D art styles: unique, like playing a live diorama; Project Horizon's art direction comes from Octopath Traveler's world and style (he has never played it)",
+      "source": "brian"
+    }
+  },
+  "hobbies": {
+    "gunRange": {
+      "value": "enjoys going to the gun range",
+      "source": "brian",
+      "_note": "Which guns he owns is deliberately NOT published: firearm ownership plus a city on a public page is a burglary risk. Brian may opt in."
+    },
+    "funFact": {
+      "value": "can crack all his fingers just by making a fist",
+      "source": "brian"
+    },
+    "pets": {
+      "value": "a hamster, when he was young",
+      "source": "brian"
+    }
+  },
+  "career": {
+    "afterGraduating": {
+      "value": "honestly, anything that pays in this job market; beyond that, robotics, AI, and autonomous decision-making with hardware interest him most, though his experience leans full-stack",
+      "source": "brian"
+    },
+    "proudestProjects": {
+      "value": "Axle first, DeskStats second: both solve problems he had himself. He used Axle to buy his own car; he built DeskStats because he missed Windows Task Manager's hardware view on his MacBook",
+      "source": "brian"
     }
   }
 }

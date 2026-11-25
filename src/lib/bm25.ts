@@ -73,7 +73,10 @@ const STOPWORDS = new Set(
   ("a an and about are as at be but by can could did do does for from had has have her how i if in is it its me my of on or should " +
     "s so t tell that the their them they this to was we what when where which who whose why will would with you your " +
     /* asking about now: see RECENCY */
-    "now today currently lately recently nowadays doing up").split(" ")
+    "now today currently lately recently nowadays doing up " +
+    /* a lone digit is arithmetic or a version suffix, never the subject:
+       "solve 2 + 2" used to find Valorant's "Immortal 2" (2026-11-25) */
+    "0 1 2 3 4 5 6 7 8 9").split(" ")
 );
 
 /* Words that ask about the present. They match nothing in the archive - the

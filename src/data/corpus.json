@@ -68,14 +68,14 @@
       "section": "Projects",
       "title": "Axle",
       "dates": "Jan 2026 - Present",
-      "text": "Axle is an AI-powered used-car search that Brian has been building since January 2026: describe the car you want in plain English, and it finds, ranks, and compares real listings from nearby dealers. Brian built and deployed Axle as its sole author, taking it from a TAMUhack prototype (built for the Toyota track) to a deployed product with a React and Vite frontend, a FastAPI backend, PostgreSQL, and auth. Axle's LLM pipeline (OpenRouter) turns free-form text into validated, structured JSON, with schema sanitization, a 40-entry feature-alias map with fuzzy matching, and two-tier model routing with failover: a cheap model for routine parses and a capable one when the request is ambiguous. Axle ranks results with a 10-level progressive constraint-relaxation algorithm over a weighted scoring engine, so a search returns useful matches instead of an empty page when nothing satisfies every filter. Axle stays within a 1,000-call/month free API tier through multi-tier caching across memory, disk, and AWS DynamoDB (NoSQL, with TTL expiry). Axle runs serverless on AWS Lambda and API Gateway, with its frontend on CloudFront and S3. Axle's backend is FastAPI on AWS Lambda (Python 3.12, arm64) behind API Gateway through Mangum, defined in a SAM template, with the Lambda's role scoped to its single DynamoDB table. Axle caches listings in DynamoDB because Lambda filesystems are ephemeral and per-instance, so a disk cache stops protecting the API quota once the app runs serverless. Axle is built with React, TypeScript, Python, FastAPI, PostgreSQL, AWS, and REST APIs."
+      "text": "Axle is an AI-powered used-car search that Brian has been building since January 2026: describe the car you want in plain English, and it finds, ranks, and compares real listings from nearby dealers. Brian built and deployed Axle as its sole author, taking it from a TAMUhack prototype (built for the Toyota track) to a deployed product with a React and Vite frontend, a FastAPI backend, PostgreSQL, and auth. Axle's LLM pipeline (OpenRouter) turns free-form text into validated, structured JSON, with schema sanitization, a 40-entry feature-alias map with fuzzy matching, and two-tier model routing with failover: a cheap model for routine parses and a capable one when the request is ambiguous. Axle ranks results with a 10-level progressive constraint-relaxation algorithm over a weighted scoring engine, so a search returns useful matches instead of an empty page when nothing satisfies every filter. Axle stays within a 1,000-call/month free API tier through multi-tier caching across memory, disk, and AWS DynamoDB (NoSQL, with TTL expiry). Axle runs serverless on AWS Lambda and API Gateway, with its frontend on CloudFront and S3. Axle's backend is FastAPI on AWS Lambda (Python 3.12, arm64) behind API Gateway through Mangum, defined in a SAM template, with the Lambda's role scoped to its single DynamoDB table. Axle caches listings in DynamoDB because Lambda filesystems are ephemeral and per-instance, so a disk cache stops protecting the API quota once the app runs serverless. Axle is built with React, TypeScript, Python, FastAPI, PostgreSQL, AWS, and REST APIs. Brian used Axle himself when he bought his own car."
     },
     {
       "id": 9,
       "section": "Projects",
       "title": "Project Horizon",
       "dates": "Aug 2023 - Present",
-      "text": "Project Horizon is a narrative exploration game that Brian has been building solo in C# and Unity since August 2023. Project Horizon is written in C# on the Unity engine. Brian owns Project Horizon's full development cycle: a branching storyline system with multiple outcomes, core mechanics, state management, player progression, and UX. Project Horizon has branching dialogue with voiceover sync, third-person traversal, and a life system."
+      "text": "Project Horizon is a narrative exploration game that Brian has been building solo in C# and Unity since August 2023. Project Horizon is written in C# on the Unity engine. Brian owns Project Horizon's full development cycle: a branching storyline system with multiple outcomes, core mechanics, state management, player progression, and UX. Project Horizon has branching dialogue with voiceover sync, third-person traversal, and a life system. Project Horizon's 2.5D art direction is inspired by the look of Octopath Traveler, which Brian has never actually tried."
     },
     {
       "id": 10,
@@ -89,14 +89,14 @@
       "section": "Projects",
       "title": "DeskStats",
       "dates": "2026",
-      "text": "DeskStats is a native desktop widget for Apple Silicon Macs that Brian built in 2026 with Swift, SwiftUI, AppKit, and IOKit. DeskStats shows per-core CPU, GPU, memory, power draw, and charging rate, read straight from IOKit. DeskStats needs no permissions and uses about 1.4% of one CPU core."
+      "text": "DeskStats is a native desktop widget for Apple Silicon Macs that Brian built in 2026 with Swift, SwiftUI, AppKit, and IOKit. DeskStats shows per-core CPU, GPU, memory, power draw, and charging rate, read straight from IOKit. DeskStats needs no permissions and uses about 1.4% of one CPU core. Brian decided to build DeskStats because he missed the hardware readout of Windows Task Manager and found no equivalent for his MacBook."
     },
     {
       "id": 12,
       "section": "Projects",
       "title": "CarStatus",
       "dates": "2026",
-      "text": "CarStatus is a command-line tool that Brian built in 2026 to read a car's odometer, fuel, and battery through Smartcar's v3 API. Brian built CarStatus against a BMW, reading its live odometer, fuel, battery, and location through the Smartcar API. CarStatus includes the webhook setup that Smartcar's documentation leaves out. CarStatus is written in JavaScript on Node.js. The CarStatus recording on the projects page runs the tool in a real terminal against a Smartcar Simulator car, through Smartcar's real v3 API."
+      "text": "CarStatus is a command-line tool that Brian built in 2026 to read a car's odometer, fuel, and battery through Smartcar's v3 API. Brian built CarStatus against a BMW, reading its odometer, fuel, battery, and GPS position through the Smartcar API. CarStatus includes the webhook setup that Smartcar's documentation leaves out. CarStatus is written in JavaScript on Node.js. The CarStatus recording on the projects page runs the tool in a real terminal against a Smartcar Simulator car, through Smartcar's real v3 API."
     },
     {
       "id": 13,
@@ -138,7 +138,7 @@
       "section": "Projects",
       "title": "Class work & open source",
       "dates": "",
-      "text": "In CSCE 331, Foundations of Software Engineering, Brian's Team 14 built a point-of-sale system for Sharetea as its second project; its generated Javadoc is public on Brian's GitHub, and the source is in the private class repository. Brian forked PeakRDL-html, the open-source tool that generates address-space documentation from SystemRDL, the register-description format he worked with at United Micro Technology. Brian's code is on GitHub at github.com/jiacheng-fu: Axle, Project Horizon, Wild West Party Game, DeskStats, CarStatus, this website, and his TAMUhack 2025 team project."
+      "text": "In CSCE 331, Foundations of Software Engineering, Brian's Team 14 built a point-of-sale system for Sharetea as its second project; its generated Javadoc is public on Brian's GitHub, and the source is in the private class repository. Brian forked PeakRDL-html, the open-source tool that generates address-space documentation from SystemRDL, the register-description format he worked with at United Micro Technology. Brian's code is on GitHub at github.com/jiacheng-fu, including his TAMUhack 2025 team project."
     },
     {
       "id": 19,
@@ -150,9 +150,37 @@
     {
       "id": 20,
       "section": "Personal",
+      "title": "Background",
+      "dates": "",
+      "text": "Brian's hometown is Xi'an, China, where he was born; he later moved to Austin, Texas. Xi'an is Brian's favorite place: it holds an unshakable, golden nostalgia for him that nothing will beat. When Brian was young, he had a pet hamster. Brian got into programming because he enjoyed fixing problems; software engineering came naturally to him as technology evolved."
+    },
+    {
+      "id": 21,
+      "section": "Personal",
       "title": "Favorites",
       "dates": "",
-      "text": "Brian's favorite color is green. Brian's favorite ice cream flavor is cookies and cream."
+      "text": "Brian's favorite color is green. Brian's favorite ice cream flavor is cookies and cream. Brian's favorite foods are the carbs of Xi'an: jianbing guozi, roujiamo, yangrou paomo, and biangbiang noodles, which he misses; he also loves Texas barbecue. Brian's favorite movie of all time is Interstellar. For music, Brian listens to Tyler, the Creator and Kanye West, and his favorite song is probably Homecoming. Brian used to watch One Piece, until its pacing lost him. Brian's favorite programming language is Python: it is easy and simple, with lots of built-in functions and no braces to type, though he admits it is slow and interpreted."
+    },
+    {
+      "id": 22,
+      "section": "Personal",
+      "title": "Games",
+      "dates": "",
+      "text": "Brian plays video games, mostly shooters, because he is mechanically skilled; these days he plays Deadlock. Brian used to play Valorant, where he peaked at Immortal 2. In Overwatch 1, Brian was top 500 on tank. Brian loves 2.5D art styles, because each one is unique and plays as if you were inside a diorama; that is why Project Horizon looks the way it does."
+    },
+    {
+      "id": 23,
+      "section": "Personal",
+      "title": "Outside work",
+      "dates": "",
+      "text": "Brian's hobbies outside programming are video games and going to the gun range. Brian's fun fact: he can crack all of his fingers just by making a fist."
+    },
+    {
+      "id": 24,
+      "section": "Personal",
+      "title": "What's next",
+      "dates": "",
+      "text": "Asked what he wants to work on after graduating, Brian's honest first answer is anything that pays in this job market, but the field he finds most interesting is robotics, AI, and autonomous decision-making with hardware. Brian's experience so far leans full-stack. Brian's proudest projects are Axle and then DeskStats, because both fix problems he actually had: he used Axle to buy his own car, and built DeskStats for his own MacBook."
     }
   ]
 }
