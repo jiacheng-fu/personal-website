@@ -1,33 +1,71 @@
-/* The generation stage: Qwen3-0.6B running in the visitor's browser.
+/* The generation stage: a small language model running in the visitor's
+ * browser. Which model is ragBackends.ts's business; WHEN it loads, and what
+ * the machine says about it while it does, is this file's.
  *
- * Everything about this model is local. The weights (~400 MB, quantized)
- * stream from Hugging Face's CDN into the browser's Cache API storage, the
- * shaders compile on the visitor's own GPU via WebGPU, and inference never
- * leaves the machine. There is no API key anywhere in this repo and the
- * site stays static files - which is the reason this path was chosen over
- * a serverless proxy.
+ * Everything about the model is local. The weights stream from Hugging Face's
+ * CDN into the browser's Cache API storage, the GPU programs are built on the
+ * visitor's own GPU via WebGPU, and inference never leaves the machine. There
+ * is no API key anywhere in this repo and the site stays static files - which
+ * is the reason this path was chosen over a serverless proxy.
+ *
+ * WHEN IT LOADS (Brian, 2026-10-20). In three parts:
+ *
+ *   landing   warmModel("landing") the instant the page mounts: the largest
+ *             weight file (the vocabulary table, 78 MB) starts downloading
+ *   rest      warmModel("rest") once the visitor moves past the hero: every
+ *             other file
+ *   arrival   requestModel() when the machine is reached: whatever is still
+ *             missing, then the GPU upload and compile - the "finishing
+ *             touches" the boot screen's progress bar shows
+ *
+ * The first two only download, at low network priority, and never touch the
+ * GPU; the files land in WebLLM's own caches (see ragBackends.ts). The GPU
+ * work stays on demand, so nothing heavy runs while the hero and keyboard are
+ * on screen. And nobody waits minutes on the boot screen: it lets the
+ * visitor in after BOOT_HOLD_MS (RagSection), answers from fragments, and
+ * re-asks the model the moment it lands.
  *
  * The engine is a plain module singleton with a subscriber list rather than
  * a React context: the section component mounts and unmounts as the visitor
- * scrolls, but a 400 MB download must belong to the page, not to a
- * component's lifetime.
+ * scrolls, but a 350 MB download, once asked for, belongs to the page, not to
+ * a component's lifetime. Leaving the section mid-download does not stop it.
  *
- * WebLLM is imported dynamically inside preload(), so none of its ~1 MB
- * reaches the main chunk (same policy as three.js in App.tsx).
+ * The runtimes are imported dynamically inside the backends, so none of their
+ * weight reaches the main chunk (same policy as three.js in App.tsx).
  */
 
 import { isClipBusy } from "./transitions";
+import {
+  BACKENDS,
+  __resetDownloadsForTests,
+  type Backend,
+  type LoadReport,
+  type Runner,
+  type WarmPart,
+} from "./ragBackends";
 
-// One string to swap models. Must exist in WebLLM's prebuilt list.
-export const MODEL_ID = "Qwen3-0.6B-q4f16_1-MLC";
-export const MODEL_LABEL = "Qwen3 0.6B · q4f16 · ~400 MB";
+/* The model on board. Qwen3-0.6B, chosen over LFM2.5-350M on 2026-10-20 -
+   see docs/rag-model-bench.md for the numbers. */
+export const backend: Backend = BACKENDS.qwen3;
+
+/** Megabytes, as printed on the glass. Decimal, like the files' own sizes. */
+export const mb = (bytes: number) => Math.round(bytes / 1e6);
 
 export type EngineState =
-  | { phase: "idle"; detail: string } // gates not yet consulted / declined
-  | { phase: "queued"; detail: string } // deferred on a transient signal, retrying
-  | { phase: "unavailable"; detail: string } // no WebGPU etc - permanent
-  | { phase: "downloading"; detail: string; progress: number }
-  | { phase: "compiling"; detail: string }
+  | { phase: "idle"; detail: string } // not requested, or a gate declined
+  | { phase: "queued"; detail: string } // requested, waiting out something brief
+  | { phase: "unavailable"; detail: string } // no WebGPU - permanent
+  | {
+      phase: "downloading";
+      detail: string;
+      /** fraction of the CURRENT stage, 0..1, as the runtime computed it */
+      progress: number;
+      /** fetch = over the network; upload = from the browser's cache to the GPU */
+      stage: "fetch" | "upload";
+      /** bytes fetched so far, as the runtime counted them (fetch only) */
+      bytes: number;
+    }
+  | { phase: "compiling"; detail: string; progress: number | null }
   | { phase: "ready"; detail: string }
   | { phase: "generating"; detail: string }
   | { phase: "error"; detail: string };
@@ -51,43 +89,25 @@ export function subscribe(l: (s: EngineState) => void): () => void {
 }
 
 /* ---- gates -------------------------------------------------------------
-   Pulling 400 MB uninvited is only defensible when every signal says the
-   visitor won't feel it. But a failed gate is now two different things, and
-   conflating them was a real bug: some signals are facts about the machine
-   and some are weather.
+   Arriving at the machine is a request, so the gates left are the ones that
+   no request should override without the visitor's own click: facts about
+   the machine, and the visitor's stated preference.
 
-   `navigator.connection.effectiveType` is the weather. It is a rolling
-   estimate of RECENT throughput, and this page opens by pulling three.js, a
-   GLB, four video clips, fonts and reels - during which a gigabit connection
-   cheerfully reports "3g". The auto-load ran on an idle callback right in the
-   middle of that storm, read the number, wrote the model off for the whole
-   visit and left the section saying MODEL NOT LOADED. Reload with a warm
-   cache, less traffic, "4g", and it worked - which is exactly the "sometimes"
-   in the bug report.
-
-   So a transient verdict now DEFERS and is asked again; only a permanent one
-   refuses, and only WebGPU refuses forever. */
+   What is gone is everything that judged the CONNECTION - the "4g" check,
+   the bandwidth floor, the two-readings confirmation and the ten minutes of
+   patient re-asking. They existed to make an uninvited background download
+   polite, and they were the source of the "sometimes MODEL NOT LOADED" bug:
+   `effectiveType` is a rolling estimate that reads "3g" on a gigabit line
+   while the page is busy. A download the visitor asked for by arriving does
+   not need to guess at the weather. The bar shows the real rate, and on a
+   slow line the boot stops holding after BOOT_HOLD_MS (RagSection) and lets
+   the visitor in while the rest arrives. */
 export type Verdict = { ok: true } | { ok: false; reason: string; permanent: boolean };
 
-/* "4g" is a much weaker promise than it sounds: the spec's threshold is about
-   700 kbps, at which 400 MB takes over an hour. It is the right check for
-   "not on a train", and the wrong one for "can afford this download", so the
-   estimated bandwidth is checked too. Browsers cap `downlink` at 10 Mbps for
-   fingerprinting reasons, so 5 is a real bar and not an unreachable one. */
-const MIN_DOWNLINK_MBPS = 5;
-
-/* And one good reading is not enough to commit 400 MB. Deferring on a bad
-   reading (rather than giving up, as this used to) means the auto-load is now
-   watching for its moment - so it must not take a single optimistic blip on
-   an otherwise poor connection as its moment. Two readings in a row, seconds
-   apart, are cheap insurance against that. */
-const CONFIRMATIONS = 2;
-let goodReadings = 0;
-
-export function autoloadVerdict(): Verdict {
+export function arrivalVerdict(): Verdict {
   const nav = navigator as Navigator & {
     gpu?: unknown;
-    connection?: { saveData?: boolean; effectiveType?: string; downlink?: number };
+    connection?: { saveData?: boolean };
     deviceMemory?: number;
     maxTouchPoints?: number;
   };
@@ -98,7 +118,7 @@ export function autoloadVerdict(): Verdict {
   if (nav.deviceMemory !== undefined && nav.deviceMemory < 4)
     return { ok: false, reason: "device reports <4 GB RAM", permanent: true };
   /* iPadOS calls itself a Macintosh, and an iPad with WebGPU would otherwise
-     sail through every one of these checks and start pulling 400 MB over
+     sail through every one of these checks and start pulling 350 MB over
      someone's cellular plan. A pointing device that reports ten fingers is
      not a desktop. */
   const handheld =
@@ -106,22 +126,17 @@ export function autoloadVerdict(): Verdict {
     ((nav.maxTouchPoints ?? 0) > 1 && /Macintosh/.test(navigator.userAgent));
   if (handheld) return { ok: false, reason: "handheld device", permanent: true };
 
-  /* ---- weather: worth waiting out, never worth overriding ---- */
+  /* ---- brief, and waited out ---- */
   if (typeof document !== "undefined" && document.visibilityState === "hidden")
     return { ok: false, reason: "the tab is in the background", permanent: false };
-  const conn = nav.connection;
-  if (conn?.effectiveType && conn.effectiveType !== "4g")
-    return { ok: false, reason: `connection reports ${conn.effectiveType}`, permanent: false };
-  if (typeof conn?.downlink === "number" && conn.downlink < MIN_DOWNLINK_MBPS)
-    return { ok: false, reason: `connection estimates ${conn.downlink} Mbps`, permanent: false };
   return { ok: true };
 }
 
-/* ~400 MB of weights, and the browser needs room to store and unpack them. If
-   there is not that much space left, starting the download fills the
-   visitor's remaining quota to the brim and then fails on the last chunk -
-   worse for them than never having started. */
-const MODEL_BYTES = 420 * 1024 * 1024;
+/* The browser needs room to store and unpack the weights. If there is not that
+   much space left, starting the download fills the visitor's remaining quota
+   to the brim and then fails on the last chunk - worse for them than never
+   having started. */
+const HEADROOM = 1.25;
 
 async function storageShortfall(): Promise<string | null> {
   const store = navigator.storage;
@@ -130,69 +145,40 @@ async function storageShortfall(): Promise<string | null> {
     const { quota = 0, usage = 0 } = await store.estimate();
     if (!quota) return null;
     const free = quota - usage;
-    return free < MODEL_BYTES * 1.25
-      ? `only ${Math.round(free / 1e6)} MB of browser storage left, and the model needs ~400 MB`
+    return free < backend.bytes * HEADROOM
+      ? `only ${mb(free)} MB of browser storage left, and the model needs ${mb(backend.bytes)} MB`
       : null;
   } catch {
     return null;
   }
 }
 
-/* How long the auto-load keeps asking - and it should ask for a long time.
-   The machine is the THIRD section. Between arriving and scrolling to it a
-   visitor reads a hero, watches a keyboard assemble itself and goes through
-   the work index, which is minutes, not seconds. Nothing is gained by giving
-   up inside the first one: a re-check costs a property read, and the download
-   only starts when the answer is finally yes.
-
-   So the retry backs OFF rather than stopping - eagerly at first, because the
-   most common case by far is a connection reading polluted by the page's own
-   asset load and clearing within seconds, then slower and slower, settling
-   into a half-minute pulse it can hold for the rest of the visit.
-
-   The attempt cap is a runaway backstop, not a policy: at this backoff it
-   sits well beyond the ten minutes of patience, so what actually ends the
-   waiting in a browser is the clock. */
-const CLIP_RETRY_MS = 600;
-const LINE_FIRST_MS = 2500;
-const LINE_BACKOFF = 1.4;
-const LINE_MAX_MS = 30_000;
-const PATIENCE_MS = 10 * 60 * 1000;
+/* The waits that are left are short and clear themselves: a transition clip
+   still fading off the screen (the arrival call lands as the clip ends, and
+   the overlay holds for ~0.7 s after), or a tab switched away. Starting a
+   download and a GPU compile under a playing clip makes the clip drop frames,
+   so those are waited out rather than talked over. The cap is a runaway
+   backstop - the player's own failsafe clears a stuck clip in 15 s. */
+const RETRY_MS = 600;
 const MAX_ATTEMPTS = 60;
 
 let attempts = 0;
-let waitingSince = 0;
-let lineDelay = LINE_FIRST_MS;
 let retryTimer = 0;
 
-function defer(kind: "line" | "clip", reason: string) {
+function defer(reason: string) {
   if (retryTimer || enginePromise) return;
-  if (!waitingSince) waitingSince = Date.now();
-  const waited = Date.now() - waitingSince;
-  if (++attempts > MAX_ATTEMPTS || waited > PATIENCE_MS) {
-    set({
-      phase: "idle",
-      detail: `auto-load gave up after ${Math.round(waited / 1000)}s of ${reason}`,
-    });
+  if (++attempts > MAX_ATTEMPTS) {
+    set({ phase: "idle", detail: `gave up waiting: ${reason}` });
     return;
   }
-  let ms = CLIP_RETRY_MS;
-  if (kind === "line") {
-    ms = lineDelay;
-    lineDelay = Math.min(Math.round(lineDelay * LINE_BACKOFF), LINE_MAX_MS);
-  }
-  set({ phase: "queued", detail: `waiting to auto-load — ${reason}` });
+  set({ phase: "queued", detail: `waiting — ${reason}` });
   retryTimer = window.setTimeout(() => {
     retryTimer = 0;
     void preload(false);
-  }, ms);
+  }, RETRY_MS);
 }
 
-/* A tab opened in the background and read later is the other way this used to
-   go wrong: the checks happen while nobody is looking, on a throttled timer,
-   and the visitor arrives to a machine that gave up in private. Coming back
-   to the tab restarts the asking at full eagerness - whatever was true about
-   the connection while it was hidden is not news any more. */
+/* Coming back to the tab asks again at once instead of waiting for the timer. */
 if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "visible") return;
@@ -201,60 +187,66 @@ if (typeof document !== "undefined" && typeof document.addEventListener === "fun
       window.clearTimeout(retryTimer);
       retryTimer = 0;
     }
-    lineDelay = LINE_FIRST_MS;
     void preload(false);
   });
 }
 
-type Engine = import("@mlc-ai/web-llm").MLCEngine;
-let enginePromise: Promise<Engine | null> | null = null;
+let enginePromise: Promise<Runner | null> | null = null;
 
-/** Start loading the model. Idempotent; safe to call from a button after the
- *  auto-preload already began. force=true skips the etiquette gates (it is
- *  the visitor's own click) but never the WebGPU one. */
-export function preload(force = false): Promise<Engine | null> {
+/** Map the runtime's own report onto the machine's state. */
+function onReport(r: LoadReport) {
+  if (r.stage === "fetch")
+    set({ phase: "downloading", stage: "fetch", progress: r.progress, bytes: r.bytes, detail: r.text });
+  else if (r.stage === "upload")
+    set({ phase: "downloading", stage: "upload", progress: r.progress, bytes: 0, detail: r.text });
+  else set({ phase: "compiling", progress: r.progress, detail: r.text });
+}
+
+/** Start loading the model. Idempotent: a second call while one is loading
+ *  returns the same promise. force=true is the visitor's own click on the
+ *  load button and skips every gate except WebGPU; force=false is the
+ *  arrival request, which respects them. */
+export function preload(force = false): Promise<Runner | null> {
   if (enginePromise) return enginePromise;
-  /* An attempt is already queued, so this call is a duplicate - and it must
-     not be allowed to stand in as the confirming second reading. The two
-     readings have to be SECONDS apart to mean anything; two in the same tick
-     mean nothing at all. React's StrictMode double-invokes effects in
-     development and did exactly that, turning "check twice before committing
-     400 MB" into "check twice in one millisecond and commit". */
+  asked = force ? "click" : (asked ?? "arrival");
+  /* already waiting on something brief; the timer will ask again */
   if (!force && retryTimer) return Promise.resolve(null);
   if (force && retryTimer) {
-    window.clearTimeout(retryTimer); // the visitor's own click outranks the queue
+    window.clearTimeout(retryTimer); // the visitor's own click outranks the wait
     retryTimer = 0;
   }
 
   if (!force) {
-    /* Never start the download/compile while a transition clip is on screen -
-       it competes with video decode and the compositor and makes the clip
-       drop frames. A "not yet", asked again shortly. */
-    if (isClipBusy()) {
-      defer("clip", "a transition clip is playing");
+    /* ?rag=off keeps the model away entirely - for testing the extractive
+       fallback (and screenshots: a GPU-resident model blocks Playwright's
+       CDP captures). Plate rendering (?frame=) never wants it either. The
+       button still works. */
+    const q = typeof location === "undefined" ? "" : location.search;
+    if (/[?&]rag=off/.test(q) || /[?&]frame=/.test(q)) {
+      set({ phase: "idle", detail: "model off for this page (?rag=off)" });
       return Promise.resolve(null);
     }
 
-    const verdict = autoloadVerdict();
+    if (isClipBusy()) {
+      defer("a transition clip is playing");
+      return Promise.resolve(null);
+    }
+
+    const verdict = arrivalVerdict();
     if (!verdict.ok) {
       if (!verdict.permanent) {
-        goodReadings = 0; // the streak is broken; start counting again
-        defer("line", verdict.reason);
+        defer(verdict.reason);
         return Promise.resolve(null);
       }
       const noGpu = verdict.reason.includes("WebGPU");
       set(
         noGpu
           ? { phase: "unavailable", detail: verdict.reason }
-          : { phase: "idle", detail: `auto-load skipped: ${verdict.reason}` }
+          : { phase: "idle", detail: `not loaded: ${verdict.reason}` }
       );
       if (!noGpu) return Promise.resolve(null); // the button still works
       enginePromise = Promise.resolve(null); // no point re-checking WebGPU
       return enginePromise;
-    }
-    if (++goodReadings < CONFIRMATIONS) {
-      defer("line", "confirming the connection can carry 400 MB");
-      return Promise.resolve(null);
     }
   } else if (!(navigator as { gpu?: unknown }).gpu) {
     set({ phase: "unavailable", detail: "no WebGPU in this browser" });
@@ -262,30 +254,26 @@ export function preload(force = false): Promise<Engine | null> {
     return enginePromise;
   }
 
+  /* Said synchronously, before the first await: between here and the storage
+     estimate the state would otherwise still read "idle", and the boot screen
+     takes idle to mean "nothing is coming" and stops holding. */
+  set({ phase: "queued", detail: "starting" });
   enginePromise = (async () => {
     try {
       const shortfall = await storageShortfall();
       if (shortfall) {
-        set({ phase: "idle", detail: `auto-load skipped: ${shortfall}` });
+        set({ phase: "idle", detail: `not loaded: ${shortfall}` });
         enginePromise = null; // they may free space; the button still works
         return null;
       }
-      set({ phase: "downloading", detail: "fetching weights", progress: 0 });
-      const webllm = await import("@mlc-ai/web-llm");
-      const engine = await webllm.CreateMLCEngine(MODEL_ID, {
-        initProgressCallback: (p) => {
-          /* WebLLM's text is chatty; keep the raw line as the detail (it is
-             exactly the kind of guts this section exists to show) and split
-             the phases on it. */
-          if (/loading gpu|shader/i.test(p.text) || p.progress >= 1)
-            set({ phase: "compiling", detail: p.text });
-          else set({ phase: "downloading", detail: p.text, progress: p.progress });
-        },
-      });
+      set({ phase: "downloading", stage: "fetch", progress: 0, bytes: 0, detail: "starting" });
+      const runner = await backend.load(onReport);
+      netRetries = 0;
       set({ phase: "ready", detail: "weights cached in this browser" });
-      return engine;
+      return runner;
     } catch (e) {
-      set({ phase: "error", detail: e instanceof Error ? e.message : String(e) });
+      const message = e instanceof Error ? e.message : String(e);
+      set({ phase: "error", detail: message });
       /* Let go of the failed attempt. A dropped connection mid-download, a GPU
          that was busy, a tab that was backgrounded at the wrong moment - all
          transient, and all of them used to be permanent for the rest of the
@@ -294,11 +282,108 @@ export function preload(force = false): Promise<Engine | null> {
          same failure. Nothing retries on its own; the next deliberate call
          starts clean. */
       enginePromise = null;
+      scheduleNetRetry(message);
       return null;
     }
   })();
   return enginePromise;
 }
+
+/** The arrival request: the visitor has reached the machine. */
+export function requestModel(): void {
+  void preload(false);
+}
+
+/* ---- background download ------------------------------------------------
+   Same facts as an arrival - no WebGPU, Data Saver, a phone or tablet, under
+   4 GB of RAM, too little browser storage, ?rag=off, plate rendering - and any
+   one of them means nothing is fetched. A background tab is NOT a reason to
+   wait here: this is only a download, and a link opened in a new tab and read
+   later is exactly the visitor it helps most. Each part runs once a page. */
+const warmed = new Set<WarmPart>();
+
+export function warmModel(part: WarmPart): void {
+  if (!backend.warm || warmed.has(part)) return;
+  const q = typeof location === "undefined" ? "" : location.search;
+  if (/[?&]rag=off/.test(q) || /[?&]frame=/.test(q)) return;
+  const verdict = arrivalVerdict();
+  if (!verdict.ok && verdict.permanent) return;
+  warmed.add(part);
+  void (async () => {
+    /* A refresh, or a return visit: everything is already on disk, so the
+       only work left is the GPU's, and it is done now, quietly, while the
+       visitor is on the hero - the machine is simply ready when they get
+       there. No browser keeps a model on the GPU across a reload; this is
+       the nearest thing to it. Waits for the hero's own entrance to finish
+       and for an idle moment, and goes through the arrival's gates (no
+       clip on screen, tab visible). Never on a first visit: there, the GPU
+       work stays on demand under the progress bar. */
+    if (part === "landing" && (await backend.cached?.())) {
+      const go = () => void preload(false);
+      const idle = (window as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => void }).requestIdleCallback;
+      window.setTimeout(() => (idle ? idle(go, { timeout: 2000 }) : go()), RETURN_VISIT_DELAY_MS);
+      return;
+    }
+    if (await storageShortfall()) return;
+    /* not while a transition clip is playing: the next file waits for it */
+    await backend.warm!(part, () => !isClipBusy());
+  })().catch((err) => {
+    warmed.delete(part); // a later call may try again; the arrival will anyway
+    console.warn(`[rag] background download (${part}) stopped; the machine will finish it`, err);
+  });
+}
+
+/** After the hero's entrance (words rising, rules drawing) has played. */
+const RETURN_VISIT_DELAY_MS = 1800;
+
+/* ---- a dropped connection ------------------------------------------------
+   A laptop that sleeps, or Wi-Fi that switches networks, kills every
+   download in flight. Measured 2026-10-21/22 on Brian's own Mac, asleep on
+   battery: ERR_NETWORK_IO_SUSPENDED, ERR_NETWORK_CHANGED,
+   ERR_INTERNET_DISCONNECTED - and the machine sat on its fault screen until
+   someone clicked RETRY. Chrome did NOT fire "online" afterwards (it never
+   decided it had been offline), so that event alone is not enough.
+
+   So a load that failed for any reason other than the GPU is retried on its
+   own: on a backoff timer, the moment the tab is visible again (the laptop
+   woke), and when the browser does say it is back online. Each retry
+   re-runs the background parts too - finished files are skipped, failed
+   ones fetched again - and asks for the model the way it was first asked. */
+let asked: null | "arrival" | "click" = null;
+
+/** Faults a retry cannot fix. Everything else is treated as the network. */
+const GPU_FAULT = /device|adapter|webgpu|navigator\.gpu|out of memory|shader|destroyed/i;
+const NET_RETRY_MS = [3_000, 10_000, 30_000, 60_000];
+const NET_RETRY_MAX = 22; // about twenty minutes, then the RETRY button
+let netRetries = 0;
+let netTimer = 0;
+
+function retryNow() {
+  if (netTimer) {
+    window.clearTimeout(netTimer);
+    netTimer = 0;
+  }
+  for (const part of warmed) void backend.warm?.(part, () => !isClipBusy()).catch(() => {});
+  if (state.phase === "error" && asked && !enginePromise) void preload(asked === "click");
+}
+
+function scheduleNetRetry(message: string) {
+  if (!asked || netTimer || GPU_FAULT.test(message) || netRetries >= NET_RETRY_MAX) return;
+  const ms = NET_RETRY_MS[Math.min(netRetries, NET_RETRY_MS.length - 1)];
+  netRetries++;
+  set({ phase: "error", detail: `connection lost — retrying in ${Math.round(ms / 1000)} s` });
+  netTimer = window.setTimeout(() => {
+    netTimer = 0;
+    retryNow();
+  }, ms);
+}
+
+if (typeof window !== "undefined" && typeof window.addEventListener === "function")
+  window.addEventListener("online", retryNow);
+if (typeof document !== "undefined" && typeof document.addEventListener === "function")
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && state.phase === "error") retryNow();
+  });
 
 /** Put the module back to how it started.
  *
@@ -311,34 +396,15 @@ export function __resetForTests() {
   if (retryTimer) window.clearTimeout(retryTimer);
   retryTimer = 0;
   attempts = 0;
-  goodReadings = 0;
-  waitingSince = 0;
-  lineDelay = LINE_FIRST_MS;
   enginePromise = null;
   inflight = null;
+  warmed.clear();
+  asked = null;
+  if (netTimer) window.clearTimeout(netTimer);
+  netTimer = 0;
+  netRetries = 0;
+  __resetDownloadsForTests();
   state = { phase: "idle", detail: "model not requested yet" };
-}
-
-/** Start the model as early as the page can afford it.
- *
- *  Not tied to the RAG section: by the time a visitor scrolls down to the
- *  machine the weights should already be in the browser's cache, and which
- *  section they happen to be looking at has nothing to do with it.
- *
- *  "As early as it can afford" means the page's own load event, not an idle
- *  callback with an eight second timeout - on a busy main thread that idle
- *  window arrived late, in the middle of the asset storm, and got a bad
- *  connection reading for its trouble. After `load` the site's own fetches
- *  are done and the line is genuinely clear.
- */
-export function scheduleAutoPreload() {
-  /* ?rag=off keeps the model away entirely - for testing the extractive
-     fallback (and screenshots) without a GPU-resident model. */
-  const q = new URLSearchParams(location.search);
-  if (q.get("rag") === "off" || q.has("frame")) return;
-  const kick = () => window.setTimeout(() => void preload(false), 250);
-  if (document.readyState === "complete") kick();
-  else window.addEventListener("load", kick, { once: true });
 }
 
 export interface GenerationResult {
@@ -347,11 +413,11 @@ export interface GenerationResult {
   seconds: number;
 }
 
-/* WebLLM runs one generation at a time. A second question while the first
-   is still streaming used to throw, which flipped the state to "error" for
-   good - every later question fell back to raw fragments until reload. Now
-   a new request interrupts the old one and waits for it to unwind, and a
-   failed generation reports itself and leaves the model READY. */
+/* One generation at a time. A second question while the first is still
+   streaming used to throw, which flipped the state to "error" for good -
+   every later question fell back to raw fragments until reload. Now a new
+   request interrupts the old one and waits for it to unwind, and a failed
+   generation reports itself and leaves the model READY. */
 let inflight: Promise<GenerationResult | null> | null = null;
 
 /* A lost GPU device does not heal, and every later question would fall back to
@@ -369,12 +435,12 @@ export async function generate(
   signal?: AbortSignal
 ): Promise<GenerationResult | null> {
   if (state.phase !== "ready" && state.phase !== "generating") return null;
-  const engine = await enginePromise!;
-  if (!engine) return null;
+  const runner = await enginePromise!;
+  if (!runner) return null;
 
   if (inflight) {
     try {
-      await engine.interruptGenerate();
+      await runner.interrupt();
     } catch {
       /* nothing to interrupt */
     }
@@ -385,35 +451,9 @@ export async function generate(
   const run = (async (): Promise<GenerationResult | null> => {
     set({ phase: "generating", detail: "sampling tokens on your GPU" });
     let fatal = "";
-    const t0 = performance.now();
-    let tokens = 0;
-    let text = "";
     try {
-      const stream = await engine.chat.completions.create({
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-        stream: true,
-        max_tokens: 220,
-        temperature: 0.3,
-        /* Qwen3 is a reasoning model by default; its <think> monologue at 0.6B
-           is long and rarely improves a grounded answer. Belt (option) and
-           suspenders (strip tags below). */
-        extra_body: { enable_thinking: false },
-      });
-      for await (const delta of stream) {
-        if (signal?.aborted) {
-          await engine.interruptGenerate();
-          break;
-        }
-        const piece = delta.choices[0]?.delta?.content ?? "";
-        if (!piece) continue;
-        tokens++;
-        text += piece;
-        onToken(text.replace(/<think>[\s\S]*?(<\/think>|$)/, "").trimStart());
-      }
-      return { aborted: !!signal?.aborted, tokens, seconds: (performance.now() - t0) / 1000 };
+      const stats = await runner.generate(system, user, onToken, signal);
+      return { aborted: !!signal?.aborted, tokens: stats.tokens, seconds: stats.seconds };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (FATAL.test(msg)) {

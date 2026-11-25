@@ -1,0 +1,33 @@
+{
+  "model_id": "Qwen3-0.6B-q4f16_1-MLC",
+  "upstream_model_url": "https://huggingface.co/mlc-ai/Qwen3-0.6B-q4f16_1-MLC",
+  "upstream_lib_url": "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_84/base/Qwen3-0.6B-q4f16_1_cs1k-webgpu.wasm",
+  "mirrored": "2026-10-20",
+  "note": "Written by scripts/mirror-model.cjs. Weight shards are NOT here; tensor-cache.json points at Hugging Face.",
+  "files": {
+    "resolve/main/mlc-chat-config.json": {
+      "from": "https://huggingface.co/mlc-ai/Qwen3-0.6B-q4f16_1-MLC/resolve/main/mlc-chat-config.json",
+      "bytes": 2075,
+      "sha256": "190a51c56b9a07a8d8721266f8e459bcd1b1689bcdff294795cd2bffa203ff2d"
+    },
+    "resolve/main/tokenizer.json": {
+      "from": "https://huggingface.co/mlc-ai/Qwen3-0.6B-q4f16_1-MLC/resolve/main/tokenizer.json",
+      "bytes": 11422654,
+      "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+    },
+    "resolve/main/tensor-cache.json": {
+      "from": "https://huggingface.co/mlc-ai/Qwen3-0.6B-q4f16_1-MLC/resolve/main/tensor-cache.json",
+      "upstream_sha256": "f4647d617dc869d91fbd7851c65af0a2cf7dd615884ebe3b110013801b65d8c7",
+      "rewritten": "every dataPath made an absolute Hugging Face URL",
+      "bytes": 51503,
+      "sha256": "df83235ade78a560683833d7131b25cee533cf3e963503a5e2bb59051ac165af",
+      "shards": 9,
+      "shard_bytes": 335372288
+    },
+    "Qwen3-0.6B-q4f16_1_cs1k-webgpu.wasm": {
+      "from": "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_84/base/Qwen3-0.6B-q4f16_1_cs1k-webgpu.wasm",
+      "bytes": 5535989,
+      "sha256": "4db800b24119204e1a0386e8a12e084d5012aa60f77c5bffad362f20498df912"
+    }
+  }
+}

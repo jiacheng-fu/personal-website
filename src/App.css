@@ -2186,16 +2186,27 @@ html.is-framing-kb .kb__sound {
   border: 1px solid var(--ph-dim);
   padding: 2px;
 }
+/* Width is set inline from the model's real load (RagSection loadLine), in
+   whole 1/32 cells. No transition: a character-cell bar jumps a cell at a
+   time, and easing between reports would draw progress nobody reported. */
 .a2-progress__fill {
   display: block;
   height: 100%;
   width: 0;
   background: var(--ph);
-  animation: a2-progress 0.8s steps(16, end) forwards;
 }
-@keyframes a2-progress {
-  to {
-    width: 100%;
+/* a stage the runtime gives no count for: full bar, blinking label */
+.a2-progress.is-indeterminate .a2-progress__label {
+  animation: a2-progress-blink 1s steps(1, end) infinite;
+}
+@keyframes a2-progress-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .a2-progress.is-indeterminate .a2-progress__label {
+    animation: none;
   }
 }
 

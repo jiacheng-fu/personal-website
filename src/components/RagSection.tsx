@@ -6,7 +6,10 @@ import {
   engineState,
   subscribe,
   preload,
+  requestModel,
   generate,
+  backend,
+  mb,
   type EngineState,
 } from "../lib/ragEngine";
 
@@ -91,26 +94,96 @@ function engineStatus(engine: EngineState): { text: string; led: "off" | "busy" 
     case "idle":
       return { text: "MODEL: NOT LOADED — FRAGMENTS QUOTED RAW", led: "off" };
     case "queued":
-      /* deferred on something transient and still being asked again - the
-         machine is waiting, not broken, and says so */
-      return { text: "MODEL: QUEUED — WAITING FOR A CLEAR LINE", led: "busy" };
+      /* requested, waiting out something brief (a clip still fading, a tab
+         switched away) - the machine is waiting, not broken, and says so */
+      return { text: "MODEL: STARTING…", led: "busy" };
     case "unavailable":
       return { text: "MODEL: NO WEBGPU — FRAGMENTS QUOTED RAW", led: "off" };
     case "downloading":
       return {
-        text: `MODEL: LOADING ${Math.round((engine.phase === "downloading" ? engine.progress : 0) * 100)}% OF ~400MB`,
+        text: notYet(engine)
+          ? "MODEL: STARTING…"
+          : engine.stage === "fetch"
+            ? `MODEL: DOWNLOADING ${pct(engine.progress)}% · ${mb(engine.bytes)} MB`
+            : `MODEL: LOADING ONTO YOUR GPU ${pct(engine.progress)}%`,
         led: "busy",
       };
     case "compiling":
       return { text: "MODEL: COMPILING SHADERS ON YOUR GPU…", led: "busy" };
     case "ready":
-      return { text: "MODEL: QWEN3-0.6B · GPU: YOURS · UPLINK: NONE", led: "on" };
+      return { text: `MODEL: ${backend.name} · GPU: YOURS · UPLINK: NONE`, led: "on" };
     case "generating":
       return { text: "MODEL: GENERATING ON YOUR GPU", led: "on" };
     case "error":
-      return { text: "MODEL: FAULT — FRAGMENTS QUOTED RAW", led: "off" };
+      return engine.detail.startsWith("connection lost")
+        ? { text: "MODEL: CONNECTION LOST — RETRYING…", led: "busy" }
+        : { text: "MODEL: FAULT — FRAGMENTS QUOTED RAW", led: "off" };
   }
 }
+
+const pct = (f: number) => Math.floor(f * 100);
+
+/* The load has begun but the runtime has not reported anything yet - no byte
+   has arrived and no stage has been named. A cached model goes straight to
+   the GPU stage from here, so printing "DOWNLOADING 0%" in this gap would
+   announce a download that is not happening. */
+const notYet = (e: EngineState) =>
+  e.phase === "downloading" && e.stage === "fetch" && e.bytes === 0 && e.progress === 0;
+
+/* The boot screen's progress bar. It draws the model's load exactly as the
+   runtime reports it - the stage it is in and that stage's own fraction -
+   and nothing else: no easing toward a guess, no fake minimum. WebLLM counts
+   its download in whole weight shards, so on a cold load the bar moves in
+   steps of a shard; that is the runtime's granularity, shown as it is.
+   `fill` null is a stage the runtime gives no count for. */
+function loadLine(engine: EngineState): { label: string; fill: number | null } {
+  switch (engine.phase) {
+    case "queued":
+      return { label: `STARTING ${backend.name}…`, fill: 0 };
+    case "downloading":
+      if (notYet(engine)) return { label: `STARTING ${backend.name}…`, fill: 0 };
+      return engine.stage === "fetch"
+        ? { label: `DOWNLOADING ${backend.name} ${pct(engine.progress)}% · ${mb(engine.bytes)} MB`, fill: engine.progress }
+        : { label: `LOADING WEIGHTS ONTO YOUR GPU ${pct(engine.progress)}%`, fill: engine.progress };
+    case "compiling":
+      return engine.progress === null
+        ? { label: "COMPILING ON YOUR GPU…", fill: null }
+        : { label: `COMPILING SHADERS ${pct(engine.progress)}%`, fill: engine.progress };
+    case "ready":
+    case "generating":
+      return { label: `${backend.name} LOADED`, fill: 1 };
+    case "unavailable":
+      return { label: "NO WEBGPU — ANSWERING FROM FRAGMENTS", fill: 0 };
+    case "error":
+      return { label: "MODEL FAULT — ANSWERING FROM FRAGMENTS", fill: 0 };
+    case "idle":
+      return {
+        label: `MODEL NOT LOADED${engine.detail.startsWith("not loaded: ") ? ` — ${engine.detail.slice(12).toUpperCase()}` : ""}`,
+        fill: 0,
+      };
+  }
+}
+
+/** The load has reached somewhere the boot can stop waiting for. */
+const settled = (e: EngineState) =>
+  e.phase === "ready" || e.phase === "generating" || e.phase === "idle" || e.phase === "unavailable" || e.phase === "error";
+
+/* How long the bar is shown at the least - the old fixed bar's length, so a
+   model that is already loaded still gets its beat - and how long the boot
+   will hold the machine shut for a load still in progress. Past the hold the
+   visitor is let in to ask from the fragments; the status line keeps
+   counting, and an answer given from fragments is re-asked of the model the
+   moment it lands (see `speak`).
+
+   10 s, not the 60 it was: Brian, 2026-10-20, "We cant have people wait
+   minutes on this screen." The download now starts on landing (ragEngine.ts),
+   so on most lines the bar is only the GPU's finishing work and ends well
+   inside this; the hold is for the slow line, where it caps the wait. */
+const BOOT_MIN_MS = 900;
+const BOOT_HOLD_MS = 10_000;
+/* and the finished bar is left up this long, so the full bar and LOADED are
+   actually seen - measured without it: 20 ms, i.e. never */
+const BOOT_DONE_BEAT_MS = 450;
 
 /* A sheet of paper beside the machine. Write on it, feed it in: it flies into
    the screen and comes out the other side as one more fragment in the corpus,
@@ -179,9 +252,9 @@ function FeedSheet({ onFeed }: { onFeed: (text: string) => void }) {
 /* After the keyboard->machine clip the section wakes up: dark glass, the
    Apple ][ beep, a CRT bloom, the boot menu typing itself in, and only then
    the page chrome. Phases are wall-clock, like the keyboard's lamp. */
-/* black glass -> tube on (blank green) -> a short progress bar -> the boot
-   text types in. The bar is honest when it can be: while the model is still
-   arriving it shows the real download percentage. */
+/* black glass -> tube on (blank green) -> the progress bar, which is the
+   model actually loading, held until the load settles -> the boot text types
+   in. */
 type BootPhase = "done" | "off" | "on" | "loading" | "typing";
 
 export default function RagSection({ active, boot = 0, leaving = 0 }: { active: boolean; boot?: number; leaving?: number }) {
@@ -222,16 +295,62 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
     setAnswer(null);
     setBootPhase("off");
     const t1 = window.setTimeout(() => setBootPhase("on"), 380); // tube warms: blank green
-    const t2 = window.setTimeout(() => setBootPhase("loading"), 900); // progress bar
-    const t3 = window.setTimeout(() => setBootPhase("typing"), 1800);
-    const t4 = window.setTimeout(() => setBootPhase("done"), 3100);
+    const t2 = window.setTimeout(() => {
+      /* Coming back to a model that is already loaded: there is nothing to
+         load, so there is no bar - a bar here would read as the machine
+         loading itself all over again. The tube warms and the menu types
+         in, and that is all. */
+      const p = engineState().phase;
+      if (p === "ready" || p === "generating") {
+        setBootPhase("typing");
+        return;
+      }
+      loadingSince.current = performance.now();
+      setBootPhase("loading"); // the model's own progress, held below
+    }, 900);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
-      clearTimeout(t3);
-      clearTimeout(t4);
     };
   }, [boot]);
+
+  /* The hold. The bar stays up until the load settles (or BOOT_HOLD_MS runs
+     out), and for at least BOOT_MIN_MS. Keyed on the PHASE, not the progress,
+     so the timer is re-armed when the load changes stage and left alone while
+     it is merely counting. */
+  const loadingSince = useRef(0);
+  useEffect(() => {
+    if (bootPhase !== "loading") return;
+    const elapsed = performance.now() - loadingSince.current;
+    const wait = settled(engine)
+      ? Math.max(BOOT_DONE_BEAT_MS, BOOT_MIN_MS - elapsed)
+      : Math.max(0, BOOT_HOLD_MS - elapsed);
+    const t = window.setTimeout(() => setBootPhase("typing"), wait);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bootPhase, engine.phase]);
+  useEffect(() => {
+    if (bootPhase !== "typing") return;
+    const t = window.setTimeout(() => setBootPhase("done"), 1300);
+    return () => clearTimeout(t);
+  }, [bootPhase]);
+
+  /* ON DEMAND: reaching the machine is what asks for the model. Under reduced
+     motion the section nav is off and `active` never moves, so there it is
+     the section scrolling into view that asks. */
+  useEffect(() => {
+    if (active) requestModel();
+  }, [active]);
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!reduce || !rootRef.current) return;
+    const io = new IntersectionObserver(
+      (es) => es.some((e) => e.isIntersecting) && requestModel(),
+      { threshold: 0.5 }
+    );
+    io.observe(rootRef.current);
+    return () => io.disconnect();
+  }, [reduce]);
 
   useEffect(() => subscribe(setEngine), []);
   useEffect(
@@ -370,6 +489,7 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
   const performing = act !== "rest";
   const line = narration(act, run, answer, engine);
   const status = engineStatus(engine);
+  const load = loadLine(engine);
 
   /* ?frame=case|grow33|grow66|off|tilt renders a clean plate for the
      transition clips (docs/transition-kb-machine.md): no page chrome, the
@@ -523,16 +643,19 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
       )}
 
       {bootPhase === "loading" && (
-        <div className="a2-progress" aria-hidden>
-          <span className="a2-progress__label">
-            {engine.phase === "downloading"
-              ? `LOADING MODEL ${Math.round(engine.progress * 100)}%`
-              : engine.phase === "compiling"
-                ? "COMPILING MODEL…"
-                : "LOADING ARCHIVE…"}
-          </span>
+        <div className={`a2-progress ${load.fill === null ? "is-indeterminate" : ""}`} role="progressbar"
+          aria-label={load.label}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={load.fill === null ? undefined : pct(load.fill)}
+        >
+          <span className="a2-progress__label">{load.label}</span>
           <span className="a2-progress__track">
-            <span className="a2-progress__fill" />
+            {/* whole blocks, like a character-cell bar: 32 cells */}
+            <span
+              className="a2-progress__fill"
+              style={{ width: `${(Math.floor((load.fill ?? 1) * 32) / 32) * 100}%` }}
+            />
           </span>
         </div>
       )}
@@ -575,10 +698,10 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
         {(engine.phase === "idle" || engine.phase === "queued" || engine.phase === "error") && (
           <button type="button" data-cursor="hover" onClick={() => void preload(true)}>
             {engine.phase === "error"
-              ? "[RETRY — WEIGHTS ARE CACHED]"
+              ? "[RETRY]"
               : engine.phase === "queued"
-                ? "[LOAD IT NOW ~400MB]"
-                : "[LOAD MODEL ~400MB]"}
+                ? "[LOAD IT NOW]"
+                : `[LOAD MODEL · ${mb(backend.bytes)} MB]`}
           </button>
         )}
       </div>
@@ -588,7 +711,7 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
   );
 
   return (
-    <div className={`section shell rag ${frame ? "is-framing" : ""} ${bootPhase !== "done" ? "is-booting" : ""}`}>
+    <div ref={rootRef} className={`section shell rag ${frame ? "is-framing" : ""} ${bootPhase !== "done" ? "is-booting" : ""}`}>
       <p className="section__label">Ask the machine</p>
 
       <div className="rag__scene">
@@ -597,7 +720,7 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
       </div>
 
       <p className="field-note rag__foot">
-        BM25 scoring, a live prompt, a 0.6B model on your own GPU.{" "}
+        BM25 scoring, a live prompt, a {backend.params} model on your own GPU.{" "}
         <span className="dim">Every number on the glass is the actual machinery.</span>
       </p>
     </div>

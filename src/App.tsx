@@ -8,12 +8,12 @@ import KeyboardSection from "./components/KeyboardSection";
 import RagSection from "./components/RagSection";
 import WorkIndex from "./components/WorkIndex";
 import Hero from "./components/Hero";
-import { scheduleAutoPreload } from "./lib/ragEngine";
 import { Magnetic } from "./components/Bits";
 import { useSectionNav } from "./hooks/useSectionNav";
 import { soundEnabled, toggleSound } from "./data/keySound";
 import { CLIPS, transitionAllowed, transitionsEnabled, toggleTransitions, initFrame, isUltrawide, setBoxed } from "./lib/transitions";
 import ContactSheet from "./components/ContactSheet";
+import { warmModel } from "./lib/ragEngine";
 import TransitionPlayer, { type TransitionHandle } from "./components/TransitionPlayer";
 import TerminalHandoff, { type HandoffHandle } from "./components/TerminalHandoff";
 import { profile, skills } from "./data/content";
@@ -140,7 +140,12 @@ export default function App() {
     const stored = initFrame();
     if (stored === null && isUltrawide()) setAskFrame(true);
   }, []);
+  /* plate rendering never boots the machine; filled in below, read in effects */
+  const frameModeRef = useRef<string | null>(null);
   const hideAfterLand = useRef(false);
+  /* set when the keyboard->machine clip has already ticked `boot`, so the
+     arrival effect below does not boot the machine a second time */
+  const bootedByClip = useRef(false);
   const gate = useCallback((from: number, to: number) => {
     if (!transitionAllowed() || !player.current) return null;
     const p = player.current;
@@ -151,6 +156,7 @@ export default function App() {
       return new Promise<void>((r) => window.setTimeout(r, 220))
         .then(() => p.play(CLIPS.kbToMachine))
         .then(() => {
+          bootedByClip.current = true;
           setBoot((n) => n + 1);
           hideAfterLand.current = true;
           window.setTimeout(() => kbPanel?.classList.remove("is-departing"), 800);
@@ -196,6 +202,45 @@ export default function App() {
 
   // Reduced motion keeps native scrolling; hijacking it would be hostile.
   const { index, goTo } = useSectionNav(SECTIONS.length, !reduce, gate);
+
+  /* The model's download starts the instant the site is landed on, and the
+     rest follows as soon as the visitor moves past the hero (ragEngine.ts,
+     WHEN IT LOADS). Only downloads: the GPU work waits for the machine. */
+  useEffect(() => warmModel("landing"), []);
+  useEffect(() => {
+    if (index >= 1) warmModel("rest");
+  }, [index]);
+  /* Under reduced motion the section nav is off and `index` never moves, so
+     "past the hero" is read from the scroll position instead. */
+  useEffect(() => {
+    if (!reduce) return;
+    const onScroll = () => {
+      if (window.scrollY < window.innerHeight * 0.5) return;
+      warmModel("rest");
+      window.removeEventListener("scroll", onScroll);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [reduce]);
+
+  /* The machine boots on EVERY arrival from above, not only after the clip.
+     The boot is where the model's load is shown - the progress bar is the
+     real download now - so a hard cut (Motion off, a small or ultrawide
+     screen, a progress-dot jump past the keyboard) must not skip it and land
+     on a live prompt over a model that has not arrived. The clip path ticks
+     `boot` itself, as it ends; this covers everything else. Arrivals from
+     below are the terminal handoff's own scene and are left to it. */
+  const lastIndex = useRef(index);
+  useEffect(() => {
+    const from = lastIndex.current;
+    lastIndex.current = index;
+    if (index !== 2 || from >= 2 || frameModeRef.current) return;
+    if (bootedByClip.current) {
+      bootedByClip.current = false;
+      return;
+    }
+    setBoot((n) => n + 1);
+  }, [index]);
 
 
   /* The clip is held on its last frame until the landed section has painted
@@ -245,19 +290,17 @@ export default function App() {
     () => (typeof location === "undefined" ? null : new URLSearchParams(location.search).get("frame")),
     [],
   );
+  frameModeRef.current = frameMode;
   const kbFromBelow = useRef(false);
   if (index !== prevIndex.current) {
     if (index === 1) kbFromBelow.current = prevIndex.current > 1;
     prevIndex.current = index;
   }
 
-  // Background preload of the RAG model (see ragEngine.ts). Deliberately here
-  // and not in RagSection: it starts when the PAGE is reached, whatever
-  // section is on screen, so the weights are cached by the time anyone
-  // scrolls to the machine. Fires on the page's own load event, and a poor
-  // connection reading defers it rather than cancelling it.
+  /* The RAG model is NOT preloaded here any more (Brian, 2026-10-20): it
+     downloads on demand when the machine is reached, and the boot screen's
+     progress bar shows the real load. See ragEngine.ts and RagSection. */
   useEffect(() => {
-    scheduleAutoPreload();
     // clean-plate rendering for the transition clips: land on the machine
     const frame = new URLSearchParams(location.search).get("frame");
     if (frame === "kb" || frame === "kb-ui") {
