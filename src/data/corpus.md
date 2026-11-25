@@ -9,7 +9,8 @@
 
   Rules:
   - Nothing untrue. Every fact comes from the two resumes in resume/ (August
-    and November 2026) or the projects page (src/data/content.ts).
+    and November 2026), the projects page (src/data/content.ts), or
+    src/data/profile.json (things Brian has said, his GitHub and LinkedIn).
     `node scripts/gen-corpus.cjs` refuses any number it cannot find there.
   - No phone number, ever. The generator redacts one if it creeps in.
   - One "## Section | Title | Dates" heading per card. Section is one of
@@ -21,7 +22,7 @@
 
 ## About | About Brian
 
-Brian Fu is a software engineer and a Computer Science student at Texas A&M University, graduating in December 2027. Brian's legal first name is Jiacheng, but he goes by Brian. Brian is based in Austin, Texas. Brian is a permanent U.S. resident with a green card, so he is authorized to work in the United States and does not need visa sponsorship. Brian is open to 2027 internships. If you are looking to hire an intern for 2027, Brian is available: email him at brian.fu123321@gmail.com. Brian gravitates to problems where correctness is checkable: compilers, backends, and the security boundaries in between. Brian currently has a part-time job at ThingsX as an application security and full-stack engineer. You can contact Brian by email at brian.fu123321@gmail.com. Brian is on LinkedIn at linkedin.com/in/jiachengfu. Brian's GitHub is github.com/jiacheng-fu. Brian does not share a phone number on this site.
+Brian Fu is a software engineer and a Computer Science student at Texas A&M University, graduating in December 2027. Brian's legal first name is Jiacheng, but he goes by Brian. Brian is based in Austin, Texas. Brian speaks English and Mandarin Chinese, both natively. Brian is a permanent U.S. resident with a green card, so he is authorized to work in the United States and does not need visa sponsorship. Brian is open to 2027 internships: he is seeking Summer 2027 software engineering and security internships. If you are looking to hire an intern for 2027, Brian is available: email him at brian.fu123321@gmail.com. Brian gravitates to problems where correctness is checkable: compilers, backends, and the security boundaries in between. Brian currently has a part-time job at ThingsX as an application security and full-stack engineer. You can contact Brian by email at brian.fu123321@gmail.com. Brian is on LinkedIn at linkedin.com/in/jiachengfu. Brian's GitHub is github.com/jiacheng-fu. Brian does not share a phone number on this site.
 
 ## Overview | Career at a glance
 
@@ -29,7 +30,11 @@ Brian has worked at three companies: ThingsX, Mesa, and United Micro Technology.
 
 ## Education | Texas A&M University | Expected Dec 2027
 
-Brian studies at Texas A&M University in College Station, Texas, and is expected to graduate in December 2027. Brian's major is Computer Science and his minor is Mathematics: he is earning a Bachelor of Science in Computer Science with a Minor in Mathematics. Brian's GPA at Texas A&M is 3.87/4.00. Brian's relevant coursework includes Data Structures & Algorithms, Design & Analysis of Algorithms, Machine Learning, Computer Systems, Foundations of Software Engineering, Programming Languages, Discrete Structures, Linear Algebra, and Statistics.
+Brian studies at Texas A&M University in College Station, Texas, and is expected to graduate in December 2027. Brian's major is Computer Science and his minor is Mathematics: he is earning a Bachelor of Science in Computer Science with a Minor in Mathematics. Brian's GPA at Texas A&M is 3.87/4.00. Brian made the Dean's Honor Roll at the Texas A&M College of Engineering in Spring 2025 and again in Fall 2025, with a 4.00 GPA both terms. Brian is a member of the Aggie Coding Club at Texas A&M, and has gone to its meetings since Spring 2025.
+
+## Education | Coursework
+
+Brian's computer science coursework at Texas A&M: Program Design & Concepts (CSCE 120), Data Structures & Algorithms (CSCE 221), Discrete Structures for Computing (CSCE 222), Computer Organization (CSCE 312), Programming Languages (CSCE 314), and Design & Analysis of Algorithms (CSCE 411). Brian's math coursework: Engineering Math III, Linear Algebra, Differential Equations, and Principles of Statistics. In Fall 2026, Brian is taking Machine Learning (CSCE 421), Computer Systems (CSCE 313), and Foundations of Software Engineering (CSCE 331). For Spring 2027, the semester after Fall 2026, Brian is registered for Artificial Intelligence (CSCE 420), Problem Solving Programming Strategies (CSCE 430), Robotics & Spatial Intelligence (CSCE 452), and Mathematical Probability (MATH 411). Brian learned Haskell in CSCE 314, Programming Languages. Brian has also taken Technical & Professional Writing.
 
 ## Experience | ThingsX | Jun 2026 - Present
 
@@ -41,15 +46,15 @@ From August 2026 to October 2026, Brian was the Founding Engineer (Backend & ML)
 
 ## Experience | United Micro · compiler intern | May 2025 - Aug 2025
 
-From May 2025 to August 2025, Brian was an LLVM Compiler Intern at United Micro Technology. At his compiler internship, Brian worked on United Micro Technology's LLVM compiler backend in C++: he implemented instruction selection rules, register allocation paths, and lowering strategies. Brian also assessed vector instruction extensions for NPU-integrated workloads. Brian enabled early-stage architectural modeling at United Micro Technology by translating ISA specifications into processor description files. Brian's technical report on backend design tradeoffs steered United Micro Technology's subsequent vDSP ASIP compiler work.
+From May 2025 to August 2025, the summer of 2025, Brian was an LLVM Compiler Intern at United Micro Technology. At his compiler internship, Brian worked on United Micro Technology's LLVM compiler backend in C++, for a proprietary vector DSP: he implemented instruction selection rules, register allocation paths, and lowering strategies. Brian also assessed vector instruction extensions for NPU-integrated workloads. Brian enabled early-stage architectural modeling at United Micro Technology by translating ISA specifications into processor description files. Brian's technical report on backend design tradeoffs steered United Micro Technology's subsequent vDSP ASIP compiler work.
 
 ## Experience | United Micro · software intern | Jun 2024 - Aug 2024
 
-From June 2024 to August 2024, Brian was a Software Engineering Intern at United Micro Technology. Brian built a Python ingestion system that normalized third-party vendor register descriptions into United Micro Technology's internal SystemRDL representation, cutting the effort to onboard externally acquired IP by an estimated 60-70%. Brian extended the open-source SystemRDL toolchain with custom Jinja2-templated exporters that emit synthesizable RTL, C headers, and documentation in the company's internal file structure. Brian's SystemRDL tool was embedded in the production chip design flow, packaged with Poetry for reproducible installs, and used daily by 200+ engineers.
+From June 2024 to August 2024, the summer of 2024, Brian was a Software Engineering Intern at United Micro Technology. Brian built a Python ingestion system that normalized third-party vendor register descriptions into United Micro Technology's internal SystemRDL representation, cutting the effort to onboard externally acquired IP by an estimated 60-70%. Brian extended the open-source SystemRDL toolchain with custom Jinja2-templated exporters that emit synthesizable RTL, C headers, and documentation in the company's internal file structure. Brian's SystemRDL tool was embedded in the production chip design flow, packaged with Poetry for reproducible installs, and used daily by 200+ engineers.
 
 ## Projects | Axle | Jan 2026 - Present
 
-Axle is an AI-powered used-car search that Brian has been building since January 2026: describe the car you want in plain English, and it finds, ranks, and compares real listings from nearby dealers. Brian built and deployed Axle as its sole author, taking it from a TAMUhack prototype to a deployed product with a React and Vite frontend, a FastAPI backend, PostgreSQL, and auth. Axle's LLM pipeline (OpenRouter) turns free-form text into validated, structured JSON, with schema sanitization, fuzzy matching, and two-tier model routing with failover. Axle ranks results with a 10-level progressive constraint-relaxation algorithm over a weighted scoring engine, so a search returns useful matches instead of an empty page when nothing satisfies every filter. Axle stays within a 1,000-call/month free API tier through multi-tier caching across memory, disk, and AWS DynamoDB (NoSQL, with TTL expiry). Axle runs serverless on AWS Lambda and API Gateway, with its frontend on CloudFront and S3. Axle is built with React, TypeScript, Python, FastAPI, PostgreSQL, AWS, and REST APIs.
+Axle is an AI-powered used-car search that Brian has been building since January 2026: describe the car you want in plain English, and it finds, ranks, and compares real listings from nearby dealers. Brian built and deployed Axle as its sole author, taking it from a TAMUhack prototype (built for the Toyota track) to a deployed product with a React and Vite frontend, a FastAPI backend, PostgreSQL, and auth. Axle's LLM pipeline (OpenRouter) turns free-form text into validated, structured JSON, with schema sanitization, a 40-entry feature-alias map with fuzzy matching, and two-tier model routing with failover: a cheap model for routine parses and a capable one when the request is ambiguous. Axle ranks results with a 10-level progressive constraint-relaxation algorithm over a weighted scoring engine, so a search returns useful matches instead of an empty page when nothing satisfies every filter. Axle stays within a 1,000-call/month free API tier through multi-tier caching across memory, disk, and AWS DynamoDB (NoSQL, with TTL expiry). Axle runs serverless on AWS Lambda and API Gateway, with its frontend on CloudFront and S3. Axle's backend is FastAPI on AWS Lambda (Python 3.12, arm64) behind API Gateway through Mangum, defined in a SAM template, with the Lambda's role scoped to its single DynamoDB table. Axle caches listings in DynamoDB because Lambda filesystems are ephemeral and per-instance, so a disk cache stops protecting the API quota once the app runs serverless. Axle is built with React, TypeScript, Python, FastAPI, PostgreSQL, AWS, and REST APIs.
 
 ## Projects | Project Horizon | Aug 2023 - Present
 
@@ -65,7 +70,7 @@ DeskStats is a native desktop widget for Apple Silicon Macs that Brian built in 
 
 ## Projects | CarStatus | 2026
 
-CarStatus is a command-line tool that Brian built in 2026 to read a car's odometer, fuel, and battery through Smartcar's v3 API. CarStatus includes the webhook setup that Smartcar's documentation leaves out. CarStatus is written in JavaScript on Node.js. The CarStatus recording on the projects page runs the tool in a real terminal against a Smartcar Simulator car, through Smartcar's real v3 API.
+CarStatus is a command-line tool that Brian built in 2026 to read a car's odometer, fuel, and battery through Smartcar's v3 API. Brian built CarStatus against a BMW, reading its live odometer, fuel, battery, and location through the Smartcar API. CarStatus includes the webhook setup that Smartcar's documentation leaves out. CarStatus is written in JavaScript on Node.js. The CarStatus recording on the projects page runs the tool in a real terminal against a Smartcar Simulator car, through Smartcar's real v3 API.
 
 ## Projects | This website | 2026 - Present
 
@@ -73,7 +78,7 @@ Brian built this website in 2026 with React, TypeScript, Vite, and Three.js. The
 
 ## Skills | Languages
 
-Brian codes in C++, Java, Python, TypeScript, JavaScript, C#, SQL (PostgreSQL and PL/pgSQL), Bash, Haskell, HTML, and CSS. Brian has also shipped Swift (DeskStats) and GLSL.
+Brian speaks two languages natively, English and Mandarin Chinese. Brian codes in C++, Java, Python, TypeScript, JavaScript, C#, SQL (PostgreSQL and PL/pgSQL), Bash, Haskell, HTML, and CSS. Brian has also written Swift, for DeskStats, and a GLSL shader for an earlier version of this website. The programming languages Brian is most comfortable in are Python, JavaScript/TypeScript, and C++. In a technical interview, Brian prefers to code in Python 3.
 
 ## Skills | Full-Stack & ML
 
@@ -82,3 +87,19 @@ On the web, Brian builds with React, Next.js, Node.js, Deno, Vite, and FastAPI, 
 ## Skills | Systems, Cloud & Security
 
 For version control and CI, Brian uses Git, GitHub, and GitHub Actions, and he has built CI/CD pipelines. Brian ships with Docker and Docker Compose, tests with pytest, and has built job queues and TOCTOU race-condition tests. For cloud, Brian uses AWS (Lambda, API Gateway, DynamoDB, IAM, S3, and CloudFront), and he has also used Supabase (PostgREST and Auth), MinIO, and Vercel. Brian's systems work includes LLVM compiler backends and SystemRDL/RTL code generation. Brian's security skills include multi-tenant isolation, Row-Level Security, threat modeling, OWASP vulnerability classes, and exploit-regression validation.
+
+## Projects | Hackathons | 2024 - 2026
+
+Brian has done three hackathons: HowdyHack 2024, TAMUhack 2025, and the TAMUhack where Axle began. At HowdyHack 2024, Brian and his team built Wild West Party Game in 24 hours. At TAMUhack 2025, Brian's team pivoted mid-event and rebuilt their idea on Project Horizon, Brian's own Unity game. At TAMUhack 2025, Brian built the team's Unity gameplay layer: the dialogue engine, third-person movement, the life system, NPC behavior, and scene triggers; his teammates built a React dashboard and a machine learning notebook. Axle started as Brian's TAMUhack prototype for the Toyota track.
+
+## Projects | Class work & open source
+
+In CSCE 331, Foundations of Software Engineering, Brian's Team 14 built a point-of-sale system for Sharetea as its second project; its generated Javadoc is public on Brian's GitHub, and the source is in the private class repository. Brian forked PeakRDL-html, the open-source tool that generates address-space documentation from SystemRDL, the register-description format he worked with at United Micro Technology. Brian's code is on GitHub at github.com/jiacheng-fu: Axle, Project Horizon, Wild West Party Game, DeskStats, CarStatus, this website, and his TAMUhack 2025 team project.
+
+## Personal | How Brian works
+
+Brian's engineering philosophy: a fix you can't demonstrate failing beforehand and passing afterwards isn't a fix. The areas of software Brian is most interested in are web apps, data processing systems, and security and privacy. Brian is keen on backend, frontend, and full-stack work equally. Outside computer science, Brian's classes at Texas A&M have included Global Cinema, Climate Change, Intro to Psychology, and beginning badminton.
+
+## Personal | Favorites
+
+Brian's favorite color is green. Brian's favorite ice cream flavor is cookies and cream.

@@ -206,7 +206,9 @@ const SYNONYMS: string[][] = [
      feeds in a note that introduces the words, and then it bridges "does he
      have a pet" to the cat they just told the machine about. */
   ["pet", "cat", "dog", "animal", "kitten", "puppy", "adopted"],
-  ["eat", "eating", "food", "lunch", "dinner", "breakfast", "meal", "hungry", "restaurant", "subway", "coffee"],
+  ["eat", "eating", "food", "lunch", "dinner", "breakfast", "meal", "hungry", "restaurant", "subway", "coffee",
+   /* the one food the archive itself knows about (Favorites) */
+   "dessert", "ice", "cream", "snack"],
   ["family", "wife", "husband", "partner", "girlfriend", "boyfriend", "married", "brother", "sister", "parent", "mom", "dad"],
   ["hobby", "hobbies", "enjoy", "favorite", "favourite", "interest"],
   ["travel", "trip", "vacation", "visit", "flight", "flying", "driving"],

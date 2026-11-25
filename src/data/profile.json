@@ -1,0 +1,176 @@
+{
+  "_about": "Facts about Brian for the machine's archive, beyond the resume. src/data/corpus.md is written from this file, the two resumes and the projects page, and scripts/gen-corpus.cjs checks every number in the archive against all of them. This file is PUBLIC (it ships in the repo): only what Brian is happy for anyone to read. Nothing from autoapply's private fields - no birth date, phone, address, demographics, health, test scores or pay.",
+  "_sources": {
+    "brian": "told directly in conversation (2026-11-25)",
+    "autoapply": "~/Desktop/autoapply/autoapply/profile.json, confirmed answers only (fields Brian confirmed; drafts he never reviewed are left out)",
+    "linkedin": "the About section as applied 2026-08-23 (autoapply/resume/LINKEDIN-AUDIT-2026-08-23.md); LinkedIn itself blocks automated reading",
+    "github": "github.com/jiacheng-fu: the profile README and repository descriptions",
+    "transcript": "Brian's unofficial transcript (Howdy copy, 23 Nov 2026): course codes, titles and terms only. Grades per course, the student ID and every other identifier are left out; the GPA is the resume's 3.87/4.00."
+  },
+  "name": {
+    "preferred": "Brian Fu",
+    "legalFirst": "Jiacheng",
+    "source": "resume"
+  },
+  "basedIn": {
+    "value": "Austin, Texas",
+    "source": "resume"
+  },
+  "workAuthorization": {
+    "value": "U.S. permanent resident with a green card; no visa sponsorship needed",
+    "source": "brian"
+  },
+  "lookingFor": {
+    "value": "Summer 2027 software engineering and security internships",
+    "source": "linkedin, brian"
+  },
+  "languagesSpoken": {
+    "value": [
+      "English (native)",
+      "Mandarin Chinese (native)"
+    ],
+    "source": "autoapply"
+  },
+  "education": {
+    "honors": {
+      "value": [
+        "Dean's Honor Roll, Texas A&M College of Engineering, Spring 2025 (4.00 term GPA)",
+        "Dean's Honor Roll, Fall 2025 (4.00 term GPA)"
+      ],
+      "source": "autoapply (verified against the certificates and transcript)"
+    },
+    "organizations": {
+      "value": [
+        "Aggie Coding Club, member since Spring 2025"
+      ],
+      "source": "autoapply, linkedin"
+    },
+    "coursework": {
+      "source": "transcript",
+      "completed": {
+        "computerScience": [
+          "CSCE 120 Program Design & Concepts",
+          "CSCE 181 Intro to Computing",
+          "CSCE 221 Data Structures & Algorithms",
+          "CSCE 222 Discrete Structures for Computing",
+          "CSCE 312 Computer Organization",
+          "CSCE 314 Programming Languages (where he learned Haskell)",
+          "CSCE 411 Design & Analysis of Algorithms"
+        ],
+        "math": [
+          "MATH 251 Engineering Math III",
+          "MATH 304 Linear Algebra",
+          "MATH 308 Differential Equations",
+          "STAT 211 Principles of Statistics I"
+        ],
+        "other": [
+          "ENGR 102 Engineering Lab I: Computation",
+          "ENGL 210 Technical & Professional Writing",
+          "GLST 215 Global Cinema",
+          "ATMO 210 Climate Change",
+          "PBSI 107 Intro to Psychology",
+          "KINE 199 Badminton (beginning)"
+        ]
+      },
+      "inProgressFall2026": [
+        "CSCE 421 Machine Learning",
+        "CSCE 313 Intro to Computer Systems",
+        "CSCE 331 Foundations of Software Engineering"
+      ],
+      "registeredSpring2027": [
+        "CSCE 420 Artificial Intelligence",
+        "CSCE 430 Problem Solving Programming Strategies",
+        "CSCE 452 Robotics & Spatial Intelligence",
+        "MATH 411 Mathematical Probability"
+      ]
+    },
+    "gpa": {
+      "value": "3.87/4.00",
+      "source": "resume, transcript"
+    }
+  },
+  "programming": {
+    "mostComfortable": {
+      "value": [
+        "Python",
+        "JavaScript/TypeScript",
+        "C++"
+      ],
+      "source": "autoapply"
+    },
+    "interviewLanguage": {
+      "value": "Python 3",
+      "source": "autoapply"
+    },
+    "areasOfInterest": {
+      "value": [
+        "web apps",
+        "data processing systems",
+        "security and privacy"
+      ],
+      "source": "autoapply"
+    },
+    "backendFrontendFullstack": {
+      "value": "keen on all three equally",
+      "source": "autoapply"
+    },
+    "philosophy": {
+      "value": "A fix you can't demonstrate failing beforehand and passing afterwards isn't a fix.",
+      "source": "linkedin"
+    }
+  },
+  "projects": {
+    "axle": {
+      "origin": {
+        "value": "started as a TAMUhack prototype for the Toyota track",
+        "source": "autoapply"
+      },
+      "aliasMap": {
+        "value": "a 40-entry feature-alias map with fuzzy matching",
+        "source": "github"
+      },
+      "routing": {
+        "value": "a cheap model for routine parses, a capable one when the request is ambiguous",
+        "source": "github"
+      },
+      "infrastructure": {
+        "value": "FastAPI on AWS Lambda (Python 3.12, arm64) behind API Gateway via Mangum; the React build on S3 behind CloudFront; a DynamoDB listing cache with native TTL; a SAM template; the Lambda role scoped to that single table",
+        "source": "autoapply"
+      },
+      "whyDynamoDB": {
+        "value": "Lambda filesystems are ephemeral and per-instance, so a disk cache stops protecting the API quota once it runs serverless",
+        "source": "autoapply"
+      }
+    },
+    "carstatus": {
+      "value": "reads a BMW's live odometer, fuel, battery and location through the Smartcar API",
+      "source": "github"
+    },
+    "tamuhack2025": {
+      "value": "a team submission: mid-event the team pivoted and rebuilt the idea on Project Horizon; Brian built the Unity gameplay layer (dialogue engine, third-person movement, life system, NPC behavior, scene triggers), teammates built a React dashboard and an ML notebook",
+      "source": "github"
+    },
+    "sharetea": {
+      "value": "CSCE 331 Project 2, Team 14: a Sharetea point-of-sale system; the generated Javadoc is public, the source is in the private class repository",
+      "source": "github"
+    },
+    "peakrdl": {
+      "value": "a fork of PeakRDL-html, the open-source tool that generates address-space documentation from SystemRDL",
+      "source": "github"
+    },
+    "umtCompiler": {
+      "value": "the LLVM backend was for a proprietary vector DSP",
+      "source": "linkedin, github"
+    }
+  },
+  "favorites": {
+    "color": {
+      "value": "green",
+      "source": "brian"
+    },
+    "iceCream": {
+      "value": "cookies and cream",
+      "source": "brian"
+    }
+  }
+}

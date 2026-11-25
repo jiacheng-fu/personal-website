@@ -82,7 +82,7 @@ const PROJECTS: Case[] = [
   { q: "what side projects does he have", want: ["Projects", "Overview"] },
   { q: "has he made a game", want: ["Wild West", "Horizon"] },
   { q: "does he use unity", want: ["Horizon", "Systems"] },
-  { q: "tell me about the hackathon project", want: ["Wild West", "Axle"] },
+  { q: "tell me about the hackathon project", want: ["Wild West", "Axle", "Hackathons"] },
   { q: "what did he build with fastapi", want: "Axle" },
   { q: "has he worked with llms", want: ["Axle", "Systems"] },
   { q: "what is project horizon", want: "Horizon" },
@@ -150,7 +150,7 @@ const MUST_REFUSE: Case[] = [
   { q: "write me a poem about cats", want: "miss" },
   { q: "how old is he", want: "miss" },
   { q: "does he have a girlfriend", want: "miss" },
-  { q: "what is his favorite food", want: "miss" },
+  { q: "what is his favorite food", want: "Favorites", note: "the archive knows his favorite ice cream (2026-11-25)" },
   { q: "is he tall", want: "miss" },
   /* the archive really does hold a car passage - Axle is a used-car platform.
      Retrieving it is correct; declining to invent his commute is the model's
@@ -239,6 +239,30 @@ const INFERRED: Case[] = [
   { q: "what is thingsx", want: ["ThingsX", "Overview"], fact: "multi-tenant" },
 ];
 
+/* Beyond the resume (2026-11-25): src/data/profile.json - what Brian has
+   said, his GitHub, his LinkedIn, his transcript - written into the archive. */
+const PERSONAL: Case[] = [
+  { q: "what is his favorite color", want: "Favorites", fact: "green" },
+  { q: "what's his favourite ice cream", want: "Favorites", fact: "cookies and cream" },
+  { q: "what languages does he speak", want: ["About", "Languages"], fact: "Mandarin" },
+  { q: "does he speak chinese", want: "About", fact: "Mandarin" },
+  { q: "has he made the dean's list", want: ["Texas A&M", "Education"], fact: "Dean's Honor Roll" },
+  { q: "is he in any clubs", want: ["Texas A&M", "Education"], fact: "Aggie Coding Club" },
+  { q: "what language does he interview in", want: "Languages", fact: "Python 3" },
+  { q: "what is he most comfortable coding in", want: "Languages", fact: "C++" },
+  { q: "what did he build at tamuhack 2025", want: ["Hackathons", "Horizon"], fact: "Unity" },
+  { q: "how many hackathons has he done", want: ["Hackathons", "Overview"], fact: "three" },
+  { q: "what was the sharetea project", want: "Class work", fact: "point-of-sale" },
+  { q: "is he taking artificial intelligence", want: "Coursework", fact: "CSCE 420" },
+  { q: "has he taken robotics", want: "Coursework", fact: "Robotics" },
+  { q: "what classes is he taking this semester", want: "Coursework", fact: "Fall 2026" },
+  { q: "what kind of internship is he looking for", want: ["About", "Overview"], fact: "security internships" },
+  { q: "what is his engineering philosophy", want: "How Brian works", fact: "failing beforehand" },
+  { q: "what parts of software interest him", want: "How Brian works", fact: "security and privacy" },
+  { q: "what car did carstatus read", want: "CarStatus", fact: "BMW" },
+  { q: "what track was axle built for", want: ["Axle", "Hackathons"], fact: "Toyota" },
+];
+
 const SUITES: [string, Case[]][] = [
   ["experience", EXPERIENCE],
   ["education", EDUCATION],
@@ -249,6 +273,7 @@ const SUITES: [string, Case[]][] = [
   ["inferred & multi-hop", INFERRED],
   ["as typed", TYPED_LIKE_A_HUMAN],
   ["must refuse", MUST_REFUSE],
+  ["beyond the resume", PERSONAL],
 ];
 
 /* Notes a visitor might feed, and what the machine owes them afterwards. Run

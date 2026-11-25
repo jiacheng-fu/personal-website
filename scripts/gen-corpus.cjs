@@ -30,11 +30,11 @@ const RESUMES = [
   path.join(ROOT, "resume", "Brian_Fu_Resume_2026-11.html"),
   path.join(ROOT, "resume", "Brian_Fu_Resume_Updated.html"),
 ];
-const TRUTH = [...RESUMES, path.join(ROOT, "src", "data", "content.ts")];
+const TRUTH = [...RESUMES, path.join(ROOT, "src", "data", "content.ts"), path.join(ROOT, "src", "data", "profile.json")];
 /* numbers that are facts about the site itself, not about Brian's record */
 const SITE_NUMBERS = ["3", "25"]; // "Three.js", "BM25"
 
-const SECTIONS = new Set(["About", "Overview", "Education", "Experience", "Projects", "Skills"]);
+const SECTIONS = new Set(["About", "Overview", "Education", "Experience", "Projects", "Skills", "Personal"]);
 
 const REDACT = [[/\+?\d{0,2}[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/g, "[redacted]"]];
 const redact = (t) => REDACT.reduce((acc, [re, to]) => acc.replace(re, to), t);

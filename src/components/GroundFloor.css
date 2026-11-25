@@ -82,6 +82,40 @@
   transform: rotate(calc(var(--r) * 0.5)) translateY(calc(-5 * var(--u)));
 }
 
+/* ---- picking a Polaroid up: off its pin, to the middle, big; and back ---- */
+.nb__item--pick {
+  transition: transform 0.55s cubic-bezier(0.3, 1.15, 0.4, 1), box-shadow 0.4s ease;
+}
+.nb__item.is-zoomed,
+.nb__item.is-zoomed:hover {
+  z-index: 60 !important;
+  transform: translate(var(--zx), var(--zy)) scale(var(--zs));
+  transition: transform 0.62s cubic-bezier(0.18, 1.3, 0.4, 1), box-shadow 0.4s ease;
+  box-shadow:
+    0 calc(2 * var(--u)) calc(3 * var(--u)) rgba(0, 0, 0, 0.25),
+    0 calc(30 * var(--u)) calc(50 * var(--u)) rgba(0, 0, 0, 0.45);
+}
+/* the pin stays in the cork */
+.nb__item--pick .nb__pin {
+  transition: opacity 0.2s ease;
+}
+.nb__item.is-zoomed .nb__pin {
+  opacity: 0;
+}
+.nb__dim {
+  position: absolute;
+  inset: -100vmax;
+  z-index: 50;
+  background: rgba(24, 12, 2, 0.58);
+  animation: nb-in 0.3s ease both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nb__item--pick,
+  .nb__item.is-zoomed {
+    transition: none;
+  }
+}
+
 /* push-pins: a glossy head and its shadow on the cork */
 .nb__pin {
   position: absolute;

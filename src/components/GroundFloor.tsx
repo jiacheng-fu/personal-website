@@ -42,6 +42,9 @@ function Item({
   z,
   className = "",
   children,
+  zoom,
+  onPick,
+  label,
 }: {
   x: number;
   y: number;
@@ -50,14 +53,50 @@ function Item({
   z?: number;
   className?: string;
   children: ReactNode;
+  /** set while this item is picked up and held to the screen */
+  zoom?: Zoom | null;
+  /** makes the item a button that picks it up (Polaroids) */
+  onPick?: (el: HTMLDivElement) => void;
+  label?: string;
 }) {
-  const style = { "--x": x, "--y": y, "--w": w, "--r": `${r}deg`, zIndex: z } as CSSProperties;
+  const style = {
+    "--x": x,
+    "--y": y,
+    "--w": w,
+    "--r": `${r}deg`,
+    zIndex: z,
+    ...(zoom ? { "--zx": `${zoom.dx}px`, "--zy": `${zoom.dy}px`, "--zs": zoom.s } : {}),
+  } as CSSProperties;
+  if (!onPick)
+    return (
+      <div className={`nb__item ${className}`} style={style}>
+        {children}
+      </div>
+    );
   return (
-    <div className={`nb__item ${className}`} style={style}>
+    <div
+      className={`nb__item nb__item--pick ${zoom ? "is-zoomed" : ""} ${className}`}
+      style={style}
+      role="button"
+      tabIndex={0}
+      aria-pressed={!!zoom}
+      aria-label={zoom ? `Put back: ${label}` : `Pick up: ${label}`}
+      data-cursor="hover"
+      onClick={(e) => onPick(e.currentTarget)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onPick(e.currentTarget);
+        }
+      }}
+    >
       {children}
     </div>
   );
 }
+
+/** A Polaroid held up to the screen: how far to move it, and how big. */
+type Zoom = { key: string; dx: number; dy: number; s: number };
 const PinHead = ({ c, at = 50 }: { c: Pin; at?: number }) => (
   <i className={`nb__pin nb__pin--${c}`} style={{ left: `${at}%` }} aria-hidden />
 );
@@ -73,6 +112,40 @@ const ext = { target: "_blank", rel: "noreferrer" } as const;
 export default function GroundFloor({ active, onRideUp }: { active: boolean; onRideUp: () => void }) {
   const [ride, setRide] = useState<Ride>("idle");
   const [ft, setFt] = useState(0);
+  /* Click a Polaroid and it comes off the board to the middle of the
+     screen, straightened and big; click again (or the dimmed board, or Esc)
+     and it goes back on its pin (Brian, 2026-11-25: "clicking on images
+     should make them zoom in/pop out and clicking again should put them
+     back, like a video game"). Measured from where the item sits in the
+     layout, not from its hover tilt. */
+  const [zoom, setZoom] = useState<Zoom | null>(null);
+  const pick = (key: string) => (el: HTMLDivElement) => {
+    if (zoom) {
+      setZoom(null);
+      return;
+    }
+    const board = el.offsetParent as HTMLElement | null;
+    if (!board) return;
+    const b = board.getBoundingClientRect();
+    const cx = b.left + el.offsetLeft + el.offsetWidth / 2;
+    const cy = b.top + el.offsetTop + el.offsetHeight / 2;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    /* as big as fits: most of the height, never more than half the width */
+    const s = Math.min((vh * 0.8) / el.offsetHeight, (vw * 0.5) / el.offsetWidth);
+    setZoom({ key, dx: vw / 2 - cx, dy: vh / 2 - cy, s });
+  };
+  useEffect(() => {
+    if (!zoom) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setZoom(null);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [zoom]);
+  /* scrolled away: everything goes back on the board */
+  useEffect(() => {
+    if (!active) setZoom(null);
+  }, [active]);
+  const held = (key: string) => (zoom?.key === key ? zoom : null);
   const timers = useRef<number[]>([]);
   const raf = useRef(0);
 
@@ -117,6 +190,8 @@ export default function GroundFloor({ active, onRideUp }: { active: boolean; onR
     <div className={`section shell nb ${active ? "is-in" : ""}`}>
       <div className="nb__stage">
         <div className="nb__board">
+          {/* the board dims behind a picked-up Polaroid; clicking it puts it back */}
+          {zoom && <div className="nb__dim" onClick={() => setZoom(null)} aria-hidden="true" />}
           {/* a few spare pins, as every board has */}
           <i className="nb__pin nb__pin--yellow nb__pin--loose" style={{ left: "21.6%", top: "48.6%" }} aria-hidden />
           <i className="nb__pin nb__pin--green nb__pin--loose" style={{ left: "77.4%", top: "92.2%" }} aria-hidden />
@@ -128,9 +203,16 @@ export default function GroundFloor({ active, onRideUp }: { active: boolean; onR
           </Item>
 
           {/* filmed on location */}
-          <Item x={40} y={112} w={285} r={-6} className="nb__polaroid">
+          <Item x={40} y={112} w={285} r={-6} className="nb__polaroid" zoom={held("glass")} onPick={pick("glass")} label="the glasshouse photo">
             <PinHead c="red" />
-            <img src="/board/polaroid.webp" alt="Brian under a glass sculpture in a glasshouse in Seattle" loading="lazy" decoding="async" />
+            <img
+              src="/board/polaroid.webp"
+              srcSet="/board/polaroid.webp 600w, /board/polaroid-940.webp 940w"
+              sizes={zoom?.key === "glass" ? "70vh" : "18vw"}
+              alt="Brian under a glass sculpture in a glasshouse in Seattle"
+              loading="lazy"
+              decoding="async"
+            />
             <p>
               <small>filmed on location:</small> Seattle, not Austin
             </p>
@@ -200,14 +282,21 @@ export default function GroundFloor({ active, onRideUp }: { active: boolean; onR
           </Item>
 
           {/* Xi'an, from the photo's own metadata: the Drum Tower, June 2024 */}
-          <Item x={560} y={402} w={232} r={4} className="nb__polaroid">
+          <Item x={560} y={402} w={232} r={4} className="nb__polaroid" zoom={held("xian")} onPick={pick("xian")} label="the Xi'an photo">
             <PinHead c="green" />
-            <img src="/board/xian.webp" alt="The Drum Tower in Xi'an, under a tree" loading="lazy" decoding="async" />
+            <img
+              src="/board/xian.webp"
+              srcSet="/board/xian.webp 600w, /board/xian-1200.webp 1200w"
+              sizes={zoom?.key === "xian" ? "70vh" : "15vw"}
+              alt="The Drum Tower in Xi'an, under a tree"
+              loading="lazy"
+              decoding="async"
+            />
             <p>Xi&apos;an, summer 2024</p>
           </Item>
 
           {/* a meme, and the machine's opt-in */}
-          <Item x={1295} y={60} w={200} r={6} className="nb__polaroid">
+          <Item x={1295} y={60} w={200} r={6} className="nb__polaroid" zoom={held("glow")} onPick={pick("glow")} label="the glowing meme">
             <Tape x="50%" y="1%" r={-4} w={80} />
             <img src="/board/glow.webp" alt="A blown-out, glowing meme photo" loading="lazy" decoding="async" />
             <p>your GPU, LLM on</p>
