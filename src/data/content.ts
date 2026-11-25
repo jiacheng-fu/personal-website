@@ -136,7 +136,7 @@ export const projects: Project[] = [
     years: "2026",
     repo: "https://github.com/jiacheng-fu/CarStatus",
     blurb:
-      "A CLI and small dashboard for a car's odometer, fuel and battery on Smartcar's v3 API, ported off the SDK that dies Dec 1, plus the webhook step Smartcar's docs leave out.",
+      "A CLI and small dashboard for a car's odometer, fuel and battery, built on Smartcar's v3 API, including the webhook setup their docs leave out.",
     stack: ["JavaScript", "Node.js", "Smartcar API"],
   },
 ];
