@@ -129,14 +129,14 @@ export const projects: Project[] = [
   },
   {
     title: "CarStatus",
-    /* Real data, simulated car: the dashboard reading a Smartcar Simulator
-       vehicle through the live v3 API. Mid-take the car is "driven" in the
-       Simulator and the webhook-fed API moves the odometer on its own. */
+    /* Real data, simulated car: `npm start` in a real terminal (a clean zsh
+       in the project, via ttyd) reading a Smartcar Simulator vehicle through
+       the live v3 API - once, then again after the car is driven. */
     reel: { clip: "/reels/carstatus.mp4", still: "/shots/carstatus.jpg" },
     years: "2026",
     repo: "https://github.com/jiacheng-fu/CarStatus",
     blurb:
-      "A CLI and small dashboard for a car's odometer, fuel and battery, built on Smartcar's v3 API, including the webhook setup their docs leave out.",
+      "A command-line tool for a car's odometer, fuel and battery, built on Smartcar's v3 API, including the webhook setup their docs leave out.",
     stack: ["JavaScript", "Node.js", "Smartcar API"],
   },
 ];
