@@ -16,7 +16,7 @@ import {
   type EngineState,
 } from "../lib/ragEngine";
 import { extractAnswer, type Quote } from "../lib/extract";
-import { cleanModelAnswer, isRefusal, markNoteTerms, noteOnlyTerms } from "../lib/answerGuard";
+import { cleanModelAnswer, isRefusal, markNoteSentences, noteJudge, type NoteJudge } from "../lib/answerGuard";
 
 import Apple2Front from "./Apple2Front";
 import FeedShred from "./FeedShred";
@@ -57,9 +57,9 @@ interface Answer {
   done: boolean;
   /* why the model didn't answer, when it didn't */
   fallback?: "loading" | "absent" | "stumbled" | "empty";
-  /* terms only a visitor's note supports (answerGuard noteOnlyTerms): where a
-     model's answer repeats one, the glass marks it unverified */
-  noteOnly?: Set<string>;
+  /* which sentences of a model's answer come from a visitor's note
+     (answerGuard noteJudge): the glass marks them unverified */
+  fromNote?: NoteJudge;
 }
 
 interface Run {
@@ -598,27 +598,22 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
       return;
     }
     /* the model's words pass through answerGuard.ts: its own instructions
-       repeated back are dropped, and so is "According to a visitor note"
-       when no note was in the briefing */
-    const notesBriefed = r.prompt.contextBlocks.some((b) => b.label.includes("VISITOR NOTE"));
-    /* Whether the answer repeats a visitor's note is decided here, not left
-       to the model's discretion: whatever in it only a note supports is
-       marked on the glass as unverified */
-    const isNote = (b: { label: string }) => b.label.includes("VISITOR NOTE");
-    const noteOnly = notesBriefed
-      ? noteOnlyTerms(
-          r.prompt.contextBlocks.filter(isNote).map((b) => b.text),
-          [...r.prompt.contextBlocks.filter((b) => !isNote(b)).map((b) => b.text), r.query]
-        )
-      : undefined;
+       repeated back are dropped. Whether a sentence repeats a visitor's note
+       is decided there too, not left to the model: those are marked on the
+       glass as unverified, and only they may say "According to a visitor
+       note" */
+    const fromNote = noteJudge(
+      r.prompt.contextBlocks.filter((b) => b.label.includes("VISITOR NOTE")).map((b) => b.text),
+      chunks.filter((c) => c.section !== "Visitor").map((c) => c.text)
+    );
     let said = "";
     const result = await generate(
       r.prompt.system,
       userMessage(r.prompt),
       (text) => {
         if (signal.aborted) return;
-        said = cleanModelAnswer(text, notesBriefed);
-        setAnswer({ mode: "model", text: said, quotes, done: false, noteOnly });
+        said = cleanModelAnswer(text, fromNote);
+        setAnswer({ mode: "model", text: said, quotes, done: false, fromNote: fromNote ?? undefined });
       },
       signal
     );
@@ -700,7 +695,7 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
   const performing = act !== "rest";
   const line = narration(act, run, answer, engine);
   /* a model's answer, cut where it repeats something only a visitor's note says */
-  const marked = answer?.mode === "model" && answer.noteOnly ? markNoteTerms(answer.text, answer.noteOnly) : null;
+  const marked = answer?.mode === "model" && answer.fromNote ? markNoteSentences(answer.text, answer.fromNote) : null;
   const usesNote = !!marked?.some((m) => m.fromNote);
   const status = llmOn
     ? engineStatus(engine)
@@ -867,7 +862,7 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
                 <>
                   {usesNote && (
                     <p className="a2-speech__unverified">
-                      ⚠ UNVERIFIED: THE MARKED WORDS COME FROM A VISITOR'S NOTE, NOT FROM BRIAN.
+                      ⚠ UNVERIFIED: THE MARKED PART COMES FROM A VISITOR'S NOTE, NOT FROM BRIAN.
                     </p>
                   )}
                   <p className={`a2-speech__text ${answer && answer.mode !== "model" ? "is-quote" : ""}`}>

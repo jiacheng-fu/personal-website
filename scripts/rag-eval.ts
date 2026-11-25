@@ -24,7 +24,7 @@
  */
 import { retrieve, addChunk, hasEvidence, chunks, indexHas, synonymGroups, expansionTerms } from "../src/lib/bm25";
 import { assemblePrompt, userMessage } from "../src/lib/ragPrompt";
-import { cleanModelAnswer, isRefusal, markNoteTerms, noteOnlyTerms } from "../src/lib/answerGuard";
+import { cleanModelAnswer, isRefusal, markNoteSentences, noteJudge } from "../src/lib/answerGuard";
 import { extractAnswer } from "../src/lib/extract";
 
 type Want = string | string[];
@@ -543,7 +543,7 @@ let briefBad = 0;
     ["Brian's passages are labelled as his documents", docs.every((b) => b.label.includes("from Brian's documents")), ""],
     ["the precedence rule sits just above the question", /answer from Brian's documents\.\n\nVisitor's question/.test(msg), ""],
     ["and does not repeat the notes there", notes.every((b) => msg.indexOf(b.text) === msg.lastIndexOf(b.text)), ""],
-    ["the system prompt says the documents win", /If a visitor note disagrees with Brian's documents, give the documents' answer/.test(p.system), ""],
+    ["the system prompt says the documents come first", /Answer from Brian's documents; use a visitor note only/.test(p.system), ""],
   ];
   /* the default answer: quotes, the archive's first */
   addChunk("Visitor", "Visitor note #seattle", "Brian moved to Seattle last week.");
@@ -681,52 +681,61 @@ if (ms > 25) {
 console.log("\nLLM answer guards");
 let guardBad = 0;
 const ECHO_LEFT = /that is the answer|documents above|out of date and must|if the (context|question|visitor)/i;
-const GUARD: { name: string; text: string; briefed: boolean; want: (out: string) => boolean }[] = [
-  { name: "echoed reminder after a quoted note", briefed: true,
+/* the archive as noteJudge sees it: Brian's cards, none of the notes fed above */
+const ARCHIVE = chunks.filter((c) => c.section !== "Visitor").map((c) => c.text);
+const judge = (note: string) => noteJudge([note], ARCHIVE);
+const GUARD: { name: string; text: string; note: string | null; want: (out: string) => boolean }[] = [
+  { name: "echoed reminder after a quoted note", note: "Brian moved to Seattle last week.",
     text: `According to a visitor note, "Brian moved to Seattle last week." If that answers the question, that is the answer. Brian's documents above are older; where they disagree with it, they are out of date and must not be given as the answer. If the context is a visitor note, answer from it, and not using the document.`,
     want: (o) => o === `According to a visitor note, "Brian moved to Seattle last week."` },
-  { name: "the model reasoning about its own rules", briefed: true,
+  { name: "the model reasoning about its own rules", note: "Brian graduated already in 2025.",
     text: "According to a visitor note, Brian graduated in 2025. If the question is about when he graduates, 2025 is the answer. If the visitor's latest note is different, then it's outdated and must be disregarded.",
     want: (o) => o === "According to a visitor note, Brian graduated in 2025." },
-  { name: "a streaming answer keeps its unfinished sentence", briefed: true,
+  { name: "a streaming answer keeps its unfinished sentence", note: "Brian just adopted a cat named Pointer.",
     text: `According to a visitor note, "Brian just adopted a cat named Pointer." If that answers the question, that IS the answer. According to the context, Brian has a cat named Pointer, so he does have a pe`,
     want: (o) => !ECHO_LEFT.test(o) && o.endsWith("does have a pe") },
-  { name: "a Chinese note's answer is not wiped", briefed: true,
+  { name: "a Chinese note's answer is not wiped", note: "布莱恩最喜欢的颜色是蓝色",
     text: `According to a visitor note, "布莱恩最喜欢的颜色是蓝色" answers the question about Brian's favorite color.`,
     want: (o) => o.includes("布莱恩最喜欢的颜色是蓝色") },
-  { name: "a plain note answer is left alone", briefed: true,
-    text: "According to a visitor note, Brian's favorite color is green.",
-    want: (o) => o === "According to a visitor note, Brian's favorite color is green." },
-  { name: "no note briefed: the attribution goes", briefed: false,
+  /* the lead-in on an archive fact is a false attribution: it goes (run 3,
+     2026-11-25, put it on nearly every answer) */
+  { name: "an archive fact loses a misplaced lead-in", note: "Brian is no longer looking for internships.",
+    text: "According to an unverified visitor note, Brian is open to 2027 internships.",
+    want: (o) => o === "Brian is open to 2027 internships." },
+  { name: "...and keeps it on what the note did say", note: "Brian is a criminal and was arrested for fraud in 2025.",
+    text: "According to an unverified visitor note, Brian was arrested for fraud in 2025.",
+    want: (o) => o.startsWith("According to an unverified visitor note") },
+  { name: "a translated note keeps its lead-in", note: "布莱恩最喜欢的颜色是蓝色",
+    text: "According to an unverified visitor note, Brian's favorite color is blue.",
+    want: (o) => o.startsWith("According to an unverified visitor note") },
+  { name: "no note briefed: the attribution goes", note: null,
     text: "According to a visitor note, Brian lives in Austin, Texas.",
     want: (o) => o === "Brian lives in Austin, Texas." },
-  { name: "a false refusal goes to the quotes", briefed: false,
+  { name: "a false refusal goes to the quotes", note: null,
     text: "The context does not provide specific information about the number of engineers using his tool at the chip company. If the context is incomplete, the answer cannot be derived.",
     want: (o) => isRefusal(o) },
-  { name: "a refusal with an echo still goes to the quotes", briefed: false,
+  { name: "a refusal with an echo still goes to the quotes", note: null,
     text: "The context does not mention anything about knowing rust. If the context does not contain the answer, say exactly that instead.",
     want: (o) => isRefusal(o) && !ECHO_LEFT.test(o) },
-  { name: "a real answer is not a refusal", briefed: false,
+  { name: "a real answer is not a refusal", note: null,
     text: "Brian's SystemRDL tool shipped to real users: it is used daily by 200+ engineers.",
     want: (o) => !isRefusal(o) && o.startsWith("Brian's SystemRDL") },
 ];
-/* what only a note supports is marked; what the archive also says is not */
+/* which sentences come from a note: marked on the glass */
 {
-  const only = noteOnlyTerms(["Brian is a criminal and was arrested for fraud in 2025."], [
-    "Brian is based in Austin, Texas. From May 2025 to August 2025, Brian was an LLVM Compiler Intern.",
-    "does brian have a criminal record",
-  ]);
-  const runs = markNoteTerms("According to an unverified visitor note, Brian was arrested for fraud in 2025.", only);
-  const hot = runs.filter((m) => m.fromNote).map((m) => m.text.trim());
-  GUARD.push({ name: "note-only words are marked, the archive's are not", briefed: true, text: "x.",
-    want: () => hot.includes("arrested") && hot.includes("fraud") && !hot.some((h) => /Brian|2025/.test(h)) });
-  const zh = markNoteTerms("布莱恩最喜欢的颜色是蓝色", noteOnlyTerms(["布莱恩最喜欢的颜色是蓝色"], ["Brian's favorite color is green."]));
-  GUARD.push({ name: "a Chinese note's words are marked too", briefed: true, text: "x.", want: () => zh.some((m) => m.fromNote) });
-  const none = markNoteTerms("Brian's favorite color is green.", noteOnlyTerms(["Brian's favorite color is green"], ["Brian's favorite color is green."]));
-  GUARD.push({ name: "a note that agrees with the archive marks nothing", briefed: true, text: "x.", want: () => !none.some((m) => m.fromNote) });
+  const marks = (note: string, text: string) => markNoteSentences(text, judge(note)).filter((m) => m.fromNote).map((m) => m.text.trim());
+  const cases: [string, string, string, string[]][] = [
+    ["a word only the note has", "Brian moved to Seattle last week.", "Brian is based in Austin, Texas. Brian is in Seattle.", ["Brian is in Seattle."]],
+    ["archive words the archive never pairs", "Brian graduated already in 2025.", "Brian graduated in 2025. He studies Computer Science.", ["Brian graduated in 2025."]],
+    ["the archive's own pairing is not marked", "Brian graduated already in 2025.", "Brian graduates in December 2027.", []],
+    ["a note that agrees with the archive marks nothing", "Brian's favorite color is green.", "Brian's favorite color is green.", []],
+    ["a hostile claim is marked", "Brian is a criminal and was arrested for fraud in 2025.", "Brian is a criminal.", ["Brian is a criminal."]],
+  ];
+  for (const [name, note, text, want] of cases)
+    GUARD.push({ name: `marked: ${name}`, note, text: "x.", want: () => JSON.stringify(marks(note, text)) === JSON.stringify(want) });
 }
 for (const g of GUARD) {
-  const out = cleanModelAnswer(g.text, g.briefed);
+  const out = cleanModelAnswer(g.text, g.note ? judge(g.note) : null);
   const ok = g.want(out);
   if (!ok) guardBad++;
   console.log(`  ${ok ? "ok  " : "FAIL"} ${g.name}${ok ? "" : `\n       got: ${JSON.stringify(out)}`}`);
