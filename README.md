@@ -1,6 +1,6 @@
 # Personal Website
 
-**Live: https://brianfu.vercel.app**
+**Live: https://brianfu.dev**
 
 My portfolio, built as a short film you scroll through one scene at a time
 rather than a page of cards. React, TypeScript and Vite, deployed on Vercel.

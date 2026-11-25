@@ -1,11 +1,14 @@
-# Handoff — brianfu.vercel.app
+# Handoff — brianfu.dev
 
 Read this first, then `docs/`. Written 2026-08-01.
 
 **Working copy:** `C:\Users\brian\OneDrive\Desktop\Resume\personal-website`
 **Repo:** https://github.com/jiacheng-fu/personal-website (branch `main`)
-**Live:** https://brianfu.vercel.app — ⚠️ serving a build from *well before*
-everything below. Nothing in this document is deployed yet.
+**Live:** https://brianfu.dev (also https://brianfu.vercel.app). Since
+2026-11-25 every push to `main` deploys to production: Vercel scope `brian125`
+(Brian's gmail account), project `brianfu`. The domain was registered through
+Vercel on 2026-11-25 for one year with auto-renew OFF — renew it by hand before
+it expires (vercel.com/brian125/~/domains).
 
 The working directory for a new chat is the **parent** folder,
 `C:\Users\brian\OneDrive\Desktop\Resume` — that is where `.mcp.json` and
