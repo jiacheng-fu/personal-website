@@ -52,10 +52,10 @@ function sectionTop(i: number) {
  *  wait - the hero uses it to play the robot beat before handing over. */
 export type Gate = (from: number, to: number) => Promise<void> | null | undefined;
 
-/* A reload starts at the top. The browser's own scroll restoration would put
+/* The browser never restores the scroll on its own: left to it, a reload put
    the page back on, say, the projects while the nav (and every section's
-   "active" state) starts at the hero: titles never drawn, dots on the wrong
-   section. The site is meant to be entered from the hero anyway. */
+   "active" state) started at the hero - titles never drawn, dots on the wrong
+   section. The nav restores the section itself (RELOAD, below). */
 if (typeof history !== "undefined" && "scrollRestoration" in history) {
   history.scrollRestoration = "manual";
 }
@@ -69,6 +69,8 @@ if (typeof history !== "undefined" && "scrollRestoration" in history) {
    still pushing), which is what keeps deliberate continued scrolling moving -
    the reason the old quiet-period rule, which waited for a pause only, felt dead. */
 const NEW_GESTURE_GAP = 160; // ms
+/* The section this tab was on, so a reload comes back to it (see below). */
+const SECTION_KEY = "nav:section";
 const GROWTH = 1.4;
 
 export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
@@ -155,10 +157,28 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
     [count]
   );
 
-  /* Keep the page on the section the nav believes it is on from the first
-     frame (and after a dev hot-reload remount, which resets the index). */
+  /* RELOAD. The page and the nav are set together, by us, never left to the
+     browser: a reload comes back to the section this tab was on, ARRIVED AT the
+     way a progress-dot jump arrives (the nav starts at the hero for one render
+     and then moves, so the app's arrival logic runs - the machine boots, the
+     keyboard plays its intro, the index draws its titles). Before this, a
+     reload could leave the page scrolled to one section while the nav sat on
+     the hero: nothing on screen was ever activated, and it read as a black,
+     broken page. A new tab still starts at the hero (sessionStorage), and the
+     clip-plate renderer (?frame=) positions itself. */
   useEffect(() => {
     if (!enabled) return;
+    let back = 0;
+    try {
+      back = Number(sessionStorage.getItem(SECTION_KEY)) || 0;
+    } catch {
+      /* storage blocked: start at the hero */
+    }
+    const plate = new URLSearchParams(location.search).has("frame");
+    if (!plate && back > 0 && back < count && indexRef.current === 0) {
+      indexRef.current = back;
+      setIndex(back);
+    }
     const realign = () => window.scrollTo(0, sectionTop(indexRef.current));
     realign();
     /* ...and again whenever the browser might have put the scroll back on its
@@ -174,6 +194,13 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled]);
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SECTION_KEY, String(index));
+    } catch {
+      /* ignore */
+    }
+  }, [index]);
 
   useEffect(() => {
     if (!enabled) return;

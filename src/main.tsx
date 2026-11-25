@@ -78,6 +78,15 @@ class SafetyNet extends Component<{ children: ReactNode }, { failed: boolean }> 
   }
 }
 
+/* Development: a saved file reloads the page instead of being hot-swapped in.
+   This site is a stateful film (a booted machine, a lit keyboard, a scene
+   mid-play), and a live swap kept the section while resetting what was on it -
+   a dark machine or a black keyboard under dots that still said section 2 or 3.
+   A reload lands back on the same section, properly (useSectionNav, RELOAD). */
+if (import.meta.hot) {
+  import.meta.hot.on("vite:beforeUpdate", () => location.reload());
+}
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <SafetyNet>
