@@ -16,6 +16,8 @@ import { setClipBusy } from "../lib/transitions";
 export type TransitionHandle = {
   /** Load a clip so it is ready to play the moment it is needed. */
   prime: (src: string) => void;
+  /** Resolves once the primed clip can play through (or is already playable). */
+  whenReady: (src: string) => Promise<void>;
   /** Play a clip full-screen. Forward: reveal under the first motion, resolve
    *  at ended. Reverse (instantReveal): cover instantly, then hide+resolve
    *  hideBeforeEndS before the static tail, under the board's stand-up. */
@@ -156,6 +158,22 @@ const TransitionPlayer = forwardRef<TransitionHandle>(function TransitionPlayer(
         v.src = src;
         v.load();
       }
+    },
+    whenReady(src) {
+      const v = video.current;
+      return new Promise<void>((resolve) => {
+        if (!v) return resolve();
+        const ok = () => v.src.endsWith(src) && v.readyState >= 4;
+        if (ok()) return resolve();
+        const check = () => {
+          if (!ok()) return;
+          v.removeEventListener("canplaythrough", check);
+          v.removeEventListener("progress", check);
+          resolve();
+        };
+        v.addEventListener("canplaythrough", check);
+        v.addEventListener("progress", check);
+      });
     },
     play(src, opts) {
       const v = video.current;

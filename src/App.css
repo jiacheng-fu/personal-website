@@ -2004,6 +2004,95 @@ html {
   color: var(--crt);
   text-shadow: none;
 }
+.a2-status__ctl {
+  display: flex;
+  gap: 0.6em;
+}
+.a2-llm {
+  color: var(--ph-dim) !important;
+}
+.a2-llm.is-on {
+  color: var(--ph) !important;
+}
+.a2-llm:hover {
+  color: var(--crt) !important;
+}
+
+/* the answer: the archive's sentences, each with where it came from */
+.a2-quote {
+  max-width: 60ch;
+  margin-bottom: 0.55em;
+  line-height: 1.35;
+}
+.a2-quote__src {
+  display: block;
+  margin-top: 0.15em;
+  font-size: 0.78em;
+  color: var(--ph-dim);
+}
+.a2-quote.is-visitor {
+  border-left: 2px solid var(--ph);
+  padding-left: 0.5em;
+}
+/* under a model's answer: the quotes it worked from, to check it against */
+.a2-speech__check {
+  margin-top: 0.7em;
+  padding-top: 0.45em;
+  border-top: 1px dashed var(--ph-faint);
+  font-size: 0.8em;
+  color: var(--ph-dim);
+}
+.a2-speech__check > p:first-child {
+  margin-bottom: 0.45em;
+  color: var(--ph);
+}
+
+/* the opt-in, over the glass */
+.a2-optin {
+  position: absolute;
+  inset: 0.95rem 1.2rem;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.6em;
+  padding: 1em 1.2em;
+  background: var(--crt);
+  border: 1px solid var(--ph);
+  font-size: 0.82em;
+  line-height: 1.35;
+}
+.a2-optin__head {
+  color: var(--ph);
+  font-size: 1.15em;
+}
+.a2-optin ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ph-dim);
+}
+.a2-optin li::before {
+  content: "· ";
+  color: var(--ph);
+}
+.a2-optin__row {
+  display: flex;
+  gap: 1.2em;
+}
+.a2-optin button {
+  font: inherit;
+  color: var(--ph);
+  background: none;
+  border: 0;
+  cursor: none;
+  text-shadow: inherit;
+}
+.a2-optin button:hover {
+  background: var(--ph);
+  color: var(--crt);
+  text-shadow: none;
+}
 
 /* ---- small screens ---- */
 @media (max-height: 860px) {

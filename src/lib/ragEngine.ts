@@ -38,6 +38,7 @@ import { isClipBusy } from "./transitions";
 import {
   BACKENDS,
   __resetDownloadsForTests,
+  haltDownloads,
   type Backend,
   type LoadReport,
   type Runner,
@@ -117,6 +118,12 @@ export function arrivalVerdict(): Verdict {
   if (nav.connection?.saveData) return { ok: false, reason: "Data Saver is on", permanent: true };
   if (nav.deviceMemory !== undefined && nav.deviceMemory < 4)
     return { ok: false, reason: "device reports <4 GB RAM", permanent: true };
+  /* A 2-core machine downloads 352 MB and then crawls; it gets the fragments
+     and the button, not an automatic download. (Chrome caps this at 8 or so
+     for privacy, but never under-reports.) */
+  const cores = (navigator as { hardwareConcurrency?: number }).hardwareConcurrency;
+  if (cores !== undefined && cores < 4)
+    return { ok: false, reason: "fewer than 4 CPU cores", permanent: true };
   /* iPadOS calls itself a Macintosh, and an iPad with WebGPU would otherwise
      sail through every one of these checks and start pulling 350 MB over
      someone's cellular plan. A pointing device that reports ten fingers is
@@ -130,6 +137,37 @@ export function arrivalVerdict(): Verdict {
   if (typeof document !== "undefined" && document.visibilityState === "hidden")
     return { ok: false, reason: "the tab is in the background", permanent: false };
   return { ok: true };
+}
+
+/* ---- the GPU itself ------------------------------------------------------
+   Asked once, before a single byte is fetched. The model is q4f16, and
+   WebLLM refuses an adapter without the shader-f16 feature - but only AFTER
+   the 352 MB download, which is exactly what an older GPU's visitor used to
+   sit through for nothing. A software (fallback) adapter would run it at a
+   token every few seconds. Both are facts about the machine: permanent. If
+   the browser cannot be asked (no requestAdapter), it is not grounds to
+   refuse - the runtime will say. */
+type Adapter = { isFallbackAdapter?: boolean; info?: { isFallbackAdapter?: boolean }; features?: { has(f: string): boolean } };
+let gpuCheck: Promise<Verdict> | null = null;
+export function gpuVerdict(): Promise<Verdict> {
+  if (gpuCheck) return gpuCheck;
+  gpuCheck = (async (): Promise<Verdict> => {
+    const gpu = (navigator as { gpu?: { requestAdapter?: (o?: object) => Promise<Adapter | null> } }).gpu;
+    if (!gpu) return { ok: false, reason: "no WebGPU in this browser", permanent: true };
+    if (typeof gpu.requestAdapter !== "function") return { ok: true };
+    try {
+      const a = await gpu.requestAdapter({ powerPreference: "high-performance" });
+      if (!a) return { ok: false, reason: "no WebGPU adapter on this machine", permanent: true };
+      if (a.isFallbackAdapter || a.info?.isFallbackAdapter)
+        return { ok: false, reason: "only a software GPU (too slow for the model)", permanent: true };
+      if (a.features && !a.features.has("shader-f16"))
+        return { ok: false, reason: "this GPU lacks shader-f16, which the model needs", permanent: true };
+      return { ok: true };
+    } catch {
+      return { ok: true };
+    }
+  })();
+  return gpuCheck;
 }
 
 /* The browser needs room to store and unpack the weights. If there is not that
@@ -258,20 +296,37 @@ export function preload(force = false): Promise<Runner | null> {
      estimate the state would otherwise still read "idle", and the boot screen
      takes idle to mean "nothing is coming" and stops holding. */
   set({ phase: "queued", detail: "starting" });
+  /* this load, as opposed to one the visitor has since switched off */
+  const gen = loadGen;
+  const live = () => gen === loadGen;
   enginePromise = (async () => {
     try {
+      /* the GPU, before anything is fetched: a machine that cannot run it is
+         told so once and keeps answering from the fragments */
+      const g = await gpuVerdict();
+      if (!live()) return null;
+      if (!g.ok) {
+        set({ phase: "unavailable", detail: g.reason });
+        return null;
+      }
       const shortfall = await storageShortfall();
+      if (!live()) return null;
       if (shortfall) {
         set({ phase: "idle", detail: `not loaded: ${shortfall}` });
         enginePromise = null; // they may free space; the button still works
         return null;
       }
       set({ phase: "downloading", stage: "fetch", progress: 0, bytes: 0, detail: "starting" });
-      const runner = await backend.load(onReport);
+      const runner = await backend.load((r) => live() && onReport(r));
+      if (!live()) {
+        void runner.dispose();
+        return null;
+      }
       netRetries = 0;
       set({ phase: "ready", detail: "weights cached in this browser" });
       return runner;
     } catch (e) {
+      if (!live()) return null; // switched off mid-load: the halt is the "error"
       const message = e instanceof Error ? e.message : String(e);
       set({ phase: "error", detail: message });
       /* Let go of the failed attempt. A dropped connection mid-download, a GPU
@@ -289,6 +344,64 @@ export function preload(force = false): Promise<Runner | null> {
   return enginePromise;
 }
 
+/* ---- the visitor's choice -------------------------------------------------
+   Since 2026-11-25 the machine's answer is a QUOTE from its archive
+   (extract.ts): instant, free, and word for word true. The LLM is an opt-in
+   on top - Brian: "RAG by default, and have a toggle with a disclaimer that
+   the model will take time to load and processing power and may not be
+   accurate". Nothing below loads unless the visitor said yes; the callers
+   (RagSection, App) check llmOptedIn() before asking. The answer is kept in
+   localStorage, which needs no permission and shows no prompt, so a visitor
+   who said yes once gets the background download from landing next time. */
+const OPT_KEY = "fu-machine-llm";
+let optedIn: boolean | null = null;
+let loadGen = 0;
+
+export function llmOptedIn(): boolean {
+  if (optedIn === null) {
+    try {
+      optedIn = localStorage.getItem(OPT_KEY) === "1";
+    } catch {
+      optedIn = false; // storage blocked: off, as for anyone who never chose
+    }
+  }
+  return optedIn;
+}
+
+export function setLlmOptIn(on: boolean): void {
+  optedIn = on;
+  try {
+    if (on) localStorage.setItem(OPT_KEY, "1");
+    else localStorage.removeItem(OPT_KEY);
+  } catch {
+    /* this page only, then */
+  }
+  haltDownloads(!on);
+  if (on) void preload(true);
+  else void unloadModel();
+}
+
+/** Switched off: stop downloading, stop retrying, free the GPU. A load still
+ *  in flight is orphaned (loadGen) - it can no longer report, and if it
+ *  finishes anyway its engine is disposed on the spot. Files already in the
+ *  cache stay, so switching back on picks up where it stopped. */
+async function unloadModel(): Promise<void> {
+  loadGen++;
+  const p = enginePromise;
+  enginePromise = null;
+  if (retryTimer) window.clearTimeout(retryTimer);
+  retryTimer = 0;
+  if (netTimer) window.clearTimeout(netTimer);
+  netTimer = 0;
+  attempts = 0;
+  netRetries = 0;
+  asked = null;
+  warmed.clear();
+  set({ phase: "idle", detail: "switched off" });
+  const runner = await p?.catch(() => null);
+  void runner?.dispose();
+}
+
 /** The arrival request: the visitor has reached the machine. */
 export function requestModel(): void {
   void preload(false);
@@ -302,28 +415,24 @@ export function requestModel(): void {
    later is exactly the visitor it helps most. Each part runs once a page. */
 const warmed = new Set<WarmPart>();
 
-export function warmModel(part: WarmPart): void {
-  if (!backend.warm || warmed.has(part)) return;
+const warming = new Map<WarmPart, Promise<void>>();
+export function warmModel(part: WarmPart): Promise<void> {
+  if (!backend.warm) return Promise.resolve();
+  if (warmed.has(part)) return warming.get(part) ?? Promise.resolve();
   const q = typeof location === "undefined" ? "" : location.search;
-  if (/[?&]rag=off/.test(q) || /[?&]frame=/.test(q)) return;
+  if (/[?&]rag=off/.test(q) || /[?&]frame=/.test(q)) return Promise.resolve();
   const verdict = arrivalVerdict();
-  if (!verdict.ok && verdict.permanent) return;
+  if (!verdict.ok && verdict.permanent) return Promise.resolve();
   warmed.add(part);
-  void (async () => {
-    /* A refresh, or a return visit: everything is already on disk, so the
-       only work left is the GPU's, and it is done now, quietly, while the
-       visitor is on the hero - the machine is simply ready when they get
-       there. No browser keeps a model on the GPU across a reload; this is
-       the nearest thing to it. Waits for the hero's own entrance to finish
-       and for an idle moment, and goes through the arrival's gates (no
-       clip on screen, tab visible). Never on a first visit: there, the GPU
-       work stays on demand under the progress bar. */
-    if (part === "landing" && (await backend.cached?.())) {
-      const go = () => void preload(false);
-      const idle = (window as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => void }).requestIdleCallback;
-      window.setTimeout(() => (idle ? idle(go, { timeout: 2000 }) : go()), RETURN_VISIT_DELAY_MS);
-      return;
-    }
+  const job = (async () => {
+    /* Everything already on disk (a refresh, a return visit): nothing to
+       download. The GPU stage is NOT started from here any more - it used to
+       fire on a timer 1.8 s after landing, right as the visitor scrolled,
+       which is the likeliest cause of a stuttering first scroll on a machine
+       that already has the model (2026-11-25). loadInBackground schedules it
+       for a calm moment instead. */
+    if (await backend.cached?.()) return;
+    if (!(await gpuVerdict()).ok) return; // never download for a GPU that can't run it
     if (await storageShortfall()) return;
     /* not while a transition clip is playing: the next file waits for it */
     await backend.warm!(part, () => !isClipBusy());
@@ -331,10 +440,46 @@ export function warmModel(part: WarmPart): void {
     warmed.delete(part); // a later call may try again; the arrival will anyway
     console.warn(`[rag] background download (${part}) stopped; the machine will finish it`, err);
   });
+  warming.set(part, job);
+  return job;
 }
 
-/** After the hero's entrance (words rising, rules drawing) has played. */
-const RETURN_VISIT_DELAY_MS = 1800;
+/** THE WHOLE MODEL, IN THE BACKGROUND, FROM LANDING (Brian, 2026-11-25:
+ *  "the model should start loading as soon as they land on the hero ... it
+ *  shouldn't start loading when they first get to that section"). Every
+ *  file, largest first; then, once all of it is on disk, the GPU upload and
+ *  compile too - in the model's own worker, so the page never freezes for
+ *  it - at the first moment the caller calls quiet (`mayFinish`: not on the
+ *  3D keyboard, whose frames it would compete with). No clip on screen and
+ *  the tab visible, as for any load. Arriving at the machine first simply
+ *  takes over (requestModel), with the download already well along. */
+export async function loadInBackground(mayFinish: () => boolean, downloadsMayStart: Promise<void> = Promise.resolve()): Promise<void> {
+  const q = typeof location === "undefined" ? "" : location.search;
+  if (/[?&]rag=off/.test(q) || /[?&]frame=/.test(q)) return;
+  const v = arrivalVerdict();
+  if (!v.ok && v.permanent) return;
+  if (!(await gpuVerdict()).ok) return;
+  /* already on disk: no download to order behind anything, straight to the
+     GPU stage; otherwise wait for what the visitor needs sooner (the clip) */
+  if (!(await backend.cached?.())) {
+    await downloadsMayStart;
+    await warmModel("landing");
+    await warmModel("rest");
+    if (!(await backend.cached?.())) return; // not all of it landed; the arrival finishes it
+  }
+  await new Promise<void>((done) => {
+    const tick = () => {
+      if (enginePromise || state.phase === "ready" || state.phase === "unavailable") return done();
+      const quiet = mayFinish() && !isClipBusy() && document.visibilityState === "visible";
+      if (quiet) {
+        void preload(false);
+        return done();
+      }
+      window.setTimeout(tick, 1000);
+    };
+    tick();
+  });
+}
 
 /* ---- a dropped connection ------------------------------------------------
    A laptop that sleeps, or Wi-Fi that switches networks, kills every
@@ -393,6 +538,7 @@ if (typeof document !== "undefined" && typeof document.addEventListener === "fun
  *  cost of it existing in the bundle is a dozen bytes.
  */
 export function __resetForTests() {
+  gpuCheck = null;
   if (retryTimer) window.clearTimeout(retryTimer);
   retryTimer = 0;
   attempts = 0;

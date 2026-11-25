@@ -166,6 +166,11 @@ export default function Hero({ active }: { active: boolean }) {
         <img
           className="hx__layer hx__photo"
           src="/hero/background1.webp"
+          /* level of detail: a 1x screen gets the 1672px original (210 KB),
+             a Retina one the 3344px upscale (590 KB). Photo and head share
+             srcset and sizes, so the browser always picks the same pair. */
+          srcSet="/hero/background1-1x.webp 1672w, /hero/background1.webp 3344w"
+          sizes="100vw"
           width={PHOTO.w}
           height={PHOTO.h}
           alt=""
@@ -217,6 +222,8 @@ export default function Hero({ active }: { active: boolean }) {
         <img
           className="hx__layer hx__head"
           src="/hero/background1-head.webp"
+          srcSet="/hero/background1-head-1x.webp 1672w, /hero/background1-head.webp 3344w"
+          sizes="100vw"
           width={PHOTO.w}
           height={PHOTO.h}
           alt=""

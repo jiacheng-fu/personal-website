@@ -292,7 +292,16 @@ function legendPlane(cap: Cap) {
 /* Most pixels we are willing to shade per frame. 3.2 MP is ~1080p worth of
    work: comfortable for integrated graphics, and on a Retina panel it still
    lands above 1x so the board keeps its edge definition. */
-const PIXEL_BUDGET = 3_200_000;
+/* QUALITY TIERS (the console way: one game, settings per machine). A
+   machine reporting 4 or fewer cores, or 4 GB or less of memory, gets half
+   the pixels, no shadow pass and no MSAA - the board still reads, it just
+   stops costing what it costs a new laptop. ?tier=low forces it. */
+const LOW_TIER =
+  typeof navigator !== "undefined" &&
+  (/[?&]tier=low/.test(typeof location === "undefined" ? "" : location.search) ||
+    (navigator.hardwareConcurrency ?? 8) <= 4 ||
+    ((navigator as { deviceMemory?: number }).deviceMemory ?? 8) <= 4);
+const PIXEL_BUDGET = LOW_TIER ? 1_600_000 : 3_200_000;
 
 /** The highest device-pixel ratio that keeps a surface inside the budget,
  *  clamped to something sane. Recomputed on resize by the caller. */
@@ -1560,7 +1569,7 @@ export default function Keyboard3D({
     >
       <Canvas
         className="kb__canvas"
-        shadows
+        shadows={!LOW_TIER}
         /* Was capped at 1.75. On a Retina panel that renders ~14% fewer
            pixels per axis than the display can show (measured: a 3241x1823
            buffer where the screen could take 3705x2084), which is why the
@@ -1587,7 +1596,7 @@ export default function Keyboard3D({
            which is what makes it sit against Swiss type instead of fighting
            it with a wide-angle flare. */
         camera={daylight ? { position: [0, 1.2, 11.5], fov: 22 } : { position: [0, 5.5, 6.7], fov: 26 }}
-        gl={{ alpha: true, antialias: true }}
+        gl={{ alpha: true, antialias: !LOW_TIER }}
         onCreated={({ gl }) => {
           /* Shadows on demand: the shadow pass re-rendered every mesh every
              frame even with the board sitting still. Now it runs only on

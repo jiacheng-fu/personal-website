@@ -22,9 +22,10 @@ import { retrieve, addChunk, hasEvidence, MIN_EVIDENCE } from "../src/lib/bm25";
 import { assemblePrompt, userMessage } from "../src/lib/ragPrompt";
 import { BACKENDS as SITE, type Backend, type LoadReport } from "../src/lib/ragBackends";
 import { lfm25 } from "./bench-lfm";
+import { CANDIDATES } from "./bench-webllm";
 
-/* the shipped model, plus the parked candidate */
-const BACKENDS = { ...SITE, lfm25 } satisfies Record<string, Backend>;
+/* the shipped model, the parked candidate, and the opt-in field (2026-11-25) */
+const BACKENDS = { ...SITE, lfm25, ...CANDIDATES } satisfies Record<string, Backend>;
 type BackendId = keyof typeof BACKENDS;
 
 type Kind = "chip" | "fact" | "absent" | "note" | "hostile";
@@ -90,6 +91,21 @@ const BASE: Case[] = [
   { kind: "fact", q: "has he worked with typescript in a real job", fact: ["TypeScript"] },
   { kind: "fact", q: "what did he automate at the chip company", fact: ["SystemRDL"] },
   { kind: "fact", q: "what is thingsx", fact: ["multi-tenant"] },
+
+  /* the November resume (2026-11-25) - Mesa, and ThingsX as it reads now */
+  { kind: "fact", q: "what is mesa", fact: ["Founding Engineer"] },
+  { kind: "fact", q: "what did he do at mesa", fact: ["document"] },
+  { kind: "fact", q: "when did he work at mesa", fact: ["2026"] },
+  { kind: "fact", q: "how many tests did he write at mesa", fact: ["1,880"] },
+  { kind: "fact", q: "how many pages per hour could his pipeline read", fact: ["790"] },
+  { kind: "fact", q: "how much did the mesa deployment cost to run", fact: ["1,100"] },
+  { kind: "fact", q: "has he done machine learning in production", fact: ["classif"] },
+  { kind: "fact", q: "what ocr has he used", fact: ["Paddle"] },
+  { kind: "fact", q: "list every company he has worked at", fact: ["ThingsX", "Mesa", "United Micro"] },
+  { kind: "fact", q: "how many tickets did he resolve at thingsx", fact: ["40"] },
+  /* ...and the August resume's projects the new one no longer lists */
+  { kind: "fact", q: "what did he build at howdyhack", fact: ["frontend"] },
+  { kind: "fact", q: "tell me about project horizon", fact: ["Unity"] },
 
   { kind: "absent", q: "has he used go", forbid: ["yes, he has used go"], note: "not in the corpus; must decline, not invent" },
   { kind: "absent", q: "does he know kubernetes", note: "not in the corpus" },
@@ -332,6 +348,7 @@ async function main() {
       log(`   ${flag}${p.case.q}  →  ${text.slice(0, 110).replace(/\n/g, " ")}`);
     }
     await runner.dispose();
+    await (runner as { clear?: () => Promise<void> }).clear?.();
   }
   window.__bench.status = "done";
   log("\nDONE");

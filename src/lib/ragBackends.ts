@@ -198,6 +198,15 @@ function job(url: string, cache: string, size = 0): FileJob {
   return j;
 }
 
+/* The visitor switched the LLM off (ragEngine.setLlmOptIn): no file starts,
+   and a file mid-stream is cut off at its next chunk - a "no" stops the
+   download now, not 300 MB later. Off again: everything resumes from what is
+   already cached. */
+let halted = false;
+export function haltDownloads(on: boolean) {
+  halted = on;
+}
+
 /** Fetch one file into its cache, counting bytes as they stream. Joins an
  *  attempt already under way. */
 function runJob(j: FileJob, mayStart?: () => boolean): Promise<void> {
@@ -215,6 +224,7 @@ function runJob(j: FileJob, mayStart?: () => boolean): Promise<void> {
       return;
     }
     for (let i = 0; !urgent && mayStart && !mayStart() && i < WAIT_POLLS_MAX; i++) await sleep(WAIT_POLL_MS);
+    if (halted) throw new Error("download halted: LLM switched off");
     j.state = "fetching";
     /* `priority` is Fetch Priority (Chrome 101+); elsewhere it is ignored */
     const res = await fetch(j.url, { priority: urgent ? "high" : "low" } as RequestInit);
@@ -226,6 +236,7 @@ function runJob(j: FileJob, mayStart?: () => boolean): Promise<void> {
     const counted = res.body.pipeThrough(
       new TransformStream<Uint8Array, Uint8Array>({
         transform(chunk, ctl) {
+          if (halted) return ctl.error(new Error("download halted: LLM switched off"));
           n += chunk.byteLength;
           j.loaded = n;
           notify();
@@ -372,6 +383,7 @@ async function finishQwenDownload(report: (r: LoadReport) => void) {
 
 /** Put the download registry back to nothing. For scripts/engine-gates.ts. */
 export function __resetDownloadsForTests() {
+  halted = false;
   jobs.clear();
   ticks.clear();
   shardList = null;
@@ -400,84 +412,93 @@ const qwen3: Backend = {
          fetches the rest itself - with its coarser progress. */
       console.warn("[rag] download failed; WebLLM will fetch the rest", err);
     }
-    const webllm = await import("@mlc-ai/web-llm");
-    const rec = webllm.prebuiltAppConfig.model_list.find((m) => m.model_id === QWEN_MODEL_ID);
-    if (!rec) throw new Error(`${QWEN_MODEL_ID} is not in this WebLLM's model list`);
-    if (rec.model !== QWEN_UPSTREAM_MODEL_URL || rec.model_lib !== QWEN_UPSTREAM_LIB_URL)
-      console.warn("[rag] WebLLM's own URLs for this model changed; the mirror may be stale", {
-        model: rec.model,
-        model_lib: rec.model_lib,
-      });
+    /* WebLLM runs in its own thread (ragWorker.ts): the page never parses
+       its 6 MB, and loading or answering never freezes scrolling. */
+    const worker = new Worker(new URL("./ragWorker.ts", import.meta.url), { type: "module" });
     const h = qwenHosted();
-    /* WebLLM's record, pointed at the mirror; everything else (context
-       window, VRAM figures, overrides) is its own */
-    const appConfig = { model_list: [{ ...rec, model: h.model, model_lib: h.lib }] };
-    const engine = await webllm.CreateMLCEngine(QWEN_MODEL_ID, {
-      appConfig,
-      /* WebLLM loads in three stages and says which one it is in only in its
-         text, so the stage is read from there (lib/index.js in 0.2.84):
-           "Fetching param cache[i/N]: XMB fetched. P% completed"   network
-           "Loading model from cache[i/N]: XMB loaded. P% ..."      onto the GPU
-           "Loading GPU shader modules[i/N]: P% completed"          compile
-         and `progress` restarts from 0 at each one. After the prefetch below
-         the first stage is normally skipped. "Start to fetch params" carries
-         nothing (it is progress 0 even with every shard cached) and would
-         flash the bar back to empty, so it is not reported. */
-      initProgressCallback: (p) => {
-        const t = p.text;
-        if (/^Fetching param cache/.test(t)) {
-          const mb = Number(/(\d+)MB fetched/.exec(t)?.[1] ?? 0);
-          report({ stage: "fetch", progress: p.progress, bytes: mb * 1024 * 1024, text: t });
-        } else if (/^Loading model from cache/.test(t)) {
-          report({ stage: "upload", progress: p.progress, text: t });
-        } else if (/shader/i.test(t)) {
-          report({ stage: "compile", progress: p.progress, text: t });
-        } else if (/^Finish loading/.test(t)) {
-          report({ stage: "compile", progress: 1, text: t });
-        }
-      },
+    /* WebLLM loads in three stages and says which one it is in only in its
+       text, so the stage is read from there (lib/index.js in 0.2.84):
+         "Fetching param cache[i/N]: XMB fetched. P% completed"   network
+         "Loading model from cache[i/N]: XMB loaded. P% ..."      onto the GPU
+         "Loading GPU shader modules[i/N]: P% completed"          compile
+       and `progress` restarts from 0 at each one. After the prefetch above
+       the first stage is normally skipped. "Start to fetch params" carries
+       nothing (it is progress 0 even with every shard cached) and would flash
+       the bar back to empty, so it is not reported. */
+    const onProgress = (progress: number, t: string) => {
+      if (/^Fetching param cache/.test(t)) {
+        const mbs = Number(/(\d+)MB fetched/.exec(t)?.[1] ?? 0);
+        report({ stage: "fetch", progress, bytes: mbs * 1024 * 1024, text: t });
+      } else if (/^Loading model from cache/.test(t)) {
+        report({ stage: "upload", progress, text: t });
+      } else if (/shader/i.test(t)) {
+        report({ stage: "compile", progress, text: t });
+      } else if (/^Finish loading/.test(t)) {
+        report({ stage: "compile", progress: 1, text: t });
+      }
+    };
+    await new Promise<void>((resolve, reject) => {
+      worker.onmessage = (e: MessageEvent) => {
+        const m = e.data;
+        if (m.type === "progress") onProgress(m.progress, m.text);
+        else if (m.type === "loaded") resolve();
+        else if (m.type === "error") reject(new Error(m.message));
+        else if (m.type === "warn") console.warn(`[rag] ${m.message}`, { model: m.model, model_lib: m.model_lib });
+      };
+      worker.onerror = (e) => reject(new Error(e.message || "the model worker failed to start"));
+      worker.postMessage({
+        type: "load",
+        id: QWEN_MODEL_ID,
+        model: h.model,
+        lib: h.lib,
+        upstreamModel: QWEN_UPSTREAM_MODEL_URL,
+        upstreamLib: QWEN_UPSTREAM_LIB_URL,
+      });
+    }).catch((err) => {
+      worker.terminate();
+      throw err;
     });
 
+    /* answers stream back by request id */
+    type Pending = { onText: (t: string) => void; resolve: (s: GenerationStats) => void; reject: (e: Error) => void };
+    const pending = new Map<number, Pending>();
+    let nextId = 0;
+    worker.onmessage = (e: MessageEvent) => {
+      const m = e.data;
+      const p = pending.get(m.id);
+      if (!p) return;
+      if (m.type === "text") p.onText(m.text);
+      else if (m.type === "done") {
+        pending.delete(m.id);
+        p.resolve(m.stats);
+      } else if (m.type === "gen-error") {
+        pending.delete(m.id);
+        p.reject(new Error(m.message));
+      }
+    };
+    /* a worker that dies (the GPU lost, out of memory) fails every pending
+       answer with words the engine knows to treat as fatal */
+    worker.onerror = (e) => {
+      const err = new Error(`GPU device lost: ${e.message || "the model worker stopped"}`);
+      pending.forEach((p) => p.reject(err));
+      pending.clear();
+    };
+
     return {
-      async generate(system, user, onText, signal) {
-        const t0 = performance.now();
-        let first: number | null = null;
-        let tokens = 0;
-        let text = "";
-        const stream = await engine.chat.completions.create({
-          messages: [
-            { role: "system", content: system },
-            { role: "user", content: user },
-          ],
-          stream: true,
-          max_tokens: MAX_TOKENS,
-          temperature: 0.3,
-          /* Qwen3 is a reasoning model by default; its <think> monologue at
-             0.6B is long and rarely improves a grounded answer. Belt (option)
-             and suspenders (strip tags below). */
-          extra_body: { enable_thinking: false },
+      generate(system, user, onText, signal) {
+        const id = ++nextId;
+        return new Promise<GenerationStats>((resolve, reject) => {
+          pending.set(id, { onText, resolve, reject });
+          signal?.addEventListener("abort", () => worker.postMessage({ type: "interrupt" }), { once: true });
+          worker.postMessage({ type: "generate", id, system, user, maxTokens: MAX_TOKENS });
         });
-        for await (const delta of stream) {
-          if (signal?.aborted) {
-            await engine.interruptGenerate();
-            break;
-          }
-          const piece = delta.choices[0]?.delta?.content ?? "";
-          if (!piece) continue;
-          if (first === null) first = performance.now();
-          tokens++;
-          text += piece;
-          onText(text.replace(/<think>[\s\S]*?(<\/think>|$)/, "").trimStart());
-        }
-        const t1 = performance.now();
-        return {
-          tokens,
-          seconds: (t1 - t0) / 1000,
-          firstTokenS: first === null ? null : (first - t0) / 1000,
-        };
       },
-      interrupt: () => engine.interruptGenerate(),
-      dispose: () => engine.unload(),
+      interrupt: async () => worker.postMessage({ type: "interrupt" }),
+      dispose: async () => {
+        worker.postMessage({ type: "dispose" });
+        await new Promise((r) => setTimeout(r, 100));
+        worker.terminate();
+      },
     };
   },
 };

@@ -11,8 +11,8 @@ import Hero from "./components/Hero";
 import { Magnetic } from "./components/Bits";
 import { useSectionNav } from "./hooks/useSectionNav";
 import { CLIPS, transitionAllowed, transitionsEnabled, toggleTransitions, initFrame, isUltrawide, setBoxed } from "./lib/transitions";
-import ContactSheet from "./components/ContactSheet";
-import { warmModel } from "./lib/ragEngine";
+import GroundFloor from "./components/GroundFloor";
+import { llmOptedIn, loadInBackground } from "./lib/ragEngine";
 import TransitionPlayer, { type TransitionHandle } from "./components/TransitionPlayer";
 import TerminalHandoff, { type HandoffHandle } from "./components/TerminalHandoff";
 import { profile, skills } from "./data/content";
@@ -99,8 +99,9 @@ function KeyboardScene({ active, skipIntro, parkStanding }: { active: boolean; s
   );
 }
 
-/* The old Contact (headline + three text links) is gone: see
-   components/ContactSheet.tsx - the machine prints the details instead. */
+/* The last page is the ground floor (components/GroundFloor.tsx): the
+   credits as a building directory, and an elevator back up to the top. The
+   contact links live in the nav. */
 
 
 /* --------------------------------- app ----------------------------------- */
@@ -204,22 +205,61 @@ export default function App() {
   /* The model's download starts the instant the site is landed on, and the
      rest follows as soon as the visitor moves past the hero (ragEngine.ts,
      WHEN IT LOADS). Only downloads: the GPU work waits for the machine. */
-  useEffect(() => warmModel("landing"), []);
+  /* STREAMING ORDER (the console trick: what the player needs next loads
+     first). The keyboard->machine clip is primed as soon as the page itself
+     has loaded, and the model's background download waits for that clip to
+     buffer (10 s at most). Measured 2026-11-25 on a 10 Mbps line: with the two
+     racing, the clip took 12 s to start; the model can wait, the clip cannot. */
+  /* Created at mount, resolved when the clip has buffered (or 10 s): an
+     early scroll can never start the model download ahead of the clip. */
+  const clipReady = useRef<{ promise: Promise<void>; resolve: () => void } | null>(null);
+  if (!clipReady.current) {
+    let resolve = () => {};
+    const promise = new Promise<void>((r) => (resolve = r));
+    clipReady.current = { promise, resolve };
+  }
+  /* "Calm": no section move, scroll or key press for 2.5 s. That also covers
+     the keyboard's whole 2.45 s stand-up. The model's GPU stage (upload +
+     compile, in its worker) only starts in a calm moment - on a cached
+     return visit that GPU work landing mid-scroll was the stutter. */
+  const lastMoveAt = useRef(performance.now());
   useEffect(() => {
-    if (index >= 1) warmModel("rest");
-  }, [index]);
-  /* Under reduced motion the section nav is off and `index` never moves, so
-     "past the hero" is read from the scroll position instead. */
+    const moved = () => (lastMoveAt.current = performance.now());
+    const evs = ["wheel", "keydown", "touchmove"] as const;
+    evs.forEach((e) => window.addEventListener(e, moved, { passive: true }));
+    return () => evs.forEach((e) => window.removeEventListener(e, moved));
+  }, []);
   useEffect(() => {
-    if (!reduce) return;
-    const onScroll = () => {
-      if (window.scrollY < window.innerHeight * 0.5) return;
-      warmModel("rest");
-      window.removeEventListener("scroll", onScroll);
+    let off = false;
+    const calm = () => performance.now() - lastMoveAt.current > 2500;
+    /* the whole model, in the background, from the hero on - for a visitor
+       who switched the machine's LLM on (on an earlier visit: the choice is
+       remembered). Everyone else is answered by quotes and downloads nothing. */
+    if (llmOptedIn()) void loadInBackground(calm, clipReady.current!.promise);
+    const start = () => {
+      if (off) return;
+      const p = player.current;
+      const clip = transitionAllowed() && p;
+      if (clip) p.prime(CLIPS.kbToMachine);
+      void Promise.race([
+        clip ? p.whenReady(CLIPS.kbToMachine) : Promise.resolve(),
+        new Promise<void>((r) => window.setTimeout(r, 10_000)),
+      ]).then(() => clipReady.current!.resolve());
     };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [reduce]);
+    let t = 0;
+    const onLoad = () => (t = window.setTimeout(start, 300));
+    if (document.readyState === "complete") onLoad();
+    else window.addEventListener("load", onLoad, { once: true });
+    return () => {
+      off = true;
+      window.clearTimeout(t);
+      window.removeEventListener("load", onLoad);
+    };
+  }, []);
+  /* a section change is movement too */
+  useEffect(() => {
+    lastMoveAt.current = performance.now();
+  }, [index]);
 
   /* The machine boots on EVERY arrival from above, not only after the clip.
      The boot is where the model's load is shown - the progress bar is the
@@ -493,7 +533,8 @@ export default function App() {
         </Panel>
 
         <Panel id="contact" active={index === 4} className="panel--sheet">
-          <ContactSheet active={index === 4} plate={frameMode === "sheet"} />
+          {/* the ground floor: credits, and an elevator back up to the hero */}
+          <GroundFloor active={index === 4} onRideUp={() => goTo(0, false)} />
         </Panel>
 
         {/* Where you are, and a way to jump. */}

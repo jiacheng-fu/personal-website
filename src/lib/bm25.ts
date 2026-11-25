@@ -118,7 +118,17 @@ function words(s: string): string[] {
      word carries no meaning the two sides don't already have, so "next.js"
      and "nextjs", "u.s." and "us", index and match as one term. Numbers keep
      their dots, because 3.87 is not 387. */
-  return (s.toLowerCase().match(/[\p{L}\p{N}][\p{L}\p{N}+#.]*/gu) ?? []).map((w) => {
+  /* A thousands separator is part of the number: "$2,500" is 2500, not a "2"
+     and a "500". Split, the "2" matched "solve 2 + 2 for me" to the Mesa
+     entry ($2,500 ceiling) as evidence (2026-11-25). */
+  /* "by himself" is not his name twice: it means solo, and the archive says
+     "solo" and "sole author" (2026-11-25, "has he built anything by himself"
+     was quoting the one team build). */
+  const joined = s
+    .toLowerCase()
+    .replace(/(\d),(?=\d{3}(?!\d))/g, "$1")
+    .replace(/\b(?:by (?:him|my|your)self|on (?:his|my|your) own)\b/g, "solo");
+  return (joined.match(/[\p{L}\p{N}][\p{L}\p{N}+#.]*/gu) ?? []).map((w) => {
     const t = w.replace(/\.+$/, "");
     return /^[\d.]+$/.test(t) ? t : t.replace(/\./g, "");
   });
@@ -180,6 +190,7 @@ const SYNONYMS: string[][] = [
   ["test", "testing", "qa", "unit", "regression", "coverage", "verified", "probe", "invariant"],
   /* paradigms the resume names only by the language that implements them */
   ["functional", "haskell", "paradigm", "immutable", "declarative"],
+  ["solo", "alone", "sole", "independent", "independently", "single-handedly"],
   ["oop", "object", "inheritance", "polymorphism", "encapsulation"],
   ["devops", "ci", "cd", "pipeline", "docker", "deploy", "infrastructure", "automated", "git"],
   /* work authorisation, which a resume states in three words and nobody asks
@@ -217,6 +228,10 @@ for (const group of SYNONYMS) {
  *  corpus never contains can only ever be dead weight, unless it is there to
  *  meet a word a visitor's note will introduce. */
 export const indexHas = (term: string): boolean => docTerms.some((tf) => tf.has(term));
+/** A text's terms by the index's own rule (stems, names, no stopwords), for
+ *  matching a query to single sentences (lib/extract.ts). */
+export const termsOf = (text: string): Set<string> =>
+  new Set(words(text).filter((w) => !STOPWORDS.has(w)).map(canon));
 
 /** Every distinct term the thesaurus can produce - scripts/rag-eval.ts checks
  *  them against the corpus so a group that bridges to nothing is visible. */

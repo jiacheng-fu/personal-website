@@ -10,8 +10,11 @@ import {
   generate,
   backend,
   mb,
+  llmOptedIn,
+  setLlmOptIn,
   type EngineState,
 } from "../lib/ragEngine";
+import { extractAnswer, type Quote } from "../lib/extract";
 
 import Apple2Front from "./Apple2Front";
 import FeedShred from "./FeedShred";
@@ -23,8 +26,9 @@ import FeedShred from "./FeedShred";
    on; the green-phosphor terminal is a live DOM subtree placed on the drawn
    monitor face, square-on so it reads like a real screen. At rest the whole machine is on
    stage; when a question fires, the camera pushes into the glass and the
-   pipeline - the resume tearing into fragments, the BM25 scan, the
-   briefing, the model speaking - plays out full-size. The hardware is
+   pipeline - the archive tearing into fragments, the BM25 scan, the
+   answer quoted word for word (or, switched on, the model speaking) - plays
+   out full-size. The hardware is
    honest: the LED is wired to the real engine state, the status line
    reports the actual model, and every number on the glass is the live
    pipeline's. The pipeline logic is unchanged from the previous stagings.
@@ -44,6 +48,9 @@ const SUGGESTIONS = [
 interface Answer {
   mode: "model" | "extractive" | "none";
   text: string;
+  /* the archive's own sentences: the whole answer when quoting, and the
+     check printed under a model's answer */
+  quotes?: Quote[];
   stats?: { tokens: number; seconds: number };
   done: boolean;
   /* why the model didn't answer, when it didn't */
@@ -78,10 +85,12 @@ function narration(act: Act, run: Run | null, answer: Answer | null, engine: Eng
     case "speak":
       if (answer?.mode === "extractive")
         return answer.fallback === "loading"
-          ? "MODEL STILL LOADING — READING FRAGMENTS RAW:"
+          ? "MODEL STILL LOADING — QUOTING THE ARCHIVE MEANWHILE:"
           : answer.fallback === "stumbled"
-            ? "MODEL STUMBLED ON THAT ONE — READING FRAGMENTS RAW:"
-            : "NO MODEL ON BOARD — READING FRAGMENTS RAW:";
+            ? "MODEL STUMBLED ON THAT ONE — QUOTING THE ARCHIVE:"
+            : answer.fallback === "absent"
+              ? "NO MODEL ON THIS MACHINE — QUOTING THE ARCHIVE:"
+              : "QUOTING THE ARCHIVE, WORD FOR WORD:";
       if (answer?.mode === "none") return "ARCHIVE MISS.";
       if (engine.phase === "generating" || !answer?.done) return "MODEL READING BRIEFING…";
       return "DONE. EVERY STEP ABOVE WAS REAL.";
@@ -92,13 +101,20 @@ function narration(act: Act, run: Run | null, answer: Answer | null, engine: Eng
 function engineStatus(engine: EngineState): { text: string; led: "off" | "busy" | "on" } {
   switch (engine.phase) {
     case "idle":
-      return { text: "MODEL: NOT LOADED — FRAGMENTS QUOTED RAW", led: "off" };
+      return { text: "MODEL: NOT LOADED — QUOTING THE ARCHIVE", led: "off" };
     case "queued":
       /* requested, waiting out something brief (a clip still fading, a tab
          switched away) - the machine is waiting, not broken, and says so */
       return { text: "MODEL: STARTING…", led: "busy" };
     case "unavailable":
-      return { text: "MODEL: NO WEBGPU — FRAGMENTS QUOTED RAW", led: "off" };
+      /* no WebGPU at all, or a GPU that cannot run this model (no
+         shader-f16, or software only) - said plainly either way */
+      return {
+        text: engine.detail.startsWith("no WebGPU in")
+          ? "MODEL: NO WEBGPU HERE — QUOTING THE ARCHIVE"
+          : "MODEL: NEEDS WEBGPU WITH SHADER-F16, NOT AVAILABLE HERE — QUOTING THE ARCHIVE",
+        led: "off",
+      };
     case "downloading":
       return {
         text: notYet(engine)
@@ -117,7 +133,7 @@ function engineStatus(engine: EngineState): { text: string; led: "off" | "busy" 
     case "error":
       return engine.detail.startsWith("connection lost")
         ? { text: "MODEL: CONNECTION LOST — RETRYING…", led: "busy" }
-        : { text: "MODEL: FAULT — FRAGMENTS QUOTED RAW", led: "off" };
+        : { text: "MODEL: FAULT — QUOTING THE ARCHIVE", led: "off" };
   }
 }
 
@@ -153,9 +169,14 @@ function loadLine(engine: EngineState): { label: string; fill: number | null } {
     case "generating":
       return { label: `${backend.name} LOADED`, fill: 1 };
     case "unavailable":
-      return { label: "NO WEBGPU — ANSWERING FROM FRAGMENTS", fill: 0 };
+      return {
+        label: engine.detail.startsWith("no WebGPU in")
+          ? "NO WEBGPU HERE — QUOTING THE ARCHIVE"
+          : "NO WEBGPU SHADER-F16 HERE — QUOTING THE ARCHIVE",
+        fill: 0,
+      };
     case "error":
-      return { label: "MODEL FAULT — ANSWERING FROM FRAGMENTS", fill: 0 };
+      return { label: "MODEL FAULT — QUOTING THE ARCHIVE", fill: 0 };
     case "idle":
       return {
         label: `MODEL NOT LOADED${engine.detail.startsWith("not loaded: ") ? ` — ${engine.detail.slice(12).toUpperCase()}` : ""}`,
@@ -181,6 +202,13 @@ const settled = (e: EngineState) =>
    inside this; the hold is for the slow line, where it caps the wait. */
 const BOOT_MIN_MS = 900;
 const BOOT_HOLD_MS = 10_000;
+/* ...unless the download plainly cannot make it. After this long on the bar,
+   the measured byte rate decides: if the rest would take longer than
+   BOOT_WAIT_IF_UNDER_S, the visitor is let in now instead of at 10 s
+   (measured 2026-11-25: on 25 Mbps and slower the hold always ran out, so it
+   was ten seconds of bar followed by the fragments anyway). */
+const BOOT_PROJECT_AFTER_MS = 1800;
+const BOOT_WAIT_IF_UNDER_S = 5;
 /* and the finished bar is left up this long, so the full bar and LOADED are
    actually seen - measured without it: 20 ms, i.e. never */
 const BOOT_DONE_BEAT_MS = 450;
@@ -266,6 +294,9 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
   const [order, setOrder] = useState<ScoredChunk[] | null>(null);
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [engine, setEngine] = useState<EngineState>(engineState());
+  /* the visitor's choice: quotes (default), or the LLM on top */
+  const [llmOn, setLlmOn] = useState(llmOptedIn);
+  const [confirming, setConfirming] = useState(false);
   /* documents the visitor has fed in this session */
   const [fed, setFed] = useState(0);
   const [ingested, setIngested] = useState<string | null>(null);
@@ -300,8 +331,10 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
          load, so there is no bar - a bar here would read as the machine
          loading itself all over again. The tube warms and the menu types
          in, and that is all. */
+      /* Quotes need nothing loaded, and neither does a model that already
+         is: straight to the menu. */
       const p = engineState().phase;
-      if (p === "ready" || p === "generating") {
+      if (!llmOptedIn() || p === "ready" || p === "generating") {
         setBootPhase("typing");
         return;
       }
@@ -335,17 +368,43 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
     return () => clearTimeout(t);
   }, [bootPhase]);
 
+  /* the download's real rate, from the runtime's own byte counts */
+  const rate = useRef<{ t: number; bytes: number }[]>([]);
+  useEffect(() => {
+    if (engine.phase !== "downloading" || engine.stage !== "fetch" || engine.bytes <= 0) return;
+    const r = rate.current;
+    r.push({ t: performance.now(), bytes: engine.bytes });
+    while (r.length > 2 && r[r.length - 1].t - r[0].t > 3000) r.shift();
+  }, [engine]);
+  useEffect(() => {
+    if (bootPhase !== "loading") return;
+    const iv = window.setInterval(() => {
+      const e = engineState();
+      if (e.phase !== "downloading" || e.stage !== "fetch") return;
+      if (performance.now() - loadingSince.current < BOOT_PROJECT_AFTER_MS) return;
+      const r = rate.current;
+      if (r.length < 2) return;
+      const a = r[0];
+      const b = r[r.length - 1];
+      const bps = (b.bytes - a.bytes) / Math.max(0.001, (b.t - a.t) / 1000);
+      const total = e.progress > 0.01 ? e.bytes / e.progress : backend.bytes;
+      const left = bps > 0 ? (total - e.bytes) / bps : Infinity;
+      if (left > BOOT_WAIT_IF_UNDER_S) setBootPhase("typing");
+    }, 400);
+    return () => window.clearInterval(iv);
+  }, [bootPhase]);
+
   /* ON DEMAND: reaching the machine is what asks for the model. Under reduced
      motion the section nav is off and `active` never moves, so there it is
      the section scrolling into view that asks. */
   useEffect(() => {
-    if (active) requestModel();
-  }, [active]);
+    if (active && llmOn) requestModel();
+  }, [active, llmOn]);
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!reduce || !rootRef.current) return;
     const io = new IntersectionObserver(
-      (es) => es.some((e) => e.isIntersecting) && requestModel(),
+      (es) => es.some((e) => e.isIntersecting) && llmOptedIn() && requestModel(),
       { threshold: 0.5 }
     );
     io.observe(rootRef.current);
@@ -409,6 +468,22 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
       });
       return;
     }
+    /* THE ANSWER: the archive's own best sentences, word for word, each with
+       its source (extract.ts). Microseconds, no download, nothing to get
+       wrong - the default for everyone since 2026-11-25. */
+    const quotes = extractAnswer(r.retrieval);
+    const quoted = (fallback?: Answer["fallback"]): Answer => ({
+      mode: "extractive",
+      fallback,
+      quotes,
+      fromVisitor: quotes.some((q) => q.visitor),
+      text: quotes.map((q) => q.text).join(" "),
+      done: true,
+    });
+    if (!llmOptedIn()) {
+      setAnswer(quoted());
+      return;
+    }
     /* a visitor's note counts as evidence like anything else - but the
        answer must say where it came from, and that is decided here, not
        left to the model's discretion */
@@ -416,7 +491,7 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
     const result = await generate(
       r.prompt.system,
       userMessage(r.prompt),
-      (text) => !signal.aborted && setAnswer({ mode: "model", text, done: false, fromVisitor }),
+      (text) => !signal.aborted && setAnswer({ mode: "model", text, quotes, done: false, fromVisitor }),
       signal
     );
     if (signal.aborted) return;
@@ -438,7 +513,7 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
          question is asked again the moment the engine reports ready, and the
          quote is replaced in place. Nothing is armed when there will never be
          a model to wait for. */
-      if (engineState().phase !== "unavailable") {
+      if (engineState().phase !== "unavailable" && llmOptedIn()) {
         upgradeRef.current?.();
         let ignoredFirst = false;
         const off = subscribe((st) => {
@@ -448,31 +523,14 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
             ignoredFirst = true;
             return;
           }
-          if (st.phase !== "ready") return;
+          if (st.phase !== "ready" || !llmOptedIn()) return;
           off();
           upgradeRef.current = null;
           if (!signal.aborted) void speak(r, signal);
         });
         upgradeRef.current = off;
       }
-      setAnswer({
-        mode: "extractive",
-        fallback,
-        fromVisitor,
-        /* Quoted from the assembled BRIEFING, not from the raw ranking. They
-           differ, and the difference was visible: the briefing leads with a
-           visitor's note, the ranking leads with whatever scored highest, so
-           a note reading "Brian moved to Seattle" was briefed first to the
-           model and quoted second to everyone who never gets a model - which
-           is every mobile visitor. One order, one source of truth. */
-        text: r.prompt.contextBlocks
-          .map(
-            (b) =>
-              `${b.label.includes("VISITOR NOTE") ? "[VISITOR NOTE] " : ""}"…${b.text.slice(0, 240)}${b.text.length > 240 ? "…" : ""}"`
-          )
-          .join("\n\n"),
-        done: true,
-      });
+      setAnswer(quoted(fallback));
     }
   };
 
@@ -488,7 +546,9 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
   const maxScore = run ? Math.max(...run.retrieval.scored.map((s) => s.score), 0.001) : 1;
   const performing = act !== "rest";
   const line = narration(act, run, answer, engine);
-  const status = engineStatus(engine);
+  const status = llmOn
+    ? engineStatus(engine)
+    : { text: "ANSWERS: QUOTED FROM THE ARCHIVE · UPLINK: NONE", led: "on" as const };
   const load = loadLine(engine);
 
   /* ?frame=case|grow33|grow66|off|tilt renders a clean plate for the
@@ -523,10 +583,18 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
           <p className="a2-boot__title">FU ][ PERSONAL ARCHIVE</p>
           <p className="a2-boot__sub">RETRIEVAL TERMINAL · REV 1</p>
           <p className="a2-boot__line">
-            {chunks.length - fed} FRAGMENTS INDEXED FROM RESUME.PDF{fed > 0 ? ` + ${fed} FED BY YOU` : ""}
+            {chunks.length - fed} FRAGMENTS INDEXED FROM BRIAN'S ARCHIVE{fed > 0 ? ` + ${fed} FED BY YOU` : ""}
           </p>
           <p className="a2-boot__line a2-boot__line--dim">
-            THE MODEL RUNS ON <b>YOUR</b> GPU. NOTHING YOU TYPE LEAVES THIS PAGE.
+            {llmOn ? (
+              <>
+                THE MODEL RUNS ON <b>YOUR</b> GPU. NOTHING YOU TYPE LEAVES THIS PAGE.
+              </>
+            ) : (
+              <>
+                ANSWERS ARE QUOTED, <b>WORD FOR WORD</b>. NOTHING YOU TYPE LEAVES THIS PAGE.
+              </>
+            )}
           </p>
           <p className="a2-boot__line">ASK ANYTHING ABOUT BRIAN, OR PICK:</p>
           <ol className="a2-boot__menu">
@@ -612,10 +680,28 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
               animate={{ opacity: 1 }}
               transition={{ duration: 0.4 }}
             >
-              <p className={`a2-speech__text ${answer && answer.mode !== "model" ? "is-quote" : ""}`}>
-                {answer?.text}
-                {(!answer || !answer.done) && <span className="a2-caret" />}
-              </p>
+              {answer?.mode === "extractive" && answer.quotes ? (
+                answer.quotes.map((q, i) => (
+                  <p key={i} className={`a2-quote ${q.visitor ? "is-visitor" : ""}`}>
+                    “{q.text}”<span className="a2-quote__src">— {q.visitor ? "A VISITOR NOTE" : q.source.toUpperCase()}</span>
+                  </p>
+                ))
+              ) : (
+                <p className={`a2-speech__text ${answer && answer.mode !== "model" ? "is-quote" : ""}`}>
+                  {answer?.text}
+                  {(!answer || !answer.done) && <span className="a2-caret" />}
+                </p>
+              )}
+              {answer?.mode === "model" && answer.done && (
+                <div className="a2-speech__check">
+                  <p>⚠ WRITTEN BY A {backend.params} MODEL ON YOUR GPU — IT CAN GET THINGS WRONG. THE ARCHIVE SAYS:</p>
+                  {answer.quotes?.map((q, i) => (
+                    <p key={i} className="a2-quote">
+                      “{q.text}”<span className="a2-quote__src">— {q.visitor ? "A VISITOR NOTE" : q.source.toUpperCase()}</span>
+                    </p>
+                  ))}
+                </div>
+              )}
               {answer?.fromVisitor && answer.done && (
                 <p className="a2-speech__source">
                   ⚠ SOURCED FROM A VISITOR NOTE — TYPED BY SOMEONE ON THIS PAGE, NOT FROM BRIAN'S DOCUMENTS.
@@ -626,7 +712,7 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
                   {answer.stats.tokens} TOKENS · {(answer.stats.tokens / Math.max(answer.stats.seconds, 0.001)).toFixed(0)} TOK/S · ON YOUR GPU
                 </p>
               )}
-              {run && answer && answer.mode !== "none" && (
+              {run && answer && answer.mode === "model" && (
                 <details className="a2-briefing">
                   <summary data-cursor="hover">VIEW THE EXACT BRIEFING SENT TO THE MODEL</summary>
                   <pre data-scrollable>
@@ -695,16 +781,58 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
       {/* status line + engine loader */}
       <div className="a2-status">
         <span>{status.text}</span>
-        {(engine.phase === "idle" || engine.phase === "queued" || engine.phase === "error") && (
-          <button type="button" data-cursor="hover" onClick={() => void preload(true)}>
-            {engine.phase === "error"
-              ? "[RETRY]"
-              : engine.phase === "queued"
-                ? "[LOAD IT NOW]"
-                : `[LOAD MODEL · ${mb(backend.bytes)} MB]`}
+        <span className="a2-status__ctl">
+          {llmOn && (engine.phase === "queued" || engine.phase === "error") && (
+            <button type="button" data-cursor="hover" onClick={() => void preload(true)}>
+              {engine.phase === "error" ? "[RETRY]" : "[LOAD IT NOW]"}
+            </button>
+          )}
+          <button
+            type="button"
+            className={`a2-llm ${llmOn ? "is-on" : ""}`}
+            role="switch"
+            aria-checked={llmOn}
+            data-cursor="hover"
+            onClick={() => {
+              if (llmOn) {
+                setLlmOptIn(false);
+                setLlmOn(false);
+              } else setConfirming(true);
+            }}
+          >
+            [LLM {llmOn ? "● ON" : "○ OFF"}]
           </button>
-        )}
+        </span>
       </div>
+
+      {/* the opt-in, said plainly before anything is fetched */}
+      {confirming && (
+        <div className="a2-optin" role="dialog" aria-label="Turn on the LLM">
+          <p className="a2-optin__head">TURN ON THE LLM?</p>
+          <p>A SMALL LANGUAGE MODEL ({backend.name}) WRITES THE ANSWERS INSTEAD OF QUOTING THEM.</p>
+          <ul>
+            <li>A ONE-TIME DOWNLOAD OF {mb(backend.bytes)} MB, KEPT IN THIS BROWSER.</li>
+            <li>IT RUNS ON YOUR GPU: IT TAKES A WHILE TO LOAD AND USES REAL PROCESSING POWER.</li>
+            <li>IT CAN GET THINGS WRONG. THE QUOTES IT WORKED FROM ARE PRINTED UNDER EVERY ANSWER.</li>
+          </ul>
+          <p className="a2-optin__row">
+            <button
+              type="button"
+              data-cursor="hover"
+              onClick={() => {
+                setConfirming(false);
+                setLlmOn(true);
+                setLlmOptIn(true);
+              }}
+            >
+              [TURN IT ON]
+            </button>
+            <button type="button" data-cursor="hover" onClick={() => setConfirming(false)}>
+              [KEEP QUOTES]
+            </button>
+          </p>
+        </div>
+      )}
       <div className="a2-crt__scanlines" aria-hidden />
       <div className="a2-crt__vignette" aria-hidden />
     </div>
@@ -720,7 +848,7 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
       </div>
 
       <p className="field-note rag__foot">
-        BM25 scoring, a live prompt, a {backend.params} model on your own GPU.{" "}
+        BM25 scoring and word-for-word quotes, in your browser; a {backend.params} model on your own GPU if you switch it on.{" "}
         <span className="dim">Every number on the glass is the actual machinery.</span>
       </p>
     </div>

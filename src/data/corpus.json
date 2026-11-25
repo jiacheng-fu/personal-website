@@ -1,96 +1,122 @@
 {
-  "generated_from": "resume/Brian_Fu_Resume_Updated.html",
+  "generated_from": [
+    "src/data/corpus.md",
+    "resume/Brian_Fu_Resume_2026-11.html",
+    "resume/Brian_Fu_Resume_Updated.html",
+    "src/data/content.ts"
+  ],
   "chunks": [
     {
       "id": 0,
       "section": "About",
-      "title": "Contact & basics",
+      "title": "About Brian",
       "dates": "",
-      "text": "Jiacheng (Brian) Fu Austin, TX Permanent U.S. Resident brian.fu123321@gmail.com linkedin.com/in/jiachengfu github.com/jiacheng-fu Brian goes by Brian; his legal first name is Jiacheng. Brian lives in Austin, Texas. Contact him or reach him by email at brian.fu123321@gmail.com. He studies Computer Science at Texas A&M University and graduates in December 2027."
+      "text": "Brian Fu is a software engineer and a Computer Science student at Texas A&M University, graduating in December 2027. Brian's legal first name is Jiacheng, but he goes by Brian. Brian is based in Austin, Texas. Brian is a permanent U.S. resident, so he is authorized to work in the United States and does not need visa sponsorship. Brian gravitates to problems where correctness is checkable: compilers, backends, and the security boundaries in between. Brian currently has a part-time job at ThingsX as an application security and full-stack engineer. You can contact Brian by email at brian.fu123321@gmail.com. Brian is on LinkedIn at linkedin.com/in/jiachengfu. Brian's GitHub is github.com/jiacheng-fu. Brian does not share a phone number on this site."
     },
     {
       "id": 1,
       "section": "Overview",
       "title": "Career at a glance",
       "dates": "",
-      "text": "Overview of Brian's experience and background. Companies and employers Brian has worked at: ThingsX and United Micro Technology. Jobs and internships Brian has worked: ThingsX as Application Security Engineer / Full-Stack Engineer (Jun 2026 - Present); United Micro Technology as LLVM Compiler Intern (May 2025 - Aug 2025); United Micro Technology as Software Engineering Intern (Jun 2024 - Aug 2024). Projects Brian has built: Axle (Jan 2026 - Present), Wild West Party Game (Sep 2024), Project Horizon (Aug 2023 - Present). Education: Texas A&M University, Bachelor of Science in Computer Science, Minor in Mathematics (GPA: 3.87/4.00) (Expected Dec 2027)."
+      "text": "Brian has worked at three companies: ThingsX, Mesa, and United Micro Technology. Brian's current job is at ThingsX, where he has been an Application Security Engineer and Full-Stack Engineer on a part-time contract since June 2026. From August 2026 to October 2026, Brian was also the Founding Engineer (Backend & ML) at Mesa. Brian has done two internships, both at United Micro Technology: Software Engineering Intern from June 2024 to August 2024, and LLVM Compiler Intern from May 2025 to August 2025. Brian's projects are Axle (since January 2026), Project Horizon (since August 2023), Wild West Party Game (a HowdyHack 2024 team build), DeskStats (2026), CarStatus (2026), and this website (2026). Brian built Axle as its sole author and builds Project Horizon solo; Wild West Party Game was a team build. Brian's oldest project still in progress is Project Horizon, which he started in August 2023. Brian studies Computer Science with a Minor in Mathematics at Texas A&M University, with a 3.87/4.00 GPA, and graduates in December 2027."
     },
     {
       "id": 2,
       "section": "Education",
-      "title": "Texas A&M University - College Station, TX",
+      "title": "Texas A&M University",
       "dates": "Expected Dec 2027",
-      "text": "Brian studies at Texas A&M University (Expected Dec 2027). Texas A&M University - College Station, TX. Bachelor of Science in Computer Science, Minor in Mathematics (GPA: 3.87/4.00) Relevant Coursework: Data Structures & Algorithms, Design & Analysis of Algorithms, Object-Oriented Design, Programming Languages, Computer Organization, Discrete Structures (In Progress: Machine Learning, Computer Systems, Foundations of Software Engineering)"
+      "text": "Brian studies at Texas A&M University in College Station, Texas, and is expected to graduate in December 2027. Brian's major is Computer Science and his minor is Mathematics: he is earning a Bachelor of Science in Computer Science with a Minor in Mathematics. Brian's GPA at Texas A&M is 3.87/4.00. Brian's relevant coursework includes Data Structures & Algorithms, Design & Analysis of Algorithms, Machine Learning, Computer Systems, Foundations of Software Engineering, Programming Languages, Discrete Structures, Linear Algebra, and Statistics."
     },
     {
       "id": 3,
       "section": "Experience",
-      "title": "ThingsX (Part-Time Contract)",
+      "title": "ThingsX",
       "dates": "Jun 2026 - Present",
-      "text": "Brian worked at ThingsX as Application Security Engineer / Full-Stack Engineer (Jun 2026 - Present). ThingsX (Part-Time Contract). Application Security Engineer / Full-Stack Engineer Own features end to end on a production multi-tenant B2B SaaS platform (TypeScript, Deno, PostgreSQL, React, REST APIs), from schema migration through the API layer to the operator-facing UI. Deliver frontend and UX work across the dashboard and reporting console: sortable data tables, chart rendering and label-overlap fixes, report filter behavior, account status displays, and role/session state handling. Remediated 50+ production vulnerabilities across access-control, injection, and race-condition classes, including a cross-tenant authorization gap fixed by moving privileged-function authorization server-side onto session auth, proved by reproducing the exploit in reverse and regression-tested so the entire bug class fails the build. Built a 13-stage, one-command CI/CD pipeline enforced by a pre-push git hook (typecheck, builds, unit tests, negative Row-Level Security probes, data-integrity invariants), and eliminated a job-queue data-loss bug with exactly-once TOCTOU guards, verified under 20-way parallel load."
+      "text": "Since June 2026, Brian has been at ThingsX as an Application Security Engineer and Full-Stack Engineer, on a part-time contract. Brian works on ThingsX's production multi-tenant B2B SaaS platform, built with TypeScript, Deno, PostgreSQL, React, and REST APIs. At ThingsX, Brian has authored and resolved roughly 40 tickets (quality-of-life improvements, defects, and security fixes), owning each change from the schema migration through the API layer to the operator-facing UI. Brian's UI work at ThingsX includes sortable data tables, chart rendering and label-overlap fixes, report filter behavior, account status displays, and role and session state. In his security work at ThingsX, Brian has remediated 50+ production vulnerabilities across access-control, injection, and race-condition classes. Brian fixed a cross-tenant authorization gap at ThingsX by moving privileged-function authorization server-side onto session auth; he proved the fix by reproducing the exploit in reverse, and regression-tested it so the entire bug class fails the build. At ThingsX, Brian built a 13-stage, one-command CI/CD pipeline enforced by a pre-push git hook: typecheck, builds, unit tests, negative Row-Level Security probes, and data-integrity invariants. Brian also eliminated a job-queue data-loss bug at ThingsX with exactly-once TOCTOU guards, verified under 20-way parallel load."
     },
     {
       "id": 4,
       "section": "Experience",
-      "title": "United Micro Technology",
-      "dates": "May 2025 - Aug 2025",
-      "text": "Brian worked at United Micro Technology as LLVM Compiler Intern (May 2025 - Aug 2025). United Micro Technology. LLVM Compiler Intern Implemented instruction selection rules, register allocation paths, and lowering strategies in the LLVM C++ backend, and assessed vector instruction extensions for NPU-integrated workloads. Enabled accurate early-stage architectural modeling by translating ISA specifications into processor description files. Delivered the technical report on backend design tradeoffs steering future vDSP ASIP compiler work."
+      "title": "Mesa",
+      "dates": "Aug 2026 - Oct 2026",
+      "text": "From August 2026 to October 2026, Brian was the Founding Engineer (Backend & ML) at Mesa. As the sole owner of Mesa's backend, Brian built the production document intake pipeline end to end: quarantine, malware scanning, deduplication, parsing, OCR, segmentation, and classification. Brian covered Mesa's pipeline with roughly 1,880 tests, on a multi-tenant Postgres layer that enforces row-level security on every tenant table. Mesa's pipeline sustained about 790 pages per hour per graphics card, on a tiered reading stack Brian built with Paddle OCR and ONNX Runtime, behind a Postgres work queue whose workers scale to zero when idle. Brian's document classifier at Mesa, a production machine learning system, automated 54.2% of known-source document classification at 99.1% precision in 5.5 milliseconds, rising to 88.7% at 98.9% precision with a language-model tier. For that classifier, Brian labeled a 9,100-document corpus and shipped three tiers: template matching, title rules, and a term-frequency logistic regression. Brian's pre-registered audit of ten classifier variants then established that the model's ceiling was label source diversity, not features. Brian designed Mesa's production cloud deployment to run at roughly $1,100 a month against a $2,500 ceiling, across a 20x range of document volume. Brian also shipped Mesa's frontend-backend contract: token-based tenant identity, read models with committed schemas and generated types, and browser-direct uploads with per-file idempotency keys."
     },
     {
       "id": 5,
       "section": "Experience",
-      "title": "United Micro Technology",
-      "dates": "Jun 2024 - Aug 2024",
-      "text": "Brian worked at United Micro Technology as Software Engineering Intern (Jun 2024 - Aug 2024). United Micro Technology. Software Engineering Intern Built a Python ingestion system that normalized third-party vendor register descriptions into the company's internal SystemRDL representation, cutting the effort to onboard externally acquired IP by an estimated 60-70%. Extended the open-source SystemRDL toolchain with custom Jinja2-templated exporters emitting synthesizable RTL, C headers, and documentation directly in the company's internal file structure, and embedded the CLI in the production chip design flow. Packaged the tool with Poetry for reproducible installs and shipped it to 200+ engineers who used it daily for register development, verification prep, and documentation."
+      "title": "United Micro · compiler intern",
+      "dates": "May 2025 - Aug 2025",
+      "text": "From May 2025 to August 2025, Brian was an LLVM Compiler Intern at United Micro Technology. At his compiler internship, Brian worked on United Micro Technology's LLVM compiler backend in C++: he implemented instruction selection rules, register allocation paths, and lowering strategies. Brian also assessed vector instruction extensions for NPU-integrated workloads. Brian enabled early-stage architectural modeling at United Micro Technology by translating ISA specifications into processor description files. Brian's technical report on backend design tradeoffs steered United Micro Technology's subsequent vDSP ASIP compiler work."
     },
     {
       "id": 6,
-      "section": "Projects",
-      "title": "Axle - Personal Project",
-      "dates": "Jan 2026 - Present",
-      "text": "Brian built Axle (Jan 2026 - Present). Axle - Personal Project. Creator and Full-Stack Developer (React, TypeScript, Python, FastAPI, PostgreSQL, AWS, REST APIs) Built and own an AI-powered used-car platform end to end as sole author: React/Vite frontend, FastAPI backend, PostgreSQL, and auth, from TAMUhack prototype to deployed product (d1j3m9qdbgs5ik.cloudfront.net). Converted free-form user input into validated structured JSON via an LLM pipeline (OpenRouter) with schema sanitization, a 40-entry feature-alias map, fuzzy matching, and two-tier model routing with automatic failover. Designed a 10-level progressive constraint-relaxation algorithm over a weighted scoring engine so the system returns ranked, relevant matches even when no listing satisfies every criterion. Held API usage within a 1,000-call/month free tier via multi-tier caching across memory, disk, and AWS DynamoDB (NoSQL, TTL-expiring), deployed serverless on AWS Lambda and API Gateway with a CloudFront/S3 frontend."
+      "section": "Experience",
+      "title": "United Micro · software intern",
+      "dates": "Jun 2024 - Aug 2024",
+      "text": "From June 2024 to August 2024, Brian was a Software Engineering Intern at United Micro Technology. Brian built a Python ingestion system that normalized third-party vendor register descriptions into United Micro Technology's internal SystemRDL representation, cutting the effort to onboard externally acquired IP by an estimated 60-70%. Brian extended the open-source SystemRDL toolchain with custom Jinja2-templated exporters that emit synthesizable RTL, C headers, and documentation in the company's internal file structure. Brian's SystemRDL tool was embedded in the production chip design flow, packaged with Poetry for reproducible installs, and used daily by 200+ engineers."
     },
     {
       "id": 7,
       "section": "Projects",
-      "title": "Wild West Party Game - HowdyHack 2024",
-      "dates": "Sep 2024",
-      "text": "Brian built Wild West Party Game (Sep 2024). Wild West Party Game - HowdyHack 2024. Frontend Developer (Next.js, TypeScript, React) Shipped the frontend for a live multiplayer party game in 24 hours: inter-scene mechanics, transitions, and UI for a functional live-service prototype with real-time connectivity across distinct client states."
+      "title": "Axle",
+      "dates": "Jan 2026 - Present",
+      "text": "Axle is an AI-powered used-car search that Brian has been building since January 2026: describe the car you want in plain English, and it finds, ranks, and compares real listings from nearby dealers. Brian built and deployed Axle as its sole author, taking it from a TAMUhack prototype to a deployed product with a React and Vite frontend, a FastAPI backend, PostgreSQL, and auth. Axle's LLM pipeline (OpenRouter) turns free-form text into validated, structured JSON, with schema sanitization, fuzzy matching, and two-tier model routing with failover. Axle ranks results with a 10-level progressive constraint-relaxation algorithm over a weighted scoring engine, so a search returns useful matches instead of an empty page when nothing satisfies every filter. Axle stays within a 1,000-call/month free API tier through multi-tier caching across memory, disk, and AWS DynamoDB (NoSQL, with TTL expiry). Axle runs serverless on AWS Lambda and API Gateway, with its frontend on CloudFront and S3. Axle is built with React, TypeScript, Python, FastAPI, PostgreSQL, AWS, and REST APIs."
     },
     {
       "id": 8,
       "section": "Projects",
-      "title": "Project Horizon - Personal Project",
+      "title": "Project Horizon",
       "dates": "Aug 2023 - Present",
-      "text": "Brian built Project Horizon (Aug 2023 - Present). Project Horizon - Personal Project. Independent Developer (C#, Unity Engine) Built a narrative exploration game solo in C#/Unity, owning the full development cycle: a branching storyline system with multiple outcomes, core mechanics, state management, player progression, and UX."
+      "text": "Project Horizon is a narrative exploration game that Brian has been building solo in C# and Unity since August 2023. Project Horizon is written in C# on the Unity engine. Brian owns Project Horizon's full development cycle: a branching storyline system with multiple outcomes, core mechanics, state management, player progression, and UX. Project Horizon has branching dialogue with voiceover sync, third-person traversal, and a life system."
     },
     {
       "id": 9,
-      "section": "Skills",
-      "title": "Languages",
-      "dates": "",
-      "text": "Languages skills Brian knows: C++, Java, Python, TypeScript, JavaScript, C#, SQL (PostgreSQL, PL/pgSQL), Bash, Haskell, HTML, CSS"
+      "section": "Projects",
+      "title": "Wild West Party Game",
+      "dates": "Sep 2024",
+      "text": "Wild West Party Game is a real-time multiplayer western party game that Brian built with a team in 24 hours at HowdyHack 2024, in September 2024. In Wild West Party Game, players join a lobby from their phones for drawing and prompt rounds, with AI-generated art. Brian's work on Wild West Party Game included its inter-scene mechanics, transitions, and UI, for a working multiplayer prototype with real-time connectivity across distinct client states. Wild West Party Game was built with Next.js, TypeScript, React, Socket.IO, Python, and OpenAI."
     },
     {
       "id": 10,
-      "section": "Skills",
-      "title": "Full-Stack",
-      "dates": "",
-      "text": "Full-Stack skills Brian knows: React, Next.js, Vite, Node.js, Deno, FastAPI, REST API design, PostgreSQL schema design and migrations, authentication and authorization, caching, responsive UI"
+      "section": "Projects",
+      "title": "DeskStats",
+      "dates": "2026",
+      "text": "DeskStats is a native desktop widget for Apple Silicon Macs that Brian built in 2026 with Swift, SwiftUI, AppKit, and IOKit. DeskStats shows per-core CPU, GPU, memory, power draw, and charging rate, read straight from IOKit. DeskStats needs no permissions and uses about 1.4% of one CPU core."
     },
     {
       "id": 11,
-      "section": "Skills",
-      "title": "Systems & Infrastructure",
-      "dates": "",
-      "text": "Systems & Infrastructure skills Brian knows: Git, GitHub Actions, CI/CD, Docker, concurrency and TOCTOU testing, distributed job queues, LLVM compiler backends, SystemRDL/RTL code generation, LLM integration, Unity"
+      "section": "Projects",
+      "title": "CarStatus",
+      "dates": "2026",
+      "text": "CarStatus is a command-line tool that Brian built in 2026 to read a car's odometer, fuel, and battery through Smartcar's v3 API. CarStatus includes the webhook setup that Smartcar's documentation leaves out. CarStatus is written in JavaScript on Node.js. The CarStatus recording on the projects page runs the tool in a real terminal against a Smartcar Simulator car, through Smartcar's real v3 API."
     },
     {
       "id": 12,
+      "section": "Projects",
+      "title": "This website",
+      "dates": "2026 - Present",
+      "text": "Brian built this website in 2026 with React, TypeScript, Vite, and Three.js. The 3D keyboard on this website shows Brian's stack; the keyboard idea and keycaps are from Naresh Khatri's MIT-licensed portfolio. The photo at the top of this website was taken on the Space Needle in Seattle, not in Austin. This website's question machine works by searching this archive about Brian with BM25 scoring inside your browser, and quoting the closest-matching sentences word for word. This website has no server and no API key, and nothing you type into this machine leaves your browser. A note a visitor teaches this machine stays only in that visitor's browser tab and is gone on reload."
+    },
+    {
+      "id": 13,
       "section": "Skills",
-      "title": "Cloud & Security",
+      "title": "Languages",
       "dates": "",
-      "text": "Cloud & Security skills Brian knows: AWS (Lambda, API Gateway, DynamoDB, IAM), Supabase (PostgREST, Auth), Vercel, Row-Level Security, threat modeling, OWASP vulnerability classes, exploit-regression validation"
+      "text": "Brian codes in C++, Java, Python, TypeScript, JavaScript, C#, SQL (PostgreSQL and PL/pgSQL), Bash, Haskell, HTML, and CSS. Brian has also shipped Swift (DeskStats) and GLSL."
+    },
+    {
+      "id": 14,
+      "section": "Skills",
+      "title": "Full-Stack & ML",
+      "dates": "",
+      "text": "On the web, Brian builds with React, Next.js, Node.js, Deno, Vite, and FastAPI, with SQLAlchemy, Alembic, and Pydantic in Python. Brian designs REST APIs and PostgreSQL schemas and migrations, and implements authentication and authorization, caching, and responsive UIs. For machine learning, Brian has used scikit-learn, OCR with PaddleOCR, ONNX Runtime with CUDA, LLM integration, and evaluation design; at Mesa, Brian put OCR and a document classifier into production. Brian builds games in Unity."
+    },
+    {
+      "id": 15,
+      "section": "Skills",
+      "title": "Systems, Cloud & Security",
+      "dates": "",
+      "text": "For version control and CI, Brian uses Git, GitHub, and GitHub Actions, and he has built CI/CD pipelines. Brian ships with Docker and Docker Compose, tests with pytest, and has built job queues and TOCTOU race-condition tests. For cloud, Brian uses AWS (Lambda, API Gateway, DynamoDB, IAM, S3, and CloudFront), and he has also used Supabase (PostgREST and Auth), MinIO, and Vercel. Brian's systems work includes LLVM compiler backends and SystemRDL/RTL code generation. Brian's security skills include multi-tenant isolation, Row-Level Security, threat modeling, OWASP vulnerability classes, and exploit-regression validation."
     }
   ]
 }

@@ -333,8 +333,10 @@ console.log("load gates (on demand)\n");
 }
 
 /* 0b. A refresh, or a return visit: every file is already on disk, so the
-       landing part goes straight to the GPU load - without fetching a byte -
-       and the machine is ready when the visitor gets there. */
+       background load goes straight to the GPU stage - without fetching a
+       byte - and the machine is ready when the visitor gets there. (Since
+       2026-11-25 that is loadInBackground's job, at a calm moment, not
+       warmModel's: the GPU stage on a timer was stuttering first scrolls.) */
 {
   reset();
   engine.warmModel("landing");
@@ -345,7 +347,7 @@ console.log("load gates (on demand)\n");
   engine.__resetForTests();
   const seen: string[] = [];
   const off = engine.subscribe((s) => seen.push(s.phase));
-  engine.warmModel("landing");
+  void engine.loadInBackground(() => true);
   await settle();
   off();
   check("a return visit loads onto the GPU from the hero", seen.includes("downloading") || seen.includes("compiling"),
@@ -533,6 +535,36 @@ console.log("load gates (on demand)\n");
 {
   const r = await run("small device", { deviceMemory: 2 });
   check("a 2 GB device is left alone", r.last === "idle" && r.count("queued") === 0, r.last);
+}
+{
+  /* the GPU is asked before a byte is fetched (2026-11-25): the model is
+     q4f16, and without shader-f16 WebLLM only refuses after 352 MB */
+  const adapter = (a: Record<string, unknown> | null) => ({ requestAdapter: async () => a });
+  let r = await run("no shader-f16", { gpu: adapter({ features: new Set(["timestamp-query"]) }) });
+  check("a GPU without shader-f16 is told so, downloads nothing", r.last === "unavailable" && fetched.length === 0,
+    `${r.last}, ${fetched.length} fetch(es)`);
+  r = await run("software gpu", { gpu: adapter({ isFallbackAdapter: true, features: new Set(["shader-f16"]) }) });
+  check("a software-only GPU is told so, downloads nothing", r.last === "unavailable" && fetched.length === 0,
+    `${r.last}, ${fetched.length} fetch(es)`);
+  r = await run("no adapter", { gpu: adapter(null) });
+  check("no adapter at all is treated as no WebGPU", r.last === "unavailable" && fetched.length === 0, r.last);
+  r = await run("good gpu", { gpu: adapter({ features: new Set(["shader-f16"]) }) });
+  check("a capable GPU goes ahead", r.seen.includes("downloading"), `phases: ${r.seen.join(" -> ")}`);
+  reset({ gpu: adapter({ features: new Set() }) });
+  engine.warmModel("landing");
+  engine.warmModel("rest");
+  await settle();
+  check("...and the background download skips the GPU that can't run it", fetched.length === 0, `${fetched.length} fetch(es)`);
+}
+{
+  const r = await run("two cores", { hardwareConcurrency: 2 });
+  check("a 2-core machine is not auto-downloaded to", r.last === "idle" && r.count("queued") === 0, r.last);
+  const seen: string[] = [];
+  const off = engine.subscribe((st) => seen.push(st.phase));
+  void engine.preload(true);
+  await settle();
+  off();
+  check("...but its load button still works", seen.includes("downloading"), `phases: ${seen.join(" -> ")}`);
 }
 
 /* 7. Filling someone's disk to the brim and then failing is worse than not

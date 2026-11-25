@@ -168,6 +168,10 @@ export function createEruption(layer: HTMLElement, play?: Play): Eruption {
   shuffle();
 
   const live: Particle[] = [];
+  /* An object pool (the console habit: allocate once, reuse forever). A
+     spent logo's element goes back here instead of to the garbage
+     collector, so a long click-fest makes no garbage at all. */
+  const pool: HTMLImageElement[] = [];
   const timers: number[] = [];
   const now = () => performance.now() / 1000;
   let until = 0;
@@ -189,11 +193,12 @@ export function createEruption(layer: HTMLElement, play?: Play): Eruption {
     if (idx < 0) return;
     flying.add(idx);
     const [name] = ERUPTION_LOGOS[idx];
-    const el = document.createElement("img");
+    const el = pool.pop() ?? document.createElement("img");
     el.className = "hx__logo";
     el.src = srcs[idx];
     el.alt = "";
     el.draggable = false;
+    el.style.opacity = "0";
     el.dataset.logo = name;
     const cqw = rand(2.3, 3.7);
     el.style.width = `${cqw.toFixed(2)}cqw`;
@@ -246,9 +251,7 @@ export function createEruption(layer: HTMLElement, play?: Play): Eruption {
       /* full strength on the way up, gone a third of a second past the apex */
       const o = p.vy < 0 ? 1 : 1 - p.vy / 380;
       if (o <= 0 || p.y > PHOTO.h + 80) {
-        p.el.remove();
-        flying.delete(p.idx);
-        live.splice(i, 1);
+        remove(i);
         continue;
       }
       p.el.style.opacity = String(Math.min(1, p.age * 7) * o);
@@ -279,6 +282,7 @@ export function createEruption(layer: HTMLElement, play?: Play): Eruption {
   const remove = (i: number) => {
     const p = live[i];
     p.el.remove();
+    pool.push(p.el);
     flying.delete(p.idx);
     live.splice(i, 1);
   };

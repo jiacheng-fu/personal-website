@@ -124,7 +124,7 @@ export const projects: Project[] = [
     years: "2026 — now",
     repo: "https://github.com/jiacheng-fu/personal-website",
     blurb:
-      "The page you're on: a 3D keyboard of my stack (after Naresh Khatri's), and a retro terminal that answers questions about me with an LLM running on your GPU. No server, no API key.",
+      "The page you're on: a 3D keyboard of my stack (after Naresh Khatri's), and a retro terminal that answers questions about me by quoting its archive word for word, with an optional LLM running on your GPU. No server, no API key.",
     stack: ["React", "TypeScript", "Three.js", "WebGPU"],
   },
   {
