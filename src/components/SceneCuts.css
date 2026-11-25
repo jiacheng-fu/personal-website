@@ -1,0 +1,57 @@
+/* The 2D cuts (SceneCuts.tsx). Below the nav and the dots, which stay on top
+   of every transition, like the clips (.transition, z 40). */
+
+.cut-iris,
+.cut-board {
+  position: fixed;
+  inset: 0;
+  z-index: 41;
+  display: none;
+  pointer-events: none;
+}
+
+/* ---- sticky notes: the board's own (GroundFloor.css .nb__sticky) ---- */
+.cut-note {
+  position: absolute;
+  background:
+    linear-gradient(to top left, rgba(0, 0, 0, 0.09), transparent 28%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.05), transparent 16%),
+    linear-gradient(180deg, var(--s1), var(--s2));
+  box-shadow:
+    0 1px 2px rgba(30, 15, 0, 0.2),
+    0 14px 18px -10px rgba(40, 20, 0, 0.55);
+  will-change: transform, opacity;
+}
+.cut-backing {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+/* the cork, as the board's panel draws it */
+.cut-backing--cork {
+  background:
+    radial-gradient(125% 95% at 50% 42%, transparent 52%, rgba(45, 24, 6, 0.42)),
+    url("/textures/mottle.png") 0 0 / 560px,
+    linear-gradient(165deg, #d9a96f 0%, #c99559 48%, #b7834a 100%);
+  background-blend-mode: normal, soft-light, normal;
+}
+.cut-backing--ink {
+  background: #050505;
+}
+
+/* ---- the hero's bulb, while the iris holds on it ---- */
+/* drawn now, not ~3 s after arrival (its own draw-in is switched off for as
+   long as the hero is on screen, so it cannot restart and blink) */
+html.cut-bulb .hx__doodle--bulb .hx__stroke {
+  animation: none;
+  stroke-dashoffset: 0;
+}
+html.cut-glow .hx__doodle--bulb .hx__stroke {
+  filter: drop-shadow(0 0 5px var(--doodle)) drop-shadow(0 0 14px var(--doodle)) drop-shadow(0 0 30px var(--doodle));
+}
+/* ...click: off */
+html.cut-off .hx__doodle--bulb .hx__stroke {
+  transition: none;
+  filter: none;
+  stroke: #6f6a58;
+}

@@ -8,6 +8,7 @@ import { CAP_NOTES } from "../data/capNotes";
 import { studioMatcap } from "../data/matcap";
 import { useKeycapGeometry, capGeometry, HEIGHT_RATIO } from "../data/keycapGeometry";
 import { legendGeometry, legendExtrude, brandLogo } from "../data/legendGeometry";
+import { setBoardStanding } from "../lib/boardState";
 
 /* ---------------------------------------------------------------------------
    Layout
@@ -181,6 +182,8 @@ const _poseQ = new THREE.Quaternion();
 /* `ready` is false until the board has finished standing up. A stray mouse
    position over where a key WILL be was popping company names on screen
    mid-move, before the board had even landed. */
+/** seconds the board lies flat after arriving, before it stands up */
+const FLAT_HOLD = 1.2;
 /* lamp starts at 1 now that there is no blackout to come up from. It used to
    start at 0 to stop the legends - which are unlit and multiplied by it -
    flashing at full brightness on the commit R3F renders before the first
@@ -1122,6 +1125,7 @@ function Board({
     startAt.current = null;
     litFired.current = false;
     STAGE.ready = false;
+    setBoardStanding(false);
     STAGE.lamp = 1; // the room is always lit now; a dark parked frame would pop
     STAGE.dark = false;
     onLight?.(false);
@@ -1146,9 +1150,11 @@ function Board({
 
   /* Timeline (seconds from trigger, wall-clock so frame stalls cannot slow
      the choreography - a dropped frame skips ahead instead of dragging):
-     0.00 - 0.45  spotlight ramps on with a flicker, board flat on the floor
-     0.45 - 0.95  hold: half a second of the board just lying there
-     0.95 - 2.45  the stand-up, smootherstep eased at both ends
+     0.00 - 1.20  the board lies flat (FLAT_HOLD). Arriving from the hero
+                  the first ~0.4 s of it is under the iris's black, then the
+                  spotlight strikes over it (SceneCuts.tsx)
+     1.20 - 2.00  the stand-up (RISE), smootherstep eased at both ends
+     (Brian, 2026-11-25, tuned by eye: flat ~0.8 s once lit, a quick tilt)
 
      It used ease-out cubic, whose velocity is at its MAXIMUM on frame one -
      the board snapped off the table from a dead stop. */
@@ -1218,11 +1224,12 @@ function Board({
     // are both zero at each end, so the board eases out of rest and eases
     // into the pose with nothing to snap at either edge. Driven off the wall
     // clock, so it is frame-rate independent by construction.
-    const RISE = 1.6;
-    const x = THREE.MathUtils.clamp((s - 0.5) / RISE, 0, 1);
+    const RISE = 0.8; // Brian, 2026-11-25: twice as fast as the old 1.6 s
+    const x = THREE.MathUtils.clamp((s - FLAT_HOLD) / RISE, 0, 1);
     const u = x * x * x * (x * (x * 6 - 15) + 10);
 
     STAGE.ready = x >= 1;
+    setBoardStanding(x >= 1); // App's 1->2 gate waits on this (lib/boardState.ts)
     if (x < 1 || !shadowSettled.current) {
       state.gl.shadowMap.needsUpdate = true;
       shadowSettled.current = x >= 1;

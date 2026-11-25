@@ -66,8 +66,12 @@ try {
     await page.keyboard.press("ArrowDown");
     await page.waitForFunction(
       () => {
+        /* ENDED, not "within 20 ms of the end": a capture that starts in the
+           last instant of playback can catch the video layer with no frame
+           painted (a blank overlay, measured 2026-11-25). Once it has ended,
+           the overlay holds the last frame until App hides it (~260 ms). */
         const v = document.querySelector(".transition video");
-        return v && v.duration && v.currentTime >= v.duration - 0.02;
+        return v && v.ended;
       },
       null,
       { timeout: 20000, polling: "raf" },

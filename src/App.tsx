@@ -15,6 +15,8 @@ import GroundFloor from "./components/GroundFloor";
 import { llmOptedIn, loadInBackground } from "./lib/ragEngine";
 import TransitionPlayer, { type TransitionHandle } from "./components/TransitionPlayer";
 import TerminalHandoff, { type HandoffHandle } from "./components/TerminalHandoff";
+import SceneCuts, { type CutsHandle } from "./components/SceneCuts";
+import { whenBoardStanding } from "./lib/boardState";
 import { profile, skills } from "./data/content";
 
 const ease = [0.16, 1, 0.3, 1] as const;
@@ -126,6 +128,9 @@ export default function App() {
   /* RAG -> projects is not a clip: the terminal prints the work and the lines
      become the index. Same gate, no video. */
   const handoff = useRef<HandoffHandle>(null);
+  /* hero <-> keyboard and projects <-> board: 2D cuts, no video
+     (components/SceneCuts.tsx) */
+  const cuts = useRef<CutsHandle>(null);
   const handoffOut = useRef<false | "down" | "up">(false);
   /* ticks when the index is arrived at via the handoff, so it can skip the row
      entrance the overlay has already performed */
@@ -155,10 +160,26 @@ export default function App() {
       new Promise<boolean>((r) => window.setTimeout(() => r(false), ms)),
     ]);
   const gate = useCallback((from: number, to: number) => {
+    /* The 2D cuts need no clip, so they only follow the Motion switch, not
+       the clips' aspect and size rules. Adjacent moves only: a progress-dot
+       jump, or the elevator's ride to the top, stays as it was. */
+    const c = cuts.current;
+    if (c && transitionsEnabled() && !frameModeRef.current) {
+      if (from === 0 && to === 1) return c.irisDown();
+      if (from === 1 && to === 0) return c.irisUp();
+      if (from === 3 && to === 4) return c.notes("down");
+      if (from === 4 && to === 3) return c.notes("up");
+    }
     if (!transitionAllowed() || !player.current) return null;
     const p = player.current;
     const kbPanel = document.querySelector(".panel--void");
     if (from === 1 && to === 2) {
+      /* The clip opens on the board STANDING. Scrolled away while it is
+         still lying flat or rising (flat for 1.2 s, up by 2 s after arriving),
+         it finishes standing first - otherwise the clip's first frame snaps
+         it upright. Capped, so a board that never reports cannot hold the
+         nav. */
+      return whenBoardStanding(1800).then(() => {
       /* the section's own text fades first; the clip has none of it */
       kbPanel?.classList.add("is-departing");
       return Promise.all([
@@ -176,6 +197,7 @@ export default function App() {
           hideAfterLand.current = true;
           window.setTimeout(() => kbPanel?.classList.remove("is-departing"), 800);
         });
+      });
       });
     }
     if (from === 2 && to === 3 && handoff.current) {
@@ -242,7 +264,8 @@ export default function App() {
     clipReady.current = { promise, resolve };
   }
   /* "Calm": no section move, scroll or key press for 2.5 s. That also covers
-     the keyboard's whole 2.45 s stand-up. The model's GPU stage (upload +
+     the keyboard's whole stand-up (flat for 1.2 s, up by 2.0 s - FLAT_HOLD
+     and RISE in Keyboard3D). The model's GPU stage (upload +
      compile, in its worker) only starts in a calm moment - on a cached
      return visit that GPU work landing mid-scroll was the stutter. */
   const lastMoveAt = useRef(performance.now());
@@ -282,6 +305,9 @@ export default function App() {
   /* a section change is movement too */
   useEffect(() => {
     lastMoveAt.current = performance.now();
+    /* the iris lights the hero's bulb for its hold; let it go once the hero
+       is off screen, where nobody sees it return to its own draw-in */
+    if (index !== 0) cuts.current?.releaseBulb();
   }, [index]);
 
   /* The machine boots on EVERY arrival from above, not only after the clip.
@@ -446,6 +472,7 @@ export default function App() {
       <Cursor />
       <TransitionPlayer ref={player} />
       <TerminalHandoff ref={handoff} />
+      <SceneCuts ref={cuts} />
       {askFrame && (
         <div className="framechoice" role="dialog" aria-label="Display choice">
           <p className="framechoice__title">Ultrawide display</p>
