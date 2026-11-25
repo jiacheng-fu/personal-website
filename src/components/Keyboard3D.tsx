@@ -8,7 +8,6 @@ import { CAP_NOTES } from "../data/capNotes";
 import { studioMatcap } from "../data/matcap";
 import { useKeycapGeometry, capGeometry, HEIGHT_RATIO } from "../data/keycapGeometry";
 import { legendGeometry, legendExtrude, brandLogo } from "../data/legendGeometry";
-import { playPress, playRelease } from "../data/keySound";
 
 /* ---------------------------------------------------------------------------
    Layout
@@ -83,7 +82,7 @@ const ROWS: { caps: Cap[] }[] = [
       { label: "GitHub", w: 1.5, action: "github" },
       { label: "Email", w: 1.5, action: "email" },
       /* no legend: an empty label prints nothing and shows no caption, but the
-         cap still presses, still sounds, and still fires the wave */
+         cap still presses and still fires the wave */
       /* TEMP (debug): `code: "Space"` lifted while the transition scrubber owns
          the key. Restore it to bring the wave easter egg back. */
       { label: "", w: 6, blank: true, action: "wave" },
@@ -584,7 +583,6 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
   const enter = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
       e.stopPropagation();
-      playPress();
       onEnter(cap.label);
     },
     [cap.label, onEnter]
@@ -592,7 +590,6 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
   const leave = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
       e.stopPropagation();
-      playRelease();
       onLeave(cap.label);
     },
     [cap.label, onLeave]
@@ -1310,7 +1307,7 @@ function Board({
     };
 
     const down = (e: KeyboardEvent) => {
-      // Auto-repeat would re-trigger the press sound many times a second.
+      // Auto-repeat would re-trigger the press many times a second.
       if (e.repeat || busyElsewhere()) return;
       /* Never answer a shortcut. Cmd+R, Ctrl+C and friends must pass straight
          through - lighting up "Git" because someone copied something would be
@@ -1332,12 +1329,10 @@ function Board({
       e.stopImmediatePropagation();
 
       if (cap.action === "wave") {
-        playPress();
         runAction("wave");
         return;
       }
 
-      playPress();
       enter(cap.label);
 
       /* CapsLock reports a keydown when the light goes ON and the matching
@@ -1350,7 +1345,6 @@ function Board({
     const up = (e: KeyboardEvent) => {
       const cap = byCode.get(e.code);
       if (!cap || e.code === "CapsLock") return;
-      playRelease();
       if (cap.action !== "wave") leave(cap.label);
     };
 

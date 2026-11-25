@@ -10,7 +10,6 @@ import WorkIndex from "./components/WorkIndex";
 import Hero from "./components/Hero";
 import { Magnetic } from "./components/Bits";
 import { useSectionNav } from "./hooks/useSectionNav";
-import { soundEnabled, toggleSound } from "./data/keySound";
 import { CLIPS, transitionAllowed, transitionsEnabled, toggleTransitions, initFrame, isUltrawide, setBoxed } from "./lib/transitions";
 import ContactSheet from "./components/ContactSheet";
 import { warmModel } from "./lib/ragEngine";
@@ -115,7 +114,6 @@ export default function App() {
   // frame while paused. Delete this effect and the import to remove.
   useEffect(() => installDebugPause(), []);
 
-  const [sound, setSound] = useState(soundEnabled());
   const [clips, setClips] = useState(transitionsEnabled());
 
   /* Section-transition clips (docs/transition-kb-machine.md). The nav's gate
@@ -413,21 +411,10 @@ export default function App() {
             {profile.name}
           </a>
           <div className="nav__links">
-            {/* Site-wide, because the keycap clicks and the stage lamp both
-                use it. On by default; browsers stay silent until the first
-                interaction regardless, which keySound primes for. */}
-            <button
-              type="button"
-              className="nav__sound"
-              data-cursor="hover"
-              aria-pressed={sound}
-              aria-label={sound ? "Turn sound off" : "Turn sound on"}
-              onClick={() => setSound(toggleSound())}
-            >
-              Sound {sound ? "on" : "off"}
-            </button>
+            {/* No Sound toggle: the site is silent (Brian, 2026-11-25 - the
+                keycap clicks were the last sound left). */}
             {/* Every section boundary gets a clip; this is the one switch
-                for all of them. Session memory only, like sound. */}
+                for all of them. Session memory only. */}
             <button
               type="button"
               className="nav__sound"
