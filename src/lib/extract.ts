@@ -102,13 +102,15 @@ export function extractAnswer(r: Retrieval, max = 2, debug?: (rows: string[]) =>
   });
   cands.sort((a, b) => b.score - a.score);
   debug?.(cands.map((c) => `${c.score.toFixed(2)} [${c.hits.join(",")}] ${c.chunk.section}: ${c.text.slice(0, 70)}`));
-  /* A visitor's note that retrieval found relevant is quoted FIRST, whatever
-     a résumé sentence scored: it is what they just taught the machine, and
-     it is newer. The résumé's line follows, so a contradiction is shown as
-     one - attributed, never silently resolved. */
+  /* Brian's archive is quoted FIRST; a visitor's note that retrieval found
+     relevant comes after it, and the UI marks it unverified (Brian,
+     2026-11-25: "archive first for notes, and information inserted via notes
+     should be clearly marked"). It used to lead, as the newest thing known -
+     which made "Brian moved to Seattle", or "Brian is a criminal", the
+     machine's headline over the record it contradicts. The note takes the
+     last seat; when the archive has nothing to say, it is the only quote. */
   const picked: typeof cands = [];
   const note = cands.find((c) => c.chunk.section === "Visitor");
-  if (note) picked.push(note);
   const rest = cands.filter((c) => c.chunk.section !== "Visitor");
   /* A question about several things ("his GPA, his internships and his
      hobbies") deserves a quote per thing, not two quotes on whichever one
@@ -116,12 +118,13 @@ export function extractAnswer(r: Retrieval, max = 2, debug?: (rows: string[]) =>
      chosen for the words of the question it newly covers; a long, many-part
      question gets a third. */
   const own = new Set(direct.filter(([, w]) => w === 1).map(([t]) => t));
-  const limit = own.size >= 4 ? max + 1 : max;
+  const seats = Math.max(1, max - (note ? 1 : 0));
+  const limit = own.size >= 4 ? seats + 1 : seats;
   const covered = new Set<string>();
   const top = rest[0]?.score ?? 0;
   const pool = rest.filter((c) => c.score >= top * 0.6 || [...own].some((t) => c.hits.includes(t)));
   while (picked.length < limit) {
-    const resume = picked.some((p) => p.chunk.section !== "Visitor");
+    const resume = picked.length > 0;
     let best: (typeof cands)[number] | null = null;
     let bestScore = -Infinity;
     for (const c of pool) {
@@ -134,7 +137,7 @@ export function extractAnswer(r: Retrieval, max = 2, debug?: (rows: string[]) =>
         if (!c.hits.some((h) => own.has(h))) continue;
         if (fresh === 0 && c.score < top * 0.6) continue;
         /* a third quote has to earn it: something new, and close to the best */
-        if (picked.length >= max && (fresh === 0 || c.score < top * 0.6)) continue;
+        if (picked.length >= seats && (fresh === 0 || c.score < top * 0.6)) continue;
       }
       const sc = c.score + (resume ? 0.8 * fresh : 0);
       if (sc > bestScore) {
@@ -157,14 +160,15 @@ export function extractAnswer(r: Retrieval, max = 2, debug?: (rows: string[]) =>
     const fix = overview && sentences(overview.text).find((x) => /\bhas worked at\b/.test(x));
     if (fix && !picked.some((p) => p.text === fix)) {
       picked.unshift({ text: fix, score: Infinity, chunk: overview, hits: [] });
-      picked.splice(max);
+      picked.splice(seats);
     }
   }
   /* nothing matched sentence by sentence: the best passage's opening line */
-  if (!picked.length && ranked[0]) {
+  if (!picked.length && !note && ranked[0]) {
     const first = sentences(ranked[0].chunk.text)[0];
     picked.push({ text: first, score: 0, chunk: ranked[0].chunk, hits: [] });
   }
+  if (note) picked.push(note);
   return picked.map((c) => ({
     text: trimAround(c.text, c.hits),
     source: sourceOf(c.chunk),

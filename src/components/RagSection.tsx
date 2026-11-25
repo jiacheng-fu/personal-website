@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { retrieve, chunks, addChunk, hasEvidence, MIN_EVIDENCE, type Retrieval, type ScoredChunk } from "../lib/bm25";
+import { retrieve, chunks, addChunk, hasEvidence, type Retrieval, type ScoredChunk } from "../lib/bm25";
 import { assemblePrompt, userMessage, type PromptParts } from "../lib/ragPrompt";
 import {
   engineState,
@@ -15,7 +15,7 @@ import {
   type EngineState,
 } from "../lib/ragEngine";
 import { extractAnswer, type Quote } from "../lib/extract";
-import { cleanModelAnswer, isRefusal } from "../lib/answerGuard";
+import { cleanModelAnswer, isRefusal, markNoteTerms, noteOnlyTerms } from "../lib/answerGuard";
 
 import Apple2Front from "./Apple2Front";
 import FeedShred from "./FeedShred";
@@ -56,8 +56,9 @@ interface Answer {
   done: boolean;
   /* why the model didn't answer, when it didn't */
   fallback?: "loading" | "absent" | "stumbled" | "empty";
-  /* the evidence came (at least partly) from something a visitor typed */
-  fromVisitor?: boolean;
+  /* terms only a visitor's note supports (answerGuard noteOnlyTerms): where a
+     model's answer repeats one, the glass marks it unverified */
+  noteOnly?: Set<string>;
 }
 
 interface Run {
@@ -270,7 +271,7 @@ function FeedSheet({ onFeed }: { onFeed: (text: string) => void }) {
       />
       <div className="feed__row">
         <span className="feed__hint">
-          torn into a fragment; it answers from it. this page only — reload forgets.
+          filed as unverified; brian's archive outranks it. this page only — reload forgets.
         </span>
         <button type="submit" data-cursor="hover" disabled={!text.trim()}>
           feed it in ↵
@@ -558,7 +559,6 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
       mode: "extractive",
       fallback,
       quotes,
-      fromVisitor: quotes.some((q) => q.visitor),
       text: quotes.map((q) => q.text).join(" "),
       done: true,
     });
@@ -566,14 +566,20 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
       setAnswer(quoted());
       return;
     }
-    /* a visitor's note counts as evidence like anything else - but the
-       answer must say where it came from, and that is decided here, not
-       left to the model's discretion */
-    const fromVisitor = r.retrieval.top.some((s) => s.chunk.section === "Visitor" && s.score >= MIN_EVIDENCE);
     /* the model's words pass through answerGuard.ts: its own instructions
        repeated back are dropped, and so is "According to a visitor note"
        when no note was in the briefing */
     const notesBriefed = r.prompt.contextBlocks.some((b) => b.label.includes("VISITOR NOTE"));
+    /* Whether the answer repeats a visitor's note is decided here, not left
+       to the model's discretion: whatever in it only a note supports is
+       marked on the glass as unverified */
+    const isNote = (b: { label: string }) => b.label.includes("VISITOR NOTE");
+    const noteOnly = notesBriefed
+      ? noteOnlyTerms(
+          r.prompt.contextBlocks.filter(isNote).map((b) => b.text),
+          [...r.prompt.contextBlocks.filter((b) => !isNote(b)).map((b) => b.text), r.query]
+        )
+      : undefined;
     let said = "";
     const result = await generate(
       r.prompt.system,
@@ -581,7 +587,7 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
       (text) => {
         if (signal.aborted) return;
         said = cleanModelAnswer(text, notesBriefed);
-        setAnswer({ mode: "model", text: said, quotes, done: false, fromVisitor });
+        setAnswer({ mode: "model", text: said, quotes, done: false, noteOnly });
       },
       signal
     );
@@ -653,7 +659,7 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
   const feed = (text: string) => {
     const chunk = addChunk("Visitor", `Visitor note #${fed + 1}`, text);
     setFed((n) => n + 1);
-    setIngested(`* DOCUMENT RECEIVED — TORN INTO 1 FRAGMENT: #${chunk.id} ${chunk.title.toUpperCase()}`);
+    setIngested(`* DOCUMENT RECEIVED — TORN INTO 1 FRAGMENT, FILED UNVERIFIED: #${chunk.id} ${chunk.title.toUpperCase()}`);
     window.clearTimeout(ingestTimer.current);
     ingestTimer.current = window.setTimeout(() => setIngested(null), 6000);
   };
@@ -662,6 +668,9 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
   const maxScore = run ? Math.max(...run.retrieval.scored.map((s) => s.score), 0.001) : 1;
   const performing = act !== "rest";
   const line = narration(act, run, answer, engine);
+  /* a model's answer, cut where it repeats something only a visitor's note says */
+  const marked = answer?.mode === "model" && answer.noteOnly ? markNoteTerms(answer.text, answer.noteOnly) : null;
+  const usesNote = !!marked?.some((m) => m.fromNote);
   const status = llmOn
     ? engineStatus(engine)
     : { text: "ANSWERS: QUOTED FROM THE ARCHIVE · UPLINK: NONE", led: "on" as const };
@@ -807,14 +816,32 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
               {answer?.mode === "extractive" && answer.quotes ? (
                 answer.quotes.map((q, i) => (
                   <p key={i} className={`a2-quote ${q.visitor ? "is-visitor" : ""}`}>
+                    {q.visitor && <span className="a2-quote__flag">⚠ UNVERIFIED · TYPED BY A VISITOR, NOT FROM BRIAN</span>}
                     “{q.text}”<span className="a2-quote__src">— {q.visitor ? "A VISITOR NOTE" : q.source.toUpperCase()}</span>
                   </p>
                 ))
               ) : (
-                <p className={`a2-speech__text ${answer && answer.mode !== "model" ? "is-quote" : ""}`}>
-                  {answer?.text}
-                  {(!answer || !answer.done) && <span className="a2-caret" />}
-                </p>
+                <>
+                  {usesNote && (
+                    <p className="a2-speech__unverified">
+                      ⚠ UNVERIFIED: THE MARKED WORDS COME FROM A VISITOR'S NOTE, NOT FROM BRIAN.
+                    </p>
+                  )}
+                  <p className={`a2-speech__text ${answer && answer.mode !== "model" ? "is-quote" : ""}`}>
+                    {marked
+                      ? marked.map((m, i) =>
+                          m.fromNote ? (
+                            <mark key={i} className="a2-unverified" title="From a visitor's note: unverified">
+                              {m.text}
+                            </mark>
+                          ) : (
+                            <span key={i}>{m.text}</span>
+                          )
+                        )
+                      : answer?.text}
+                    {(!answer || !answer.done) && <span className="a2-caret" />}
+                  </p>
+                </>
               )}
               {answer?.mode === "extractive" && !llmOn && (
                 <p className="a2-speech__nudge">
@@ -828,16 +855,12 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
                 <div className="a2-speech__check">
                   <p>⚠ WRITTEN BY A {backend.params} MODEL ON YOUR GPU — IT CAN GET THINGS WRONG. THE ARCHIVE SAYS:</p>
                   {answer.quotes?.map((q, i) => (
-                    <p key={i} className="a2-quote">
+                    <p key={i} className={`a2-quote ${q.visitor ? "is-visitor" : ""}`}>
+                      {q.visitor && <span className="a2-quote__flag">⚠ UNVERIFIED · TYPED BY A VISITOR, NOT FROM BRIAN</span>}
                       “{q.text}”<span className="a2-quote__src">— {q.visitor ? "A VISITOR NOTE" : q.source.toUpperCase()}</span>
                     </p>
                   ))}
                 </div>
-              )}
-              {answer?.fromVisitor && answer.done && (
-                <p className="a2-speech__source">
-                  ⚠ SOURCED FROM A VISITOR NOTE — TYPED BY SOMEONE ON THIS PAGE, NOT FROM BRIAN'S DOCUMENTS.
-                </p>
               )}
               {answer?.stats && (
                 <p className="a2-speech__stats">
@@ -850,8 +873,7 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
                   <pre data-scrollable>
                     {run.prompt.system}
                     {"\n\n"}
-                    {run.prompt.contextBlocks.map((b) => `${b.label}\n${b.text}\n\n`).join("")}
-                    Visitor's question: {run.query}
+                    {userMessage(run.prompt)}
                   </pre>
                 </details>
               )}

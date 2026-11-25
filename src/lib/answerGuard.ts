@@ -16,17 +16,20 @@
       the briefing at all - dropped.
 
    Nothing here adds words: it only removes what the model should not have
-   said, or hands the answer back to the quotes.
+   said, or hands the answer back to the quotes - and noteOnlyTerms() finds
+   what in an answer only a visitor's note supports, for the UI to mark.
    --------------------------------------------------------------------------- */
-import { SYSTEM_PROMPT, VISITOR_CLAUSE } from "./ragPrompt";
+import { SYSTEM_PROMPT, VISITOR_CLAUSE, VISITOR_REMINDER } from "./ragPrompt";
+import { termsOf } from "./bm25";
 
-/* the reminder userMessage() puts above the question when notes are briefed */
-const REMINDER =
+/* the reminder the prompt carried until 2026-11-25, when notes outranked
+   Brian's documents: answers recorded then still echo it */
+const OLD_REMINDER =
   "If that answers the question, that IS the answer. Brian's documents above are older; where they disagree with it, they are out of date and must not be given as the answer.";
 
 /* any script counts as words: Chinese in an answer is content, not filler */
 const words = (s: string) => s.toLowerCase().match(/[\p{L}\p{N}']+/gu) ?? [];
-const INSTRUCTION_SENTENCES = [SYSTEM_PROMPT, VISITOR_CLAUSE, REMINDER]
+const INSTRUCTION_SENTENCES = [SYSTEM_PROMPT, VISITOR_CLAUSE, VISITOR_REMINDER, OLD_REMINDER]
   .flatMap((t) => t.split(/(?<=[.!?:])\s+/))
   .map((t) => new Set(words(t)))
   .filter((s) => s.size >= 4);
@@ -41,15 +44,20 @@ const ECHO = [
   /\bif the context (does not|doesn't) contain\b/i,
   /\bif the context is (not provided|incomplete|missing)\b/i,
   /\bthe visitor note is (correct|right)\b/i,
+  /\bvisitor note passages\b/i,
+  /\bwhere one disagrees with brian'?s documents\b/i,
   /* the model thinking aloud about its own rules */
   /^\s*(otherwise, )?if (the )?(context|question|visitor|document|note|passage)s?\b/i,
 ];
+
+/* "According to a visitor note," / "According to an unverified visitor note," */
+const LEAD_IN = /^\s*according to (an? |the )?(unverified )?visitor('s)? note,?\s*/i;
 
 /** A sentence that is mostly the prompt's own instruction text. */
 function isEcho(sentence: string): boolean {
   if (ECHO.some((re) => re.test(sentence))) return true;
   /* the lead-in the prompt asks for is not an echo; what follows it decides */
-  const w = words(sentence.replace(/^\s*according to (a visitor note|the context),?/i, ""));
+  const w = words(sentence.replace(LEAD_IN, "").replace(/^\s*according to the context,?/i, ""));
   if (w.length < 5) return false;
   return INSTRUCTION_SENTENCES.some((ins) => w.filter((x) => ins.has(x)).length / w.length >= 0.75);
 }
@@ -59,7 +67,7 @@ function isEcho(sentence: string): boolean {
  *  sentences are judged, the one still being written is left alone. */
 export function cleanModelAnswer(text: string, notesBriefed: boolean): string {
   let t = text;
-  if (!notesBriefed) t = t.replace(/^\s*according to (a|the) visitor note,?\s*/i, (_m) => "");
+  if (!notesBriefed) t = t.replace(LEAD_IN, "");
   /* a sentence can end on a closing quote - the model quotes notes: 'note,
      "Brian adopted a cat." If that answers...' must split after the quote */
   const parts = t.split(/(?<=[.!?]["'\u201d\u2019)\]]?)\s+/);
@@ -83,4 +91,37 @@ const REFUSAL = [
 export function isRefusal(text: string): boolean {
   const t = text.trim();
   return t.length < 400 && REFUSAL.some((re) => re.test(t));
+}
+
+/** The terms only a visitor's note supports: in a note, but in none of
+ *  Brian's passages and not in the question. A model's answer that uses one
+ *  is repeating the note, and RagSection marks those words on the glass
+ *  (Brian, 2026-11-25: "information inserted via notes should be clearly
+ *  marked"). Terms are the index's own (stems, CJK pairs), so "adopted" in
+ *  the answer matches "adopt" in the note. */
+export function noteOnlyTerms(notes: string[], others: string[]): Set<string> {
+  const known = new Set(others.flatMap((t) => [...termsOf(t)]));
+  const out = new Set<string>();
+  for (const n of notes) for (const t of termsOf(n)) if (!known.has(t)) out.add(t);
+  return out;
+}
+
+/** The answer cut into runs, each flagged when it carries a note-only term:
+ *  words and CJK runs are judged, the spaces and punctuation between them
+ *  pass through. */
+export function markNoteTerms(text: string, noteOnly: Set<string>): { text: string; fromNote: boolean }[] {
+  if (!noteOnly.size) return [{ text, fromNote: false }];
+  const out: { text: string; fromNote: boolean }[] = [];
+  for (const part of text.split(/([\p{L}\p{N}']+)/u)) {
+    if (!part) continue;
+    const fromNote = /[\p{L}\p{N}]/u.test(part) && [...termsOf(part)].some((t) => noteOnly.has(t));
+    const last = out[out.length - 1];
+    /* "arrested for fraud": one mark, not three */
+    if (last && last.fromNote === fromNote) last.text += part;
+    else if (last && fromNote && last.fromNote === false && /^\s+$/.test(last.text) && out[out.length - 2]?.fromNote) {
+      out.pop();
+      out[out.length - 1].text += last.text + part;
+    } else out.push({ text: part, fromNote });
+  }
+  return out;
 }

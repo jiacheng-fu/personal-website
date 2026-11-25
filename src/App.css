@@ -2016,9 +2016,29 @@ html {
   font-size: 0.78em;
   color: var(--ph-dim);
 }
+/* a visitor's note, quoted after Brian's archive: marked as what it is, in
+   the busy LED's amber - the one colour on the glass that is not phosphor */
 .a2-quote.is-visitor {
-  border-left: 2px solid var(--ph);
+  border-left: 2px dashed #e0a33c;
   padding-left: 0.5em;
+  color: var(--ph-dim);
+}
+.a2-quote__flag,
+.a2-speech__unverified {
+  display: block;
+  margin-bottom: 0.2em;
+  font-size: 0.75em;
+  letter-spacing: 0.06em;
+  color: #e0a33c;
+  text-shadow: 0 0 6px rgba(224, 163, 60, 0.35);
+}
+/* in a model's answer, whatever only a visitor's note supports */
+.a2-unverified {
+  background: none;
+  color: #e0a33c;
+  text-shadow: 0 0 6px rgba(224, 163, 60, 0.35);
+  text-decoration: underline dashed;
+  text-underline-offset: 0.2em;
 }
 /* under a model's answer: the quotes it worked from, to check it against */
 .a2-speech__check {

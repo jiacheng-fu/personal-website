@@ -726,32 +726,28 @@ export function retrieve(query: string, k = 3): Retrieval {
      big picture. It is sorted in by score like any other chunk, so a zero
      score on it cannot masquerade as evidence. */
   const overview = scored.find((s) => s.chunk.section === "Overview");
-  /* When a visitor's note has out-ranked everything, the briefing carries one
-     fewer of Brian's older passages. Not to hide them - the note leads, and
-     the model is told plainly that the older ones may be stale - but because
-     a 25-character note arguing with 400 characters of confident résumé prose
-     loses that argument on sheer mass. "Where is brian", against a note
-     saying he is at a Subway, was briefing the contact card ("Brian lives in
-     Austin, Texas") AND the education card ("College Station, TX") and coming
-     back with Austin. Trimming the weakest of them costs a question nothing:
-     if a passage were carrying the answer it would not be ranked last. */
-  /* The best visitor note in contention, promoted to the front of the queue.
-     Promoting it FIRST is what makes the trim safe: taking one fewer passage
-     to give a note room, without also guaranteeing the note a seat, dropped
-     the note itself - "Brian moved to Seattle" fell out of its own briefing
-     in favour of the Austin card it was supposed to correct. */
+  /* Brian's passages keep every seat they would have without any note;
+     visitor notes ranked in contention ride along ON TOP, two at most.
+     Until 2026-11-25 a note took the seat of the weakest archive passage, so
+     that "Brian moved to Seattle" would out-argue the Austin card - and three
+     notes about where he was left the archive two passages. Now Brian's
+     archive outranks every note (Brian: "archive first for notes"), and the
+     passage a note contradicts has to be in the briefing to be quoted first. */
   const contenders = ranked.slice(0, Math.max(1, k - 1));
-  const note = contenders.find((s) => s.chunk.section === "Visitor");
-  const room = Math.max(1, k - (note ? 2 : 1));
-  const queue = note ? [note, ...ranked.filter((s) => s !== note)] : ranked;
   const others: ScoredChunk[] = [];
-  for (const s of queue) {
-    if (others.length >= room) break;
-    if (s === overview) continue;
-    if (overview && nearDuplicate(s.chunk, overview.chunk)) continue;
-    if (others.some((t) => nearDuplicate(s.chunk, t.chunk))) continue;
-    others.push(s);
-  }
+  const seat = (pool: ScoredChunk[], room: number) => {
+    let n = 0;
+    for (const s of pool) {
+      if (n >= room) break;
+      if (s === overview) continue;
+      if (overview && nearDuplicate(s.chunk, overview.chunk)) continue;
+      if (others.some((t) => nearDuplicate(s.chunk, t.chunk))) continue;
+      others.push(s);
+      n++;
+    }
+  };
+  seat(ranked.filter((s) => s.chunk.section !== "Visitor"), Math.max(1, k - 1));
+  seat(contenders.filter((s) => s.chunk.section === "Visitor"), 2);
   const top =
     overview && ranked.length > 0
       ? [overview, ...others].sort((a, b) => b.score - a.score)
