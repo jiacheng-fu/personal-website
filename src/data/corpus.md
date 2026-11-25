@@ -106,7 +106,7 @@ Brian's hometown is Xi'an, China, where he was born; he later moved to Austin, T
 
 ## Personal | Favorites
 
-Brian's favorite color is green. Brian's favorite ice cream flavor is cookies and cream. Brian's favorite foods are the carbs of Xi'an: jianbing guozi, roujiamo, yangrou paomo, and biangbiang noodles, which he misses; he also loves Texas barbecue. Brian's favorite movie of all time is Interstellar. For music, Brian listens to Tyler, the Creator and Kanye West, and his favorite song is probably Homecoming. Brian used to watch the anime show One Piece, until its pacing lost him. Brian's favorite programming language is Python: it is easy and simple, with lots of built-in functions and no braces to type, though he admits it is slow and interpreted.
+Brian's favorite color is green. Brian's favorite ice cream flavor is cookies and cream. Brian's favorite foods are the carbs of Xi'an, which he misses: savory Chinese breakfast crepes, Chinese burgers of braised pork in flatbread, lamb soup with torn flatbread, and wide hand-pulled noodles; he also loves Texas barbecue. Brian's favorite movie of all time is Interstellar. For music, Brian listens to Tyler, the Creator and Kanye West, and his favorite song is probably Homecoming. Brian used to watch the anime show One Piece, until its pacing lost him. Brian's favorite programming language is Python: it is easy and simple, with lots of built-in functions and no braces to type, though he admits it is slow and interpreted.
 
 ## Personal | Games
 

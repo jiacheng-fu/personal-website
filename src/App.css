@@ -1813,6 +1813,17 @@ html {
   gap: 6px;
   margin-top: 0.5em;
   overflow-y: auto;
+  /* No scrollbars on the field (Brian, 2026-11-25: "giant ugly white scroll
+     bars" while it searched). It holds every card, more than fit, so it always
+     overflowed and the browser drew its own bar, white wherever scrollbars
+     are always shown (Safari, Macs set to "always", Windows); and fragments
+     scaling in poked past the side for a horizontal one. It still scrolls -
+     the wheel on the screen reaches it. */
+  overflow-x: hidden;
+  scrollbar-width: none;
+}
+.a2-frags::-webkit-scrollbar {
+  display: none;
 }
 .a2-frag {
   position: relative;
@@ -1887,6 +1898,25 @@ html {
   scrollbar-width: thin;
   scrollbar-color: var(--ph-faint) transparent;
 }
+/* the answer and the briefing keep a scrollbar - it is the only sign there is
+   more to read - but a thin phosphor one, in browsers without scrollbar-color
+   (Safari) too, never the white default */
+.a2-speech::-webkit-scrollbar,
+.a2-briefing pre::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.a2-speech::-webkit-scrollbar-track,
+.a2-briefing pre::-webkit-scrollbar-track,
+.a2-speech::-webkit-scrollbar-corner,
+.a2-briefing pre::-webkit-scrollbar-corner {
+  background: transparent;
+}
+.a2-speech::-webkit-scrollbar-thumb,
+.a2-briefing pre::-webkit-scrollbar-thumb {
+  background: var(--ph-faint);
+  border-radius: 2px;
+}
 .a2-speech__text {
   white-space: pre-wrap;
   max-width: 58ch;
@@ -1933,6 +1963,8 @@ html {
   max-height: 9em;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ph-faint) transparent;
   border: 1px solid var(--ph-faint);
   padding: 0.5em 0.6em;
   font-family: inherit;

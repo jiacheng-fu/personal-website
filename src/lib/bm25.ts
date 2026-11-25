@@ -325,8 +325,10 @@ const SYNONYMS: string[][] = [
      have a pet" to the cat they just told the machine about. */
   ["pet", "cat", "dog", "animal", "kitten", "puppy", "adopted"],
   ["eat", "eating", "food", "lunch", "dinner", "breakfast", "meal", "hungry", "restaurant", "subway", "coffee",
-   /* the one food the archive itself knows about (Favorites) */
-   "dessert", "ice", "cream", "snack", "noodle", "barbecue", "carb"],
+   /* the foods the archive itself knows about (Favorites), in English since
+      2026-11-25: "jianbing guozi" meant nothing to most visitors */
+   "dessert", "ice", "cream", "snack", "noodle", "barbecue", "carb", "crepe", "burger", "hamburger", "soup",
+   "lamb", "pork", "flatbread"],
   ["family", "wife", "husband", "partner", "girlfriend", "boyfriend", "married", "brother", "sister", "parent", "mom", "dad"],
   ["hobby", "hobbies", "enjoy", "favorite", "favourite", "interest", "weekend", "pastime"],
   ["travel", "trip", "vacation", "visit", "flight", "flying", "driving"],
