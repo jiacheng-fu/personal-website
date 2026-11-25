@@ -94,10 +94,34 @@ function hairPoint(spread: number, depth: number) {
   return { x, y: PHOTO.top[i] + depth };
 }
 
+/** A ledge a logo can land on, in photo pixels: the top of a letter. */
+export type Platform = { x0: number; x1: number; y: number };
+
+/** PLAY mode (the hero uses it): the logos come down instead of fading -
+ *  onto the tops of the letters and onto his hair, where they roll off -
+ *  and the cursor knocks them about. `front` is a layer above the head and
+ *  the name; a logo moves into it once it has cleared his hair. */
+export type Play = { front: HTMLElement; platforms: () => Platform[] };
+
+/** the head's top edge at x, in photo px; Infinity off either side of it */
+function headTop(x: number) {
+  if (x < PHOTO.x0 || x > PHOTO.x1) return Infinity;
+  const f = (x - PHOTO.x0) / PHOTO.step;
+  const i = Math.min(PHOTO.top.length - 1, Math.floor(f));
+  const j = Math.min(PHOTO.top.length - 1, i + 1);
+  return PHOTO.top[i] + (PHOTO.top[j] - PHOTO.top[i]) * (f - i);
+}
+
 type Particle = {
   /** which logo, so it can be in the air only once at a time */
   idx: number;
   el: HTMLImageElement;
+  /** radius in photo px (play mode) */
+  rad: number;
+  /** moved above the head yet (play mode) */
+  front: boolean;
+  /** seconds spent at rest (play mode); it fades and goes after a while */
+  rest: number;
   x: number;
   y: number;
   vx: number;
@@ -123,7 +147,7 @@ export type Eruption = {
  *   photo and the name, so they come out from behind the head and pass
  *   behind the letters
  */
-export function createEruption(layer: HTMLElement): Eruption {
+export function createEruption(layer: HTMLElement, play?: Play): Eruption {
   /* fetched up front, so the first volley is not a row of empty boxes */
   const srcs = ERUPTION_LOGOS.map(([, f]) => `/logos/brand/${f}.svg`);
   for (const s of srcs) new Image().src = s;
@@ -171,7 +195,8 @@ export function createEruption(layer: HTMLElement): Eruption {
     el.alt = "";
     el.draggable = false;
     el.dataset.logo = name;
-    el.style.width = `${rand(2.3, 3.7).toFixed(2)}cqw`;
+    const cqw = rand(2.3, 3.7);
+    el.style.width = `${cqw.toFixed(2)}cqw`;
     layer.append(el);
     const at = hairPoint(0.55, 34);
     const ang = ((-90 + rand(-1, 1) * (volley ? 58 : 32)) * Math.PI) / 180;
@@ -179,6 +204,9 @@ export function createEruption(layer: HTMLElement): Eruption {
     live.push({
       idx,
       el,
+      rad: ((cqw / 100) * PHOTO.w) / 2 * 0.82,
+      front: false,
+      rest: 0,
       ...at,
       vx: Math.cos(ang) * sp,
       vy: Math.sin(ang) * sp,
@@ -202,6 +230,11 @@ export function createEruption(layer: HTMLElement): Eruption {
     } else acc = 0;
 
     const s = layer.clientWidth / PHOTO.w;
+    if (play) {
+      stepPlay(t, dt, s);
+      raf = t < until || live.length > 0 || timers.length > 0 ? requestAnimationFrame(frame) : 0;
+      return;
+    }
     for (let i = live.length - 1; i >= 0; i--) {
       const p = live[i];
       p.age += dt;
@@ -223,6 +256,137 @@ export function createEruption(layer: HTMLElement): Eruption {
     }
 
     raf = t < until || live.length > 0 || timers.length > 0 ? requestAnimationFrame(frame) : 0;
+  };
+
+  /* ---- play mode ------------------------------------------------------ */
+  const cursor = { x: -1e4, y: -1e4, vx: 0, vy: 0, at: 0 };
+  const onMove = (e: PointerEvent) => {
+    const b = layer.getBoundingClientRect();
+    if (!b.width) return;
+    const k = PHOTO.w / b.width;
+    const x = (e.clientX - b.left) * k;
+    const y = (e.clientY - b.top) * k;
+    const t = performance.now() / 1000;
+    const dt = Math.max(0.008, t - cursor.at);
+    cursor.vx = Math.max(-2500, Math.min(2500, (x - cursor.x) / dt));
+    cursor.vy = Math.max(-2500, Math.min(2500, (y - cursor.y) / dt));
+    cursor.x = x;
+    cursor.y = y;
+    cursor.at = t;
+  };
+  if (play) window.addEventListener("pointermove", onMove, { passive: true });
+
+  const remove = (i: number) => {
+    const p = live[i];
+    p.el.remove();
+    flying.delete(p.idx);
+    live.splice(i, 1);
+  };
+
+  const stepPlay = (t: number, dt: number, s: number) => {
+    const plats = play!.platforms();
+    const g = ERUPTION.gravity;
+    const fresh = t - cursor.at < 0.12;
+    for (let i = live.length - 1; i >= 0; i--) {
+      const p = live[i];
+      p.age += dt;
+      /* out of his hair and rising: from here on it is in front of him */
+      if (!p.front && p.vy < 0 && p.y + p.rad < PHOTO.crownY - 6) {
+        play!.front.append(p.el);
+        p.front = true;
+      }
+      p.vy += g * dt;
+      p.vx *= 1 - 0.15 * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      let support = false;
+      if (p.front) {
+        /* letter tops: ledges, landable from above only */
+        for (const pf of plats) {
+          if (p.vy < 0 || p.x < pf.x0 - p.rad * 0.3 || p.x > pf.x1 + p.rad * 0.3) continue;
+          const bottom = p.y + p.rad;
+          if (bottom > pf.y && bottom - p.vy * dt <= pf.y + 3) {
+            p.y = pf.y - p.rad;
+            p.vy = Math.abs(p.vy) < 60 ? 0 : -p.vy * 0.28;
+            p.vx *= 0.8;
+            support = true;
+            /* past the edge with its centre: it tips off */
+            if (p.x < pf.x0) p.vx -= 220 * dt;
+            else if (p.x > pf.x1) p.vx += 220 * dt;
+          }
+        }
+        /* his hair: it lands, then rolls downhill and off */
+        const gy = headTop(p.x);
+        if (p.y + p.rad > gy) {
+          const slope = (headTop(p.x + 10) - headTop(p.x - 10)) / 20;
+          p.y = gy - p.rad;
+          if (p.vy > 0) p.vy = Math.abs(p.vy) < 60 ? 0 : -p.vy * 0.3;
+          p.vx += (Number.isFinite(slope) ? slope : 0) * g * 0.9 * dt;
+          p.vx *= 0.985;
+          support = true;
+        }
+        /* the sides of the picture */
+        if (p.x < p.rad) {
+          p.x = p.rad;
+          p.vx = Math.abs(p.vx) * 0.5;
+        } else if (p.x > PHOTO.w - p.rad) {
+          p.x = PHOTO.w - p.rad;
+          p.vx = -Math.abs(p.vx) * 0.5;
+        }
+        /* the cursor knocks it about */
+        if (fresh) {
+          const dx = p.x - cursor.x;
+          const dy = p.y - cursor.y;
+          const d = Math.hypot(dx, dy) || 1;
+          if (d < p.rad + 28) {
+            p.vx += cursor.vx * 0.45 + (dx / d) * 220;
+            p.vy += cursor.vy * 0.45 + (dy / d) * 220 - 160;
+            p.vr += rand(-200, 200);
+            p.rest = 0;
+          }
+        }
+      }
+      /* rolling on something: spin to match; in the air, keep tumbling */
+      if (support) p.vr = (p.vx / p.rad) * 57.3;
+      p.r += p.vr * dt;
+      p.rest = support && Math.hypot(p.vx, p.vy) < 30 ? p.rest + dt : 0;
+      const fade = p.rest > 5 ? 1 - (p.rest - 5) / 0.8 : 1;
+      if (fade <= 0 || p.y > PHOTO.h + 80 || p.age > 25) {
+        remove(i);
+        continue;
+      }
+      p.el.style.opacity = String(Math.min(1, p.age * 7) * fade);
+      p.el.style.transform = `translate(${p.x * s}px, ${p.y * s}px) translate(-50%, -50%) rotate(${p.r}deg)`;
+    }
+    /* logos bump into each other (only once they are out in front) */
+    for (let a = 0; a < live.length; a++) {
+      const A = live[a];
+      if (!A.front) continue;
+      for (let b = a + 1; b < live.length; b++) {
+        const B = live[b];
+        if (!B.front) continue;
+        const dx = B.x - A.x;
+        const dy = B.y - A.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const min = A.rad + B.rad;
+        if (d >= min) continue;
+        const nx = dx / d;
+        const ny = dy / d;
+        const push = (min - d) / 2;
+        A.x -= nx * push;
+        A.y -= ny * push;
+        B.x += nx * push;
+        B.y += ny * push;
+        const vn = (B.vx - A.vx) * nx + (B.vy - A.vy) * ny;
+        if (vn < 0) {
+          const j = (-(1 + 0.3) * vn) / 2;
+          A.vx -= j * nx;
+          A.vy -= j * ny;
+          B.vx += j * nx;
+          B.vy += j * ny;
+        }
+      }
+    }
   };
 
   const run = () => {
@@ -262,6 +426,7 @@ export function createEruption(layer: HTMLElement): Eruption {
       raf = 0;
       live.splice(0).forEach((p) => p.el.remove());
       flying.clear();
+      window.removeEventListener("pointermove", onMove);
     },
   };
 }

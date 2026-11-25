@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { profile } from "../data/content";
-import { PHOTO, createEruption, type Eruption } from "../lib/eruption";
+import { PHOTO, createEruption, type Eruption, type Platform } from "../lib/eruption";
+import HeroDoodles from "./HeroDoodles";
 import "./Hero.css";
 
 /* ---------------------------------------------------------------------------
@@ -25,9 +26,10 @@ import "./Hero.css";
 
 /** Where the name's baseline sits relative to the crown, in cap heights
  *  (positive = below it, so the head covers the letters). Brian, 2026-11-25:
- *  "a bit higher" (0.46 -> 0.28), then "it needs to clear my head" (-0.08:
- *  the baseline just above the crown, so nothing of the name is covered). */
-const NAME_DROP = -0.08;
+ *  "a bit higher" (0.46 -> 0.28), then "it needs to clear my head" (-0.08),
+ *  then "even higher so it's not as blocked with the doodles" (-0.55), then
+ *  "even higher" again (-0.8: the name's top sits just under the top rail). */
+const NAME_DROP = -0.8;
 /** the name's width as a fraction of the photo ... */
 const NAME_WIDTH = 0.86;
 /** ... but never wider than this much of what is actually on screen, which
@@ -35,13 +37,29 @@ const NAME_WIDTH = 0.86;
 const NAME_FIT = 0.92;
 /** Inter Tight's cap height, as a fraction of its size */
 const CAP = 0.727;
+/** the marker colour of the doodles (Brian: "doodle in yellow") */
+const DOODLE = "#ffd93b";
 /** the name has the stage to itself for this long before the eruption */
 const ERUPT_AFTER_MS = 900;
 
 type Layout = {
   fs: number;
   base: number;
-  letters: { ch: string; x: number; delay: number }[];
+  letters: { ch: string; x: number; x1: number; delay: number }[];
+};
+
+/* Where a logo can sit on each letter, as fractions of the letter's advance
+   box: the full top bar of B R F, the single stems of I, the two stems of N
+   and U, the apex of A. Inter Tight 200 is thin, so a stem top is a ledge
+   for balancing on, not a shelf. */
+const LEDGES: Record<string, [number, number][]> = {
+  B: [[0.08, 0.72]],
+  R: [[0.08, 0.74]],
+  I: [[0.32, 0.68]],
+  A: [[0.42, 0.58]],
+  N: [[0.1, 0.24], [0.76, 0.9]],
+  F: [[0.1, 0.92]],
+  U: [[0.1, 0.24], [0.76, 0.9]],
 };
 
 export default function Hero({ active }: { active: boolean }) {
@@ -51,6 +69,9 @@ export default function Hero({ active }: { active: boolean }) {
   const spray = useRef<HTMLDivElement>(null);
   const engine = useRef<Eruption | null>(null);
   const [layout, setLayout] = useState<Layout | null>(null);
+  /* logos that have cleared his hair come out in front of him (play mode) */
+  const front = useRef<HTMLDivElement>(null);
+  const ledges = useRef<Platform[]>([]);
   const name = profile.name.toUpperCase();
 
   /* Lay the name out from the font's real metrics: fit its width, then hang
@@ -75,11 +96,20 @@ export default function Hero({ active }: { active: boolean }) {
       for (let i = 0; i < name.length; i++) {
         if (name[i] === " ") continue;
         const x = p.getStartPositionOfChar(i).x;
+        const x1 = p.getEndPositionOfChar(i).x;
         /* nearest the head rises first, as if it is coming out of it */
         const d = Math.abs(x + fs * 0.3 - PHOTO.crownX) / PHOTO.w;
-        letters.push({ ch: name[i], x, delay: 0.2 + d * 1.1 });
+        letters.push({ ch: name[i], x, x1, delay: 0.2 + d * 1.1 });
       }
-      setLayout({ fs, base: PHOTO.crownY + fs * CAP * NAME_DROP, letters });
+      const base = PHOTO.crownY + fs * CAP * NAME_DROP;
+      ledges.current = letters.flatMap((l) =>
+        (LEDGES[l.ch] ?? [[0.1, 0.9]]).map(([a, b]) => ({
+          x0: l.x + (l.x1 - l.x) * a,
+          x1: l.x + (l.x1 - l.x) * b,
+          y: base - fs * CAP,
+        })),
+      );
+      setLayout({ fs, base, letters });
     };
     document.fonts.load('200 100px "Inter Tight"').then(measure, measure);
     window.addEventListener("resize", measure);
@@ -89,10 +119,12 @@ export default function Hero({ active }: { active: boolean }) {
     };
   }, [name]);
 
-  /* The eruption engine lives as long as the hero does. */
+  /* The eruption engine lives as long as the hero does. Play mode: the
+     logos come down onto the letters and his hair, and the cursor knocks
+     them about (Brian's pick, 2026-11-25). */
   useEffect(() => {
-    if (!spray.current) return;
-    const e = createEruption(spray.current);
+    if (!spray.current || !front.current) return;
+    const e = createEruption(spray.current, { front: front.current, platforms: () => ledges.current });
     engine.current = e;
     return () => {
       e.destroy();
@@ -186,6 +218,12 @@ export default function Hero({ active }: { active: boolean }) {
           alt=""
           draggable={false}
         />
+
+        {/* marker on the print, over everything */}
+        <HeroDoodles color={DOODLE} />
+
+        {/* logos that have cleared his hair come out in front */}
+        <div className="hx__layer hx__front" ref={front} aria-hidden="true" />
       </div>
 
       {/* In the nav's own row, where its "Brian Fu" mark sits on every other

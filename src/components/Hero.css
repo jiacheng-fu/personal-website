@@ -76,6 +76,64 @@
   z-index: 3;
 }
 
+/* ---- logos in front, and the doodles ---- */
+.hx__front {
+  z-index: 4;
+  overflow: hidden;
+  pointer-events: none;
+}
+/* marker doodles: each stroke draws itself, each note writes itself */
+.hx__doodles {
+  z-index: 4;
+  overflow: visible;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+}
+.hx__stroke {
+  fill: none;
+  stroke: var(--doodle);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+.hx.is-in .hx__stroke {
+  animation-name: hx-draw;
+  animation-timing-function: cubic-bezier(0.45, 0, 0.3, 1);
+  animation-fill-mode: forwards;
+}
+@keyframes hx-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.hx__note {
+  font-family: "Caveat", "Bradley Hand", cursive;
+  font-weight: 700;
+  font-size: 52px;
+  fill: var(--doodle);
+  clip-path: inset(0 100% 0 0);
+}
+.hx.is-in .hx__note {
+  animation-name: hx-write;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+@keyframes hx-write {
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx__stroke {
+    stroke-dashoffset: 0;
+  }
+  .hx__note {
+    clip-path: none;
+  }
+}
+
 /* ---- the name ---- */
 .hx__letter {
   font-family: "Inter Tight", "Helvetica Neue", Helvetica, Arial, sans-serif;
