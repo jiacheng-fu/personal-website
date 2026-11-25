@@ -384,10 +384,26 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
        resize fires before the panels have been laid out at the new height, so
        realigning immediately just snaps to the OLD geometry. */
     let raf = 0;
+    /* A resize during a cut that locks the nav (the iris, the sticky notes,
+       the scene back up to the machine) used to be dropped - goTo refuses
+       everything while locked - so the page kept a scroll position measured
+       against the old panel heights. When the lock lifted the page sat between
+       sections (and the drift follow below then took it to the WRONG one: a
+       resize 250 ms into the notes ended on projects, not contact). The
+       realign is owed instead, and paid the moment the lock lifts. */
+    let realignOwed = false;
     const onResize = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() =>
-        requestAnimationFrame(() => goTo(indexRef.current, false))
+        requestAnimationFrame(() => {
+          if (isNavLocked()) {
+            realignOwed = true;
+            window.clearTimeout(drift);
+            drift = window.setTimeout(follow, 300);
+            return;
+          }
+          goTo(indexRef.current, false);
+        })
       );
     };
 
@@ -406,6 +422,13 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
          the move is never followed (the page ended on contact, dot on work) */
       if (busy.current || isClipBusy() || isNavLocked()) {
         drift = window.setTimeout(follow, 300);
+        return;
+      }
+      /* stale geometry from a resize is not a scroll: put the page back on
+         its own section, never "follow" it somewhere */
+      if (realignOwed) {
+        realignOwed = false;
+        goTo(indexRef.current, false);
         return;
       }
       const y = window.scrollY;

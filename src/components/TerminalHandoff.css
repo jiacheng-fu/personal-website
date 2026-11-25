@@ -27,6 +27,15 @@
      cross-fade, not a reveal - and the index's build-in needs the clear air */
   transition: opacity 0.26s cubic-bezier(0.16, 1, 0.3, 1);
 }
+/* Back up it is NOT the same place: the overlay's session (ls ~/work, the
+   names, ./ragsetup.py) and the machine's own menu are different text, and
+   the fade showed both at once for 2-3 frames at every arrival - the names
+   ghosting between the menu lines. The machine's glass is switched on in one
+   step at that instant, so the overlay goes in one step too: a terminal
+   clearing, not a dissolve (2026-11-25). */
+.handoff.is-back.is-out {
+  transition: none;
+}
 
 /* ------------------------------ the blackout ----------------------------- */
 

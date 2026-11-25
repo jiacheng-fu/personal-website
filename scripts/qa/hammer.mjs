@@ -111,7 +111,8 @@ function problemsOf(s, want) {
   if (s.idx === 1 && !s.kbLit) p.push("keyboard dark");
   if (s.idx === 2 && !s.prompt) p.push("machine has no prompt");
   if (s.fallback) p.push("SafetyNet fallback showing");
-  if (s.cutClasses.length) p.push("cut classes left on <html>: " + s.cutClasses.join(" "));
+  const stray = s.cutClasses.filter((c) => !(s.idx === 0 && c === "cut-bulb")); // the bulb stays lit on the hero by design
+  if (stray.length) p.push("cut classes left on <html>: " + stray.join(" "));
   if (s.irisUp) p.push("iris still covering the screen");
   if (s.notesLeft) p.push(`${s.notesLeft} sticky notes left on screen`);
   return p;
@@ -148,7 +149,7 @@ async function hit(name, { setup, move, want, wait = SETTLE + 3000, filmMs = 0, 
     await move(p);
     if (filmMs) await film(p, name, filmMs);
     await sleep(Math.max(0, wait - filmMs));
-    const pr = await stopProbe(p);
+    const pr = (await stopProbe(p)) || { stacked: [], speechMoved: [], departingLostUnderClip: 0, ragClassLost: [], frames: 0, overlayFrames: 0 }; // a reload wipes the probe
     const s = await state(p);
     const probs = problemsOf(s, want);
     if (pr.stacked.length) probs.push("STACKED: " + pr.stacked.join("; "));
@@ -191,7 +192,7 @@ const ask = async (p, q) => { const i = p.locator(".a2-prompt input"); await i.f
 
 /* ---- 1 -> 2: the clip, leaving the keyboard in every state ---- */
 for (const ms of [0, 300, 900, 1500]) {
-  await hit(`kb->machine: leave the keyboard ${ms} ms after the iris lifts (intro still standing up)`, { setup: async (p) => { await p.keyboard.press("ArrowDown"); await sleep(2300 + ms); }, move: key("ArrowDown"), want: 2 });
+  await hit(`kb->machine: leave the keyboard ${ms} ms after the iris lifts (intro still standing up)`, { setup: async (p) => { await p.keyboard.press("ArrowDown"); await sleep(2800 + ms); }, move: key("ArrowDown"), want: 2 });
 }
 await hit("kb->machine: leave while a key's caption is showing", { setup: async (p) => { await toCraft(p); await p.mouse.move(900, 500); await sleep(300); await p.mouse.move(980, 560); await sleep(600); }, move: key("ArrowDown"), want: 2, filmMs: 4000 });
 
