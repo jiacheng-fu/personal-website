@@ -61,6 +61,19 @@ body {
   overflow-x: hidden;
 }
 
+/* No native scrollbar, on any desktop browser. The site moves a section at a
+   time (useSectionNav), so the bar does nothing useful - and a classic one
+   (Windows always; macOS whenever a mouse is plugged in) narrows the page by
+   ~15px, which a full-screen clip has to be framed around. transitions.ts
+   measures the real layout box either way; this keeps that box the whole
+   window everywhere. Wheel, keys and touch still scroll. */
+html {
+  scrollbar-width: none; /* Firefox, Chrome 121+ */
+}
+html::-webkit-scrollbar {
+  display: none; /* Safari, older Chrome */
+}
+
 /* Hide the native cursor on devices with a precise pointer (custom cursor takes over) */
 @media (pointer: fine) {
   body {

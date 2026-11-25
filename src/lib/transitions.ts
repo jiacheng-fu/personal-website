@@ -68,10 +68,21 @@ export function isBoxed() {
   return typeof document !== "undefined" && document.documentElement.classList.contains("is-boxed");
 }
 
+/** The box the page actually lays out in - what `position: fixed; inset: 0`
+ *  fills, and so exactly the box the clip overlay draws into. NOT innerWidth:
+ *  that counts a classic scrollbar (Windows always, macOS with a mouse
+ *  plugged in, in Chrome, Firefox and Safari alike), the page and the
+ *  overlay do not, and the 15px between them was the "shift" at the end of
+ *  the keyboard->machine clip (measured 2026-11-25: clip 7-8px left of the
+ *  machine, plus a scale miss on wide windows). */
+function layoutViewport() {
+  const el = document.documentElement;
+  return { vw: el.clientWidth || window.innerWidth, vh: el.clientHeight || window.innerHeight };
+}
+
 /** Where the site is drawn: the whole viewport, or the centred 16:9 box. */
 export function viewportFrame(): Frame {
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
+  const { vw, vh } = layoutViewport();
   if (isBoxed()) {
     const w = Math.min(vw, Math.round(vh * REF_ASPECT));
     return { left: Math.round((vw - w) / 2), top: 0, w, h: vh };
@@ -155,7 +166,8 @@ export function initFrame() {
 }
 
 export function isUltrawide() {
-  return window.innerWidth >= 720 && window.innerWidth / window.innerHeight > 2.05;
+  const { vw, vh } = layoutViewport();
+  return vw >= 720 && vw / vh > 2.05;
 }
 
 /** May a clip play right now? Wide enough, aspect in the 16:9 family, motion
