@@ -103,7 +103,10 @@ export default function Hero({ active }: { active: boolean }) {
       const sec = section.current;
       if (dead || !p || !f || !sec) return;
       p.setAttribute("font-size", "100");
-      const w100 = p.getComputedTextLength();
+      /* first glyph's start to last glyph's end, not getComputedTextLength():
+         Chrome counts the letter-spacing in that and WebKit does not, while
+         every engine agrees on the glyph positions themselves */
+      const w100 = p.getEndPositionOfChar(name.length - 1).x - p.getStartPositionOfChar(0).x;
       if (!w100) return;
       const s = f.clientWidth / PHOTO.w;
       const target = Math.min(PHOTO.w * NAME_WIDTH, (sec.clientWidth * NAME_FIT) / s);
@@ -148,7 +151,17 @@ export default function Hero({ active }: { active: boolean }) {
       }
       setLayout({ fs, base, letters, sub });
     };
-    document.fonts.load('200 100px "Inter Tight"').then(measure, measure);
+    /* ...and once more a couple of frames after every font is in: WebKit
+       resolves fonts.load() before the SVG probe is laid out again in the
+       new face, so its first measurement read the fallback's wider metrics
+       and spread BRIAN FU about 4% wider than Chrome and Firefox
+       (2026-11-25). The second pass costs nothing where the first was right. */
+    const settle = () => requestAnimationFrame(() => requestAnimationFrame(measure));
+    document.fonts.load('200 100px "Inter Tight"').then(() => {
+      measure();
+      settle();
+    }, measure);
+    void document.fonts.ready.then(settle);
     window.addEventListener("resize", measure);
     return () => {
       dead = true;

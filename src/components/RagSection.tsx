@@ -277,6 +277,74 @@ function FeedSheet({ onFeed }: { onFeed: (text: string) => void }) {
   );
 }
 
+/* The card on the other side of the machine from the note: the LLM switch,
+   where a visitor can see it (Brian, 2026-11-25: "a normal visitor would
+   never know" about a switch in the status line). It opens the same
+   disclaimer on the glass, and while the model loads it carries the same
+   real progress. */
+function BrainCard({
+  on,
+  engine,
+  loading,
+  fill,
+  onToggle,
+}: {
+  on: boolean;
+  engine: EngineState;
+  loading: boolean;
+  fill: number | null;
+  onToggle: () => void;
+}) {
+  const meta = !on
+    ? `${mb(backend.bytes)} MB, once · runs on your GPU · can be wrong`
+    : engine.phase === "ready" || engine.phase === "generating"
+      ? `${backend.name} is on your GPU. Ask away.`
+      : engine.phase === "unavailable"
+        ? engine.detail.startsWith("no WebGPU in")
+          ? "This browser has no WebGPU, so it can't run here. The quotes still work."
+          : "This GPU can't run it (no WebGPU shader-f16). The quotes still work."
+        : engine.phase === "error"
+          ? "It hit a fault loading. Retry on the screen, or switch it off."
+          : engine.phase === "idle"
+            ? "Not loaded. Press [LOAD IT NOW] on the screen, or switch it off."
+            : engine.phase === "compiling"
+              ? "Compiling on your GPU…"
+              : engine.phase === "downloading" && engine.stage === "fetch" && engine.bytes > 0
+                ? `Downloading ${pct(engine.progress)}% · ${mb(engine.bytes)} of ${mb(backend.bytes)} MB`
+                : engine.phase === "downloading" && engine.stage === "upload"
+                  ? `Loading onto your GPU ${pct(engine.progress)}%`
+                  : "Starting…";
+  return (
+    <div className={`brain ${on ? "is-on" : ""}`}>
+      <p className="brain__label">Let it talk</p>
+      <p className="brain__text">
+        {on
+          ? "The full RAG pipeline is running: BM25 retrieves the passages, and a small LLM on your GPU writes each answer from them. The quotes it used are printed under every answer."
+          : "This machine is a RAG pipeline running in your browser. Retrieval is always on: BM25 searches Brian's archive and quotes the best sentences word for word. Switch on the LLM to add generation, and a small model on your GPU answers in its own words from what was retrieved."}
+      </p>
+      <button
+        type="button"
+        className="brain__switch"
+        role="switch"
+        aria-checked={on}
+        data-cursor="hover"
+        onClick={onToggle}
+      >
+        <span className={`nav__track ${on ? "is-on" : ""}`}>
+          <b />
+        </span>
+        LLM {on ? "on" : "off"}
+      </button>
+      <p className="brain__meta">{meta}</p>
+      {on && loading && (
+        <span className="brain__bar" aria-hidden>
+          <i style={{ width: `${(fill ?? 0) * 100}%` }} />
+        </span>
+      )}
+    </div>
+  );
+}
+
 /* After the keyboard->machine clip the section wakes up: dark glass, the
    Apple ][ beep, a CRT bloom, the boot menu typing itself in, and only then
    the page chrome. Phases are wall-clock, like the keyboard's lamp. */
@@ -297,6 +365,12 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
   /* the visitor's choice: quotes (default), or the LLM on top */
   const [llmOn, setLlmOn] = useState(llmOptedIn);
   const [confirming, setConfirming] = useState(false);
+  /* Leaving the machine, in either direction, dismisses an open LLM opt-in:
+     coming back should find the terminal, not a question asked of someone who
+     had already left (Brian, 2026-11-25). The handoff hides it on the way out. */
+  useEffect(() => {
+    if (!active) setConfirming(false);
+  }, [active]);
   /* documents the visitor has fed in this session */
   const [fed, setFed] = useState(0);
   const [ingested, setIngested] = useState<string | null>(null);
@@ -513,25 +587,45 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
          question is asked again the moment the engine reports ready, and the
          quote is replaced in place. Nothing is armed when there will never be
          a model to wait for. */
-      if (engineState().phase !== "unavailable" && llmOptedIn()) {
-        upgradeRef.current?.();
-        let ignoredFirst = false;
-        const off = subscribe((st) => {
-          /* subscribe() replays the current state synchronously; that one is
-             the state we already know about */
-          if (!ignoredFirst) {
-            ignoredFirst = true;
-            return;
-          }
-          if (st.phase !== "ready" || !llmOptedIn()) return;
-          off();
-          upgradeRef.current = null;
-          if (!signal.aborted) void speak(r, signal);
-        });
-        upgradeRef.current = off;
-      }
+      if (engineState().phase !== "unavailable" && llmOptedIn()) armUpgrade(r, signal);
       setAnswer(quoted(fallback));
     }
+  };
+
+  /** Ask this question again, of the model, the moment it is ready. */
+  const armUpgrade = (r: Run, signal: AbortSignal) => {
+    upgradeRef.current?.();
+    let ignoredFirst = false;
+    const off = subscribe((st) => {
+      /* subscribe() replays the current state synchronously; that one is
+         the state we already know about */
+      if (!ignoredFirst) {
+        ignoredFirst = true;
+        return;
+      }
+      if (st.phase !== "ready" || !llmOptedIn()) return;
+      off();
+      upgradeRef.current = null;
+      if (!signal.aborted) void speak(r, signal);
+    });
+    upgradeRef.current = off;
+  };
+
+  /* The visitor said yes in the disclaimer. Whatever question is on the
+     glass is answered again by the model once it lands, so the first thing
+     they see it do is the thing they switched it on for. */
+  const turnOn = () => {
+    setConfirming(false);
+    setLlmOn(true);
+    setLlmOptIn(true);
+    const ac = abortRef.current;
+    if (run && ac && !ac.signal.aborted && hasEvidence(run.retrieval) && act === "speak") armUpgrade(run, ac.signal);
+  };
+  const turnOff = () => {
+    upgradeRef.current?.();
+    upgradeRef.current = null;
+    setLlmOptIn(false);
+    setLlmOn(false);
   };
 
   const feed = (text: string) => {
@@ -550,6 +644,7 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
     ? engineStatus(engine)
     : { text: "ANSWERS: QUOTED FROM THE ARCHIVE · UPLINK: NONE", led: "on" as const };
   const load = loadLine(engine);
+  const loading = engine.phase === "queued" || engine.phase === "downloading" || engine.phase === "compiling";
 
   /* ?frame=case|grow33|grow66|off|tilt renders a clean plate for the
      transition clips (docs/transition-kb-machine.md): no page chrome, the
@@ -592,7 +687,7 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
               </>
             ) : (
               <>
-                ANSWERS ARE QUOTED, <b>WORD FOR WORD</b>. NOTHING YOU TYPE LEAVES THIS PAGE.
+                RETRIEVAL ON, ANSWERS QUOTED <b>WORD FOR WORD</b>. NOTHING YOU TYPE LEAVES THIS PAGE.
               </>
             )}
           </p>
@@ -605,6 +700,13 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
                 </button>
               </li>
             ))}
+            {!llmOn && (
+              <li className="a2-boot__llm">
+                <button type="button" data-cursor="hover" onClick={() => setConfirming(true)}>
+                  <span>{SUGGESTIONS.length + 1}.</span> LET IT TALK: ADD THE LLM TO THE RAG PIPELINE (OPTIONAL)
+                </button>
+              </li>
+            )}
           </ol>
         </div>
       )}
@@ -690,6 +792,14 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
                 <p className={`a2-speech__text ${answer && answer.mode !== "model" ? "is-quote" : ""}`}>
                   {answer?.text}
                   {(!answer || !answer.done) && <span className="a2-caret" />}
+                </p>
+              )}
+              {answer?.mode === "extractive" && !llmOn && (
+                <p className="a2-speech__nudge">
+                  WANT IT IN ITS OWN WORDS?{" "}
+                  <button type="button" data-cursor="hover" onClick={() => setConfirming(true)}>
+                    [SWITCH ON THE LLM]
+                  </button>
                 </p>
               )}
               {answer?.mode === "model" && answer.done && (
@@ -778,6 +888,22 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
       </form>
       )}
 
+      {/* the model loading, after the boot: the same bar, small, over the
+          status line - for as long as the runtime is reporting */}
+      {llmOn && bootPhase === "done" && loading && (
+        <div className={`a2-loadbar ${load.fill === null ? "is-indeterminate" : ""}`} role="progressbar"
+          aria-label={load.label}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={load.fill === null ? undefined : pct(load.fill)}
+        >
+          <span className="a2-loadbar__label">{load.label}</span>
+          <span className="a2-progress__track">
+            <span className="a2-progress__fill" style={{ width: `${(Math.floor((load.fill ?? 1) * 32) / 32) * 100}%` }} />
+          </span>
+        </div>
+      )}
+
       {/* status line + engine loader */}
       <div className="a2-status">
         <span>{status.text}</span>
@@ -793,12 +919,7 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
             role="switch"
             aria-checked={llmOn}
             data-cursor="hover"
-            onClick={() => {
-              if (llmOn) {
-                setLlmOptIn(false);
-                setLlmOn(false);
-              } else setConfirming(true);
-            }}
+            onClick={() => (llmOn ? turnOff() : setConfirming(true))}
           >
             [LLM {llmOn ? "● ON" : "○ OFF"}]
           </button>
@@ -809,7 +930,10 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
       {confirming && (
         <div className="a2-optin" role="dialog" aria-label="Turn on the LLM">
           <p className="a2-optin__head">TURN ON THE LLM?</p>
-          <p>A SMALL LANGUAGE MODEL ({backend.name}) WRITES THE ANSWERS INSTEAD OF QUOTING THEM.</p>
+          <p>
+            THE GENERATION STEP OF THE RAG PIPELINE: A SMALL LANGUAGE MODEL ({backend.name}) WRITES EACH ANSWER FROM
+            THE PASSAGES RETRIEVAL PICKED, INSTEAD OF QUOTING THEM.
+          </p>
           <ul>
             <li>A ONE-TIME DOWNLOAD OF {mb(backend.bytes)} MB, KEPT IN THIS BROWSER.</li>
             <li>IT RUNS ON YOUR GPU: IT TAKES A WHILE TO LOAD AND USES REAL PROCESSING POWER.</li>
@@ -819,11 +943,7 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
             <button
               type="button"
               data-cursor="hover"
-              onClick={() => {
-                setConfirming(false);
-                setLlmOn(true);
-                setLlmOptIn(true);
-              }}
+              onClick={turnOn}
             >
               [TURN IT ON]
             </button>
@@ -845,10 +965,20 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
       <div className="rag__scene">
         <Apple2Front led={status.led} active={active} screen={screen} {...frameProps} />
         {!frame && <FeedSheet onFeed={feed} />}
+        {!frame && (
+          <BrainCard
+            on={llmOn}
+            engine={engine}
+            loading={loading}
+            fill={load.fill}
+            onToggle={() => (llmOn ? turnOff() : setConfirming(true))}
+          />
+        )}
       </div>
 
       <p className="field-note rag__foot">
-        BM25 scoring and word-for-word quotes, in your browser; a {backend.params} model on your own GPU if you switch it on.{" "}
+        A real RAG pipeline in your browser: BM25 retrieval over Brian's archive, answers quoted word for word, and a{" "}
+        {backend.params} model on your own GPU for the generation step if you switch it on.{" "}
         <span className="dim">Every number on the glass is the actual machinery.</span>
       </p>
     </div>

@@ -2201,8 +2201,117 @@ html {
 .feed button:disabled {
   opacity: 0.35;
 }
+/* ---- the LLM switch: a card on the machine's other side ---- */
+.brain {
+  position: absolute;
+  right: 0;
+  top: 16%;
+  width: min(250px, 38vw);
+  padding: 0.9rem 1rem 0.85rem;
+  background: #fbf8f1;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  box-shadow: 0 14px 30px rgba(22, 21, 15, 0.14), 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+  z-index: 4;
+  font-family: var(--font-mono);
+}
+.brain__label {
+  font-size: 0.66rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 0.5rem;
+}
+.brain__text {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  line-height: 1.35;
+  color: var(--ink);
+}
+.brain__switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6em;
+  margin-top: 0.75rem;
+  padding: 0.4rem 0.7rem 0.4rem 0.55rem;
+  border: 0;
+  border-radius: 3px;
+  background: var(--ink);
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: none;
+  transition: background 0.3s var(--ease-out);
+}
+.brain__switch:hover,
+.brain.is-on .brain__switch {
+  background: var(--accent);
+}
+.brain__switch .nav__track {
+  opacity: 1;
+}
+.brain__meta {
+  margin-top: 0.55rem;
+  font-size: 0.62rem;
+  line-height: 1.4;
+  color: var(--ink-dim);
+}
+.brain__bar {
+  display: block;
+  height: 4px;
+  margin-top: 0.45rem;
+  background: var(--line);
+}
+.brain__bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+/* ---- on the glass: the LLM, offered and loading ---- */
+.a2-boot__llm {
+  margin-top: 0.4em;
+}
+.a2-speech__nudge {
+  margin-top: 0.3em;
+  font-size: 0.78em;
+  color: var(--ph-dim);
+}
+.a2-speech__nudge button {
+  font: inherit;
+  color: var(--ph);
+  background: none;
+  border: 0;
+  cursor: none;
+  text-shadow: inherit;
+}
+.a2-speech__nudge button:hover {
+  background: var(--ph);
+  color: var(--crt);
+  text-shadow: none;
+}
+.a2-loadbar {
+  margin-top: 0.4em;
+  font-size: 0.72em;
+  color: var(--ph);
+}
+.a2-loadbar__label {
+  display: block;
+  margin-bottom: 0.25em;
+  letter-spacing: 0.06em;
+}
+.a2-loadbar .a2-progress__track {
+  height: 0.7em;
+}
+.a2-loadbar.is-indeterminate .a2-loadbar__label {
+  animation: a2-progress-blink 1s steps(1, end) infinite;
+}
+
 @media (max-width: 720px) {
-  .feed {
+  .feed,
+  .brain {
     display: none;
   }
 }
