@@ -161,6 +161,10 @@
     "umtCompiler": {
       "value": "the LLVM backend was for a proprietary vector DSP",
       "source": "linkedin, github"
+    },
+    "mesa": {
+      "value": "an early-stage startup",
+      "source": "autoapply (Brian, 2026-10-19: \"my situation with the startup\")"
     }
   },
   "favorites": {

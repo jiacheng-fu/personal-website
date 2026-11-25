@@ -56,6 +56,9 @@ export interface Retrieval {
   tokens: QueryToken[];
   /* terms added by query expansion (stems the corpus actually contains) */
   expanded: string[];
+  /* the archive's spelling of what the visitor typed: a typo's correction, or
+     two words read as one ("desk stats") - these stand for typed words */
+  corrected: string[];
   /* every chunk, corpus order - the UI shows the whole field lighting up */
   scored: ScoredChunk[];
   /* the ones that go into the prompt, best first */
@@ -74,6 +77,11 @@ const STOPWORDS = new Set(
     "s so t tell that the their them they this to was we what when where which who whose why will would with you your " +
     /* asking about now: see RECENCY */
     "now today currently lately recently nowadays doing up " +
+    /* words that only ever collided (QA, 2026-11-25): "is he INTO sports"
+       found "got into programming", "a morning PERSON" found "third-person
+       movement", "which city does he CALL home" found "1,000-call/month",
+       "has he USED kubernetes" found "used to play Valorant" */
+    "into person call use used uses using still outside " +
     /* a lone digit is arithmetic or a version suffix, never the subject:
        "solve 2 + 2" used to find Valorant's "Immortal 2" (2026-11-25) */
     "0 1 2 3 4 5 6 7 8 9").split(" ")
@@ -103,13 +111,19 @@ const SOFT_WEIGHT = 0.2;
    "compilers" meet "compiler". A real Porter stemmer buys nothing here and
    its stems ("compil") would look like bugs in a UI built to be read. */
 function stem(w: string): string {
-  if (w.length > 4 && w.endsWith("ing")) w = w.slice(0, -3);
+  if (w.length > 4 && w.endsWith("ing")) w = restoreE(w.slice(0, -3));
   else if (w.length > 4 && w.endsWith("ies")) w = w.slice(0, -3) + "y";
-  else if (w.length > 3 && w.endsWith("ed")) w = w.slice(0, -2);
+  else if (w.length > 3 && w.endsWith("ed")) w = restoreE(w.slice(0, -2));
   else if (w.length > 4 && /(?:ss|sh|ch|x|z)es$/.test(w)) w = w.slice(0, -2);
   else if (w.length > 3 && w.endsWith("s") && !w.endsWith("ss")) w = w.slice(0, -1);
   return w;
 }
+/* Porter's step 1b, the one piece of it worth having: "graduated" and
+   "graduating" lose their ending and land on "graduat", which never met
+   "graduate" - so a visitor's note saying Brian graduated was invisible to
+   "when does he graduate" (QA, 2026-11-25). The same for created, updated,
+   automated, troubled, sized. */
+const restoreE = (w: string) => (/(?:at|bl|iz)$/.test(w) ? w + "e" : w);
 
 function words(s: string): string[] {
   /* Unicode letters, not just a-z: a visitor's note may be in any language or
@@ -128,13 +142,46 @@ function words(s: string): string[] {
      "solo" and "sole author" (2026-11-25, "has he built anything by himself"
      was quoting the one team build). */
   const joined = s
+    /* compatibility forms (full-width Ａ, ligatures) to plain letters, and
+       the invisible characters a pasted or mischievous question can carry -
+       zero-width spaces split "skills" into nothing anyone can match */
+    .normalize("NFKC")
+    .replace(/[\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]/g, "")
     .toLowerCase()
     .replace(/(\d),(?=\d{3}(?!\d))/g, "$1")
-    .replace(/\b(?:by (?:him|my|your)self|on (?:his|my|your) own)\b/g, "solo");
-  return (joined.match(/[\p{L}\p{N}][\p{L}\p{N}+#.]*/gu) ?? []).map((w) => {
+    .replace(/\b(?:by (?:him|my|your)self|on (?:his|my|your) own)\b/g, "solo")
+    /* phrases whose words mean something else on their own (QA, 2026-11-25):
+       "for a living" found his hometown through "living"; "when he's not
+       coding" found the Aggie Coding Club; "every day" missed "daily" */
+    .replace(/\bfor a living\b/g, "job")
+    .replace(/\b(?:when (?:he'?s|he is|hes) not (?:coding|working|programming|at work)|in his (?:free|spare) time|(?:free|spare) time|for fun|outside (?:of )?(?:work|coding|school))\b/g, "hobbies")
+    .replace(/\bevery ?day\b/g, "daily")
+    .replace(/\b(?:on|during|over) (?:the )?weekends?\b/g, "hobbies")
+  return (joined.match(/[\p{L}\p{N}][\p{L}\p{N}+#.]*/gu) ?? []).flatMap((w) => {
+    if (CJK.test(w)) return cjk(w);
     const t = w.replace(/\.+$/, "");
-    return /^[\d.]+$/.test(t) ? t : t.replace(/\./g, "");
+    return [/^[\d.]+$/.test(t) ? t : t.replace(/\./g, "")];
   });
+}
+
+/* Chinese, Japanese and Korean have no spaces, so a whole sentence came out
+   as ONE word: "他的GPA是多少" matched nothing, not even its "GPA", and a
+   visitor's Chinese note could never be found by a Chinese question (QA,
+   2026-11-25). Latin runs inside are split off and kept whole; the CJK runs
+   become overlapping character pairs - the standard way to search text with
+   no word breaks - so "布莱恩喜欢吃什么" meets a note "布莱恩喜欢吃饺子" on
+   布莱, 莱恩, 恩喜, 喜欢, 欢吃. */
+const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
+function cjk(w: string): string[] {
+  const out: string[] = [];
+  for (const run of w.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]+|[^\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]+/gu) ?? []) {
+    if (!CJK.test(run)) {
+      const t = run.replace(/\.+$/, "").replace(/^[^\p{L}\p{N}]+/u, "");
+      if (t) out.push(/^[\d.]+$/.test(t) ? t : t.replace(/\./g, ""));
+    } else if (run.length === 1) out.push(run);
+    else for (let i = 0; i < run.length - 1; i++) out.push(run.slice(i, i + 2));
+  }
+  return out;
 }
 
 /* The single word -> term rule, used by the index and the query alike so the
@@ -185,7 +232,17 @@ const SYNONYMS: string[][] = [
       the notes are supposed to win. */
    "moved", "moving", "relocated", "staying", "living", "home", "town"],
   ["ai", "llm", "ml", "machine", "model", "learn", "openrouter", "intelligence"],
-  ["security", "secure", "vulnerable", "exploit", "owasp", "appsec", "hack", "hacker"],
+  ["security", "secure", "vulnerable", "exploit", "owasp", "appsec", "hack", "hacker",
+   "leak", "leaking", "breach", "exposure", "vulnerability", "authorization"],
+  /* what a customer is called inside a multi-tenant system */
+  ["tenant", "customer", "client"],
+  /* money, which the archive talks about as costs, ceilings and tiers */
+  ["budget", "cost", "ceiling", "cheap", "price", "money", "spend", "quota", "afford", "frugal"],
+  /* Mesa, which the archive never calls a startup */
+  ["startup", "founder", "founded", "founding", "cofounder"],
+  ["daily", "everyday"],
+  ["gamer", "gaming", "game", "video", "shooter", "esports"],
+  ["surprising", "fun", "interesting", "trivia", "quirk", "random"],
   ["compiler", "llvm", "backend", "isa", "npu", "hardware", "chip", "silicon"],
   ["database", "sql", "postgresql", "postgres", "dynamodb", "schema", "data"],
   /* "does he test his code" has to reach the passage that says "unit tests"
@@ -193,12 +250,12 @@ const SYNONYMS: string[][] = [
   ["test", "testing", "qa", "unit", "regression", "coverage", "verified", "probe", "invariant"],
   /* paradigms the resume names only by the language that implements them */
   ["functional", "haskell", "paradigm", "immutable", "declarative"],
-  ["solo", "alone", "sole", "independent", "independently", "single-handedly"],
+  ["solo", "alone", "sole", "independent", "independently", "single-handedly", "only", "lone"],
   ["oop", "object", "inheritance", "polymorphism", "encapsulation"],
   ["devops", "ci", "cd", "pipeline", "docker", "deploy", "infrastructure", "automated", "git"],
   /* work authorisation, which a resume states in three words and nobody asks
      for in those three words */
-  ["visa", "sponsorship", "sponsor", "citizen", "citizenship", "resident", "permanent", "authorized", "eligible", "status",
+  ["visa", "sponsorship", "sponsor", "citizen", "citizenship", "resident", "permanent", "authorized", "eligible", "status", "american",
    "green", "greencard"],
   /* availability: the archive says "open to 2027 internships"; visitors ask
      "is he looking", "is he available", "can we hire him" */
@@ -211,9 +268,9 @@ const SYNONYMS: string[][] = [
   ["pet", "cat", "dog", "animal", "kitten", "puppy", "adopted"],
   ["eat", "eating", "food", "lunch", "dinner", "breakfast", "meal", "hungry", "restaurant", "subway", "coffee",
    /* the one food the archive itself knows about (Favorites) */
-   "dessert", "ice", "cream", "snack"],
+   "dessert", "ice", "cream", "snack", "noodle", "barbecue", "carb"],
   ["family", "wife", "husband", "partner", "girlfriend", "boyfriend", "married", "brother", "sister", "parent", "mom", "dad"],
-  ["hobby", "hobbies", "enjoy", "favorite", "favourite", "interest"],
+  ["hobby", "hobbies", "enjoy", "favorite", "favourite", "interest", "weekend", "pastime"],
   ["travel", "trip", "vacation", "visit", "flight", "flying", "driving"],
   ["sick", "ill", "hospital", "injured", "hurt", "tired", "asleep", "sleeping"],
 ];
@@ -341,6 +398,61 @@ export function addChunk(section: string, title: string, text: string): Chunk {
    dozen notes. */
 let idfCache = new Map<string, number>();
 
+/* how much a typo-corrected word counts, against 1 for a word typed right */
+const FUZZY_WEIGHT = 0.85;
+/* Shorter words are not corrected: a 4-5 letter word missing from the
+   archive is far likelier a real word it just does not use than a typo -
+   "live" snapped to "line", "world" to "word", "solve" to "solving" and
+   "pizza" found a project. The typos that matter are long: internship,
+   python, valorant, interstellar. */
+const FUZZY_MIN = 6;
+
+/** Every term in the archive right now, visitor notes included. */
+function vocabulary(): Set<string> {
+  const v = new Set<string>();
+  for (const tf of docTerms) for (const k of tf.keys()) v.add(k);
+  return v;
+}
+
+/** The archive's closest words to a typo: one edit up to 8 letters, two from
+ *  9, same first letter. Optimal string alignment distance,
+ *  so a swapped pair ("pyhton") is one edit. Ties all count; at most two. */
+function nearest(t: string, vocab: Set<string>): string[] {
+  const max = t.length >= 9 ? 2 : 1;
+  let best = max + 1;
+  let out: string[] = [];
+  for (const v of vocab) {
+    if (v[0] !== t[0] || Math.abs(v.length - t.length) > max || v.length < FUZZY_MIN - 1) continue;
+    const d = osa(t, v, max);
+    if (d < best) {
+      best = d;
+      out = [v];
+    } else if (d === best) out.push(v);
+  }
+  return best <= max ? out.slice(0, 2) : [];
+}
+function osa(a: string, b: string, cap: number): number {
+  const m = a.length;
+  const n = b.length;
+  let prev2: number[] = [];
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    let rowMin = i;
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      let d = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d = Math.min(d, prev2[j - 2] + 1);
+      cur.push(d);
+      if (d < rowMin) rowMin = d;
+    }
+    if (rowMin > cap) return cap + 1;
+    prev2 = prev;
+    prev = cur;
+  }
+  return prev[n];
+}
+
 function idf(term: string): number {
   let v = idfCache.get(term);
   if (v === undefined) {
@@ -440,6 +552,32 @@ export function retrieve(query: string, k = 3): Retrieval {
     const common = docTerms.some((tf) => tf.has(t)) && idf(t) < EXPAND_MIN_IDF;
     for (const x of EXPAND.get(t) ?? []) add(x, common ? COMMON_EXPANSION_WEIGHT : EXPANSION_WEIGHT);
   }
+  /* FUZZY: a word the archive does not contain is probably a typo of one it
+     does - "intenship", "pyhton", "valorent", "interstelar". Each is matched
+     to the archive's nearest words within one slip of the finger (two for a
+     long word; the first letter has to agree, and swapped neighbours count as
+     one slip), at a little under full weight, and they bring their synonyms.
+     And two words typed apart that the archive writes as one ("desk stats",
+     "java script", "git hub") are read together. Both show on the glass as
+     +TERMS like any expansion, so a correction is never invisible. */
+  const vocab = vocabulary();
+  const corrected: string[] = [];
+  for (const t of own) {
+    if (vocab.has(t) || t.length < FUZZY_MIN || /^[\d.]+$/.test(t) || CJK.test(t)) continue;
+    for (const v of nearest(t, vocab)) {
+      add(v, FUZZY_WEIGHT);
+      corrected.push(v);
+      for (const x of EXPAND.get(v) ?? []) add(x, FUZZY_WEIGHT * EXPANSION_WEIGHT);
+    }
+  }
+  const raws = tokens.filter((t) => !t.stopword).map((t) => t.raw);
+  for (let i = 0; i + 1 < raws.length; i++) {
+    const joinedTerm = stem(raws[i] + raws[i + 1]);
+    if (vocab.has(joinedTerm)) {
+      add(joinedTerm, 1);
+      corrected.push(joinedTerm);
+    }
+  }
   /* question words, dropped as terms, re-entering as vocabulary. A question
      that is nothing but his name ("tell me about brian") is read as the one
      every archive answers first - who is this - so it borrows "who"'s intent
@@ -472,6 +610,25 @@ export function retrieve(query: string, k = 3): Retrieval {
       const part = (boost * weight * w * tf * (K1 + 1)) / (tf + K1 * (1 - B + B * (docLen[i] / avgLen)));
       score += part;
       contributions.push({ term, idf: w, tf, weight, score: part });
+    }
+    /* Synonyms are alternatives for one idea, so a card that happens to use
+       six of them must not score six times: "is he still at subway" expanded
+       subway into the food words, and the Favorites card's ice, cream, food,
+       noodle, barbecue and carbs added up to more than the visitor's own note
+       that literally says Subway (QA, 2026-11-25). Together, expansion terms
+       may add at most one and a half times their single best match. Scaled,
+       not dropped, so the parts still sum to the score on the glass. */
+    const viaThesaurus = contributions.filter((c) => !typed.has(c.term) && !corrected.includes(c.term));
+    if (viaThesaurus.length > 1) {
+      const sum = viaThesaurus.reduce((a, c) => a + c.score, 0);
+      const cap = 1.5 * Math.max(...viaThesaurus.map((c) => c.score));
+      if (sum > cap) {
+        const f = cap / sum;
+        for (const c of viaThesaurus) {
+          score -= c.score * (1 - f);
+          c.score *= f;
+        }
+      }
     }
     /* Is any of this score traceable to something the visitor said? Their own
        words count, and so does anything the thesaurus reached FROM one - "and
@@ -533,5 +690,5 @@ export function retrieve(query: string, k = 3): Retrieval {
       ? [overview, ...others].sort((a, b) => b.score - a.score)
       : ranked.slice(0, k);
 
-  return { understood: own.length > 0 || soft.length > 0, tokens, expanded, scored, top };
+  return { understood: own.length > 0 || soft.length > 0, tokens, expanded, corrected, scored, top };
 }

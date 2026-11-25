@@ -196,8 +196,14 @@ interface Prompt {
   passages: string[];
 }
 
+/* ?cases=/path.json replaces the built-in cases (QA, 2026-11-25):
+   { base: Case[], notes: { note, cases: Case[] }[] } */
+let EXTERNAL: { base: Case[]; notes: { note: string; cases: Case[] }[] } | null = null;
+
 function build(): Prompt[] {
   const out: Prompt[] = [];
+  const base = EXTERNAL?.base ?? BASE;
+  const notes = EXTERNAL?.notes ?? NOTES;
   const add = (c: Case, noteFed: string | null) => {
     const r = retrieve(c.q, 4);
     const p = assemblePrompt(c.q, r.top);
@@ -212,9 +218,9 @@ function build(): Prompt[] {
       passages: p.contextBlocks.map((b) => b.label),
     });
   };
-  for (const c of BASE) add(c, null);
+  for (const c of base) add(c, null);
   let n = 0;
-  for (const { note, cases } of NOTES) {
+  for (const { note, cases } of notes) {
     addChunk("Visitor", `Visitor note #${++n}`, note);
     for (const c of cases) add(c, note);
   }
@@ -299,6 +305,8 @@ async function main() {
   const q = new URLSearchParams(location.search);
   const models = (q.get("models") ?? "qwen3,lfm25").split(",") as BackendId[];
   const cold = q.get("cold") === "1";
+  const casesUrl = q.get("cases");
+  if (casesUrl) EXTERNAL = await (await fetch(casesUrl)).json();
   const prompts = build();
   window.__bench = { status: "built", prompts, runs: [] };
   log(`${prompts.length} cases, ${prompts.filter((p) => p.canned).length} below the evidence floor (canned on the site, skipped here)`);

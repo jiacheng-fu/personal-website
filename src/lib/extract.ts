@@ -53,13 +53,15 @@ function sourceOf(c: ScoredChunk["chunk"]): string {
 }
 
 /* questions that WANT the overview: lists and counts across his career */
-const LIST_Q = /\b(list|every|all|which|how many|companies|employers|jobs|internships|projects|where has|worked|anything)\b/i;
+const LIST_Q = /\b(list|every|all|which|how many|companies|employers|jobs|internships|projects|where has|worked|anything|experience|background|career|resume)\b/i;
 
 export function extractAnswer(r: Retrieval, max = 2, debug?: (rows: string[]) => void): Quote[] {
   const wantsList = LIST_Q.test(r.tokens.map((t) => t.raw).join(" "));
-  const direct: [string, number][] = r.tokens
-    .filter((t) => t.term && !t.stopword)
-    .map((t): [string, number] => [t.term, t.soft ? 0.2 : 1]);
+  const direct: [string, number][] = [
+    ...r.tokens.filter((t) => t.term && !t.stopword).map((t): [string, number] => [t.term, t.soft ? 0.2 : 1]),
+    /* a corrected typo stands for the word the visitor meant to type */
+    ...(r.corrected ?? []).map((t): [string, number] => [t, 1]),
+  ];
   const ranked = r.top.filter((s) => s.score >= MIN_EVIDENCE);
   /* a question that is only his name and grammar ("who is brian", "tell me
      about him") has no words to match a sentence by: the answer is the
@@ -104,14 +106,41 @@ export function extractAnswer(r: Retrieval, max = 2, debug?: (rows: string[]) =>
   const note = cands.find((c) => c.chunk.section === "Visitor");
   if (note) picked.push(note);
   const rest = cands.filter((c) => c.chunk.section !== "Visitor");
-  for (const c of rest) {
-    if (picked.length >= max) break;
-    if (rest[0] && c !== rest[0] && c.score < rest[0].score * 0.6) break;
-    /* a second quote has to answer a word the visitor typed, not just ride
-       along on synonyms */
-    if (picked.some((p) => p.chunk.section !== "Visitor") && !nameOnly && !c.hits.some((h) => direct.some(([t, w]) => t === h && w === 1))) continue;
-    if (picked.some((p) => p.text === c.text)) continue;
-    picked.push(c);
+  /* A question about several things ("his GPA, his internships and his
+     hobbies") deserves a quote per thing, not two quotes on whichever one
+     scored best (QA, 2026-11-25). After the first quote, each next one is
+     chosen for the words of the question it newly covers; a long, many-part
+     question gets a third. */
+  const own = new Set(direct.filter(([, w]) => w === 1).map(([t]) => t));
+  const limit = own.size >= 4 ? max + 1 : max;
+  const covered = new Set<string>();
+  const top = rest[0]?.score ?? 0;
+  const pool = rest.filter((c) => c.score >= top * 0.6 || [...own].some((t) => c.hits.includes(t)));
+  while (picked.length < limit) {
+    const resume = picked.some((p) => p.chunk.section !== "Visitor");
+    let best: (typeof cands)[number] | null = null;
+    let bestScore = -Infinity;
+    for (const c of pool) {
+      if (picked.includes(c) || picked.some((p) => p.text === c.text)) continue;
+      const fresh = c.hits.filter((h) => own.has(h) && !covered.has(h)).length;
+      /* the first resume quote is simply the best one; after it, a quote has
+         to answer a word the visitor typed that nothing quoted yet answers,
+         or at least a word they typed, and not just ride on synonyms */
+      if (resume && !nameOnly) {
+        if (!c.hits.some((h) => own.has(h))) continue;
+        if (fresh === 0 && c.score < top * 0.6) continue;
+        /* a third quote has to earn it: something new, and close to the best */
+        if (picked.length >= max && (fresh === 0 || c.score < top * 0.6)) continue;
+      }
+      const sc = c.score + (resume ? 0.8 * fresh : 0);
+      if (sc > bestScore) {
+        best = c;
+        bestScore = sc;
+      }
+    }
+    if (!best) break;
+    picked.push(best);
+    for (const h of best.hits) covered.add(h);
   }
   /* nothing matched sentence by sentence: the best passage's opening line */
   if (!picked.length && ranked[0]) {
