@@ -51,6 +51,18 @@ const NOTES: { text: string; x: number; y: number; at: number; dur: number; rot:
   { text: "(click for more)", x: 1132, y: 512, at: 5.9, dur: 0.6, rot: -5, size: 40 },
 ];
 
+/* Which strokes and notes hover together (indices into STROKES / NOTES). */
+const GROUPS: { strokes: number[]; notes: number[]; kind?: "bulb" }[] = [
+  { strokes: [0], notes: [] }, // the loop
+  { strokes: [1, 2, 3, 4, 5, 6], notes: [] }, // sparks
+  { strokes: [7, 8, 9], notes: [], kind: "bulb" },
+  { strokes: [10, 11], notes: [0] }, // single-threaded
+  { strokes: [12, 13], notes: [1] }, // big brained
+  { strokes: [14, 15, 16], notes: [2] }, // (not Austin)
+  { strokes: [17, 18], notes: [3] }, // don't look down
+  { strokes: [], notes: [4] }, // (click for more)
+];
+
 export default function HeroDoodles({ color }: { color: string }) {
   return (
     <svg
@@ -60,26 +72,39 @@ export default function HeroDoodles({ color }: { color: string }) {
       aria-hidden="true"
       style={{ "--doodle": color } as React.CSSProperties}
     >
-      {STROKES.map((s, i) => (
-        <path
-          key={i}
-          d={s.d}
-          pathLength={1}
-          className="hx__stroke"
-          style={{ animationDelay: `${s.at}s`, animationDuration: `${s.dur}s` }}
-        />
-      ))}
-      {NOTES.map((n, i) => (
-        <text
-          key={i}
-          x={n.x}
-          y={n.y}
-          className="hx__note"
-          transform={`rotate(${n.rot} ${n.x} ${n.y})`}
-          style={{ animationDelay: `${n.at}s`, animationDuration: `${n.dur}s`, fontSize: n.size }}
-        >
-          {n.text}
-        </text>
+      {GROUPS.map((g, gi) => (
+        /* each doodle reacts to hover on its own - a small wiggle, and the
+           bulb lights up; the fat transparent strokes are the hit area, since
+           a 5px marker line is too thin to find with a mouse */
+        <g key={gi} className={`hx__doodle ${g.kind === "bulb" ? "hx__doodle--bulb" : ""}`} data-cursor="hover">
+          {g.strokes.map((i) => (
+            <path key={`h${i}`} d={STROKES[i].d} className="hx__strokeHit" />
+          ))}
+          {g.strokes.map((i) => (
+            <path
+              key={i}
+              d={STROKES[i].d}
+              pathLength={1}
+              className="hx__stroke"
+              style={{ animationDelay: `${STROKES[i].at}s`, animationDuration: `${STROKES[i].dur}s` }}
+            />
+          ))}
+          {g.notes.map((i) => {
+            const n = NOTES[i];
+            return (
+              <text
+                key={`n${i}`}
+                x={n.x}
+                y={n.y}
+                className="hx__note"
+                transform={`rotate(${n.rot} ${n.x} ${n.y})`}
+                style={{ animationDelay: `${n.at}s`, animationDuration: `${n.dur}s`, fontSize: n.size }}
+              >
+                {n.text}
+              </text>
+            );
+          })}
+        </g>
       ))}
     </svg>
   );

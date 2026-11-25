@@ -157,6 +157,69 @@
   }
 }
 
+/* ---- hover: very slight, on purpose ----
+   A letter lifts a few px and gains a little weight; a doodle gives one small
+   wiggle; the bulb lights up. The SVG layers ignore the pointer, so only these
+   groups (and their invisible hit shapes) catch it. */
+.hx__glyph {
+  pointer-events: auto;
+  transition: transform 0.45s cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+.hx__glyphHit {
+  fill: transparent;
+  pointer-events: all;
+}
+.hx__glyph .hx__letter {
+  transition: font-weight 0.45s ease;
+}
+.hx__glyph:hover {
+  transform: translateY(-6px);
+}
+.hx__glyph:hover .hx__letter {
+  font-weight: 300;
+}
+.hx__doodle {
+  pointer-events: auto;
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+}
+.hx__strokeHit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 30;
+  pointer-events: stroke;
+}
+.hx__doodle:hover {
+  animation: hx-wiggle 0.55s ease-in-out;
+}
+@keyframes hx-wiggle {
+  30% {
+    transform: rotate(-1.8deg);
+  }
+  70% {
+    transform: rotate(1.4deg);
+  }
+}
+/* the bulb is hoverable inside its glass too, not just along the line */
+.hx__doodle--bulb .hx__strokeHit {
+  pointer-events: all;
+}
+.hx__doodle--bulb .hx__stroke {
+  transition: filter 0.35s ease;
+}
+.hx__doodle--bulb:hover .hx__stroke {
+  filter: drop-shadow(0 0 5px var(--doodle)) drop-shadow(0 0 12px var(--doodle));
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx__glyph,
+  .hx__glyph .hx__letter {
+    transition: none;
+  }
+  .hx__doodle:hover {
+    animation: none;
+  }
+}
+
 /* ---- the eruption: bare logos, nothing drawn around them. The shadow is
    only a soft lift so a dark mark survives the dark water. ---- */
 .hx__logo {

@@ -30,6 +30,7 @@ export default function KeyboardSection({
   skills,
   active = false,
   skipIntro = false,
+  parkStanding = false,
   onLight,
 }: {
   skills: string[];
@@ -37,6 +38,8 @@ export default function KeyboardSection({
   active?: boolean;
   /** Skip the intro and open on the lit, posed board (entered from below). */
   skipIntro?: boolean;
+  /** the pose to hold while off-screen: standing if the next visit comes from below */
+  parkStanding?: boolean;
   onLight?: (on: boolean) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -97,6 +100,8 @@ export default function KeyboardSection({
                 paused={!visible || !active}
                 active={active && !reduce}
                 instant={skipIntro}
+                hidden={!visible}
+                parkStanding={parkStanding}
                 onLight={onLight}
               />
             </Suspense>

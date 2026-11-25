@@ -48,7 +48,7 @@ function Panel({
 
 /* ------------------------------- sections -------------------------------- */
 
-function KeyboardScene({ active, skipIntro }: { active: boolean; skipIntro: boolean }) {
+function KeyboardScene({ active, skipIntro, parkStanding }: { active: boolean; skipIntro: boolean; parkStanding: boolean }) {
   const sceneRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef(active);
   activeRef.current = active;
@@ -90,7 +90,7 @@ function KeyboardScene({ active, skipIntro }: { active: boolean; skipIntro: bool
   return (
     <div className="section shell field-section" ref={sceneRef}>
       <p className="section__label">What I work in</p>
-      <KeyboardSection skills={skills} active={active} skipIntro={skipIntro} onLight={handleLight} />
+      <KeyboardSection skills={skills} active={active} skipIntro={skipIntro} parkStanding={parkStanding} onLight={handleLight} />
       <p className="field-note">
         Every key is something I&rsquo;ve shipped with.{" "}
         <span className="dim">Hover one.</span>
@@ -437,18 +437,6 @@ export default function App() {
           <div className="nav__links">
             {/* No Sound toggle: the site is silent (Brian, 2026-11-25 - the
                 keycap clicks were the last sound left). */}
-            {/* Every section boundary gets a clip; this is the one switch
-                for all of them. Session memory only. */}
-            <button
-              type="button"
-              className="nav__sound"
-              data-cursor="hover"
-              aria-pressed={clips}
-              aria-label={clips ? "Turn transitions off" : "Turn transitions on"}
-              onClick={() => setClips(toggleTransitions())}
-            >
-              Motion {clips ? "on" : "off"}
-            </button>
             <Magnetic>
               <a href={profile.github} target="_blank" rel="noreferrer" data-cursor="hover">
                 GitHub
@@ -459,6 +447,31 @@ export default function App() {
                 Email
               </a>
             </Magnetic>
+            {/* LinkedIn, not a resume download (Brian, 2026-11-25): recruiters
+                already have the resume, a redacted one says little, and it
+                would go stale - LinkedIn he keeps current himself. */}
+            <Magnetic>
+              <a href={profile.linkedin} target="_blank" rel="noreferrer" data-cursor="hover">
+                LinkedIn
+              </a>
+            </Magnetic>
+            {/* Every section boundary gets a clip; this is the one switch for
+                all of them, as a switch rather than words, rightmost
+                (Brian, 2026-11-25). Session memory only. */}
+            <button
+              type="button"
+              role="switch"
+              className="nav__switch"
+              data-cursor="hover"
+              aria-checked={clips}
+              aria-label="Motion: section transitions"
+              onClick={() => setClips(toggleTransitions())}
+            >
+              <span>Motion</span>
+              <i className={`nav__track ${clips ? "is-on" : ""}`} aria-hidden="true">
+                <b />
+              </i>
+            </button>
           </div>
         </motion.nav>
 
@@ -467,7 +480,8 @@ export default function App() {
         </Panel>
 
         <Panel id="craft" active={index === 1} className="panel--void">
-          <KeyboardScene active={index === 1} skipIntro={kbFromBelow.current} />
+          {/* parkStanding: from below the keyboard, the next visit arrives from below and skips the intro */}
+          <KeyboardScene active={index === 1} skipIntro={kbFromBelow.current} parkStanding={index > 1} />
         </Panel>
 
         <Panel id="ask" active={index === 2}>

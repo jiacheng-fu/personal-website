@@ -1069,6 +1069,98 @@ html {
   transition: opacity 0.4s ease-out;
 }
 
+/* ---- the pointer: a thin crosshair (Cursor.tsx) ---- */
+.cursor--cross {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+  pointer-events: none;
+  will-change: transform;
+}
+.cursor--cross.is-away {
+  opacity: 0;
+}
+.cursor__mark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  transition: transform 0.28s cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+.cursor__mark i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  background: #fff;
+  /* a hairline dark edge: white alone vanishes on the paper sections */
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.55), 0 0 3px rgba(0, 0, 0, 0.25);
+  border-radius: 1px;
+}
+.cursor__mark i:first-child {
+  width: 17px;
+  height: 1.5px;
+  transform: translate(-50%, -50%);
+}
+.cursor__mark i:last-child {
+  width: 1.5px;
+  height: 17px;
+  transform: translate(-50%, -50%);
+}
+.cursor--cross.is-hover .cursor__mark {
+  transform: rotate(45deg) scale(1.12);
+}
+.cursor--cross.is-down .cursor__mark {
+  transform: scale(0.72);
+}
+.cursor--cross.is-hover.is-down .cursor__mark {
+  transform: rotate(45deg) scale(0.8);
+}
+
+/* the Motion switch: a pill with a knob, rightmost in the nav */
+.nav__switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.nav__track {
+  position: relative;
+  display: inline-block;
+  width: 26px;
+  height: 14px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  opacity: 0.85;
+  transition: background 0.25s ease, opacity 0.25s ease;
+}
+.nav__track b {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  transition: transform 0.25s cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+.nav__track.is-on b {
+  transform: translateX(12px);
+}
+.nav__track.is-on {
+  opacity: 1;
+}
+.nav__switch:hover .nav__track {
+  opacity: 1;
+}
+
 /* the site-wide sound switch, sitting with the nav links */
 .nav__sound {
   padding: 0;
@@ -2195,7 +2287,8 @@ html:has(#top.is-active) .nav {
 /* full strength over the photo: the 0.8 the links wear elsewhere reads as
    grey against a pale sky */
 html:has(#top.is-active) .nav__links a,
-html:has(#top.is-active) .nav__sound {
+html:has(#top.is-active) .nav__sound,
+html:has(#top.is-active) .nav__switch {
   color: #fff;
   opacity: 1;
   font-weight: 500;
@@ -2560,11 +2653,13 @@ html:has(.panel--sheet.is-active) .nav {
   color: #3a3225;
 }
 html:has(.panel--sheet.is-active) .nav__links a,
-html:has(.panel--sheet.is-active) .nav__sound {
+html:has(.panel--sheet.is-active) .nav__sound,
+html:has(.panel--sheet.is-active) .nav__switch {
   color: #6b6047;
 }
 html:has(.panel--sheet.is-active) .nav__links a:hover,
-html:has(.panel--sheet.is-active) .nav__sound:hover {
+html:has(.panel--sheet.is-active) .nav__sound:hover,
+html:has(.panel--sheet.is-active) .nav__switch:hover {
   color: #2a2418;
 }
 html:has(.panel--sheet.is-active) .dots__dot {

@@ -557,7 +557,7 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
     return [b.clone().lerp(LEGEND_MUTE, 0.28), b, CAP_REST, CAP_HOVER];
   }, [cap.label, cap.blank]);
 
-  useFrame((_, dt) => {
+  useFrame((state, dt) => {
     // Frame-rate independent easing, clamped so a long frame cannot overshoot.
     const step = 1 - Math.pow(0.0001, Math.min(dt, 0.1));
     press.current += ((active ? 1 : 0) - press.current) * step;
@@ -572,7 +572,13 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
         sink += Math.sin((since / 0.5) * Math.PI) * TRAVEL * 2.4;
       }
     }
-    if (group.current) group.current.position.y = baseY - sink;
+    if (group.current) {
+      const y = baseY - sink;
+      /* shadows are drawn only on frames where something moved (see the
+         Canvas's onCreated): a key travelling is one of those */
+      if (Math.abs(group.current.position.y - y) > 1e-5) state.gl.shadowMap.needsUpdate = true;
+      group.current.position.y = y;
+    }
     if (legendMat.current) {
       legendMat.current.color.lerpColors(rest, brand, p);
       legendMat.current.color.multiplyScalar(STAGE.lamp);
@@ -872,6 +878,7 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
     const faceYaw = Math.atan2(cam.x - g.position.x, cam.z - g.position.z);
     g.rotation.y = faceYaw + CARD_YAW + p * 0.42;
     g.rotation.x = p * -0.1;
+    if (open.current > 0.001) state.gl.shadowMap.needsUpdate = true;
   });
 
   if (!shown) return null;
@@ -1035,6 +1042,8 @@ function Board({
   daylight = false,
   pose,
   fill,
+  hidden = false,
+  parkStanding = false,
 }: {
   onHover: (label: string | null) => void;
   /** True once this is the section on screen. Going true ARMS the sequence;
@@ -1062,7 +1071,23 @@ function Board({
   pose?: HeroPose;
   /** Live camera fill from the tuning panel. */
   fill?: number;
+  /** the canvas is off-screen (the render loop is parked) */
+  hidden?: boolean;
+  /** hold the board standing rather than flat while off-screen */
+  parkStanding?: boolean;
 }) {
+  const advance = useThree((s) => s.advance);
+  const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
+  const camera = useThree((s) => s.camera);
+  /* the frame the stand-up last drew a final shadow for */
+  const shadowSettled = useRef(false);
+  /* Shader warm-up (a game-dev staple): compile every program in the scene in
+     the background as soon as the board exists, with the browser's parallel
+     compile where it has one, so the first frame anyone SEES is not also the
+     frame that stalls on compiling. */
+  const warm = useRef<Promise<unknown> | null>(null);
+  if (!warm.current) warm.current = gl.compileAsync ? gl.compileAsync(scene, camera).catch(() => {}) : Promise.resolve();
   const instantRef = useRef(instant);
   instantRef.current = instant;
   const { placed, width, depth } = useMemo(buildLayout, []);
@@ -1076,25 +1101,39 @@ function Board({
   const startAt = useRef<number | null>(live ? null : -99); // null = waiting in the dark
   const litFired = useRef(!live);
 
-  // Rewind when the section leaves. The board is snapped back to flat and
-  // dark here rather than in useFrame, because the render loop is parked
-  // while the section is off-screen and would never run the reset.
+  /* Park the board while it is off-screen: put it in the pose the NEXT visit
+     starts from - flat if that visit comes from above (it stands up), already
+     standing if it comes from below - and DRAW that one frame. The render loop
+     is stopped off-screen, so without the draw the canvas kept its last image:
+     on a fast scroll back, the board showed standing mid-scroll, then snapped
+     flat when the loop woke, then stood up (Brian, 2026-11-25). Only while
+     hidden: re-posing it as it scrolls away would be a visible snap too. */
   useEffect(() => {
-    // Nothing to rewind in daylight - there was no sequence to play.
-    if (daylight) return;
-    if (armed || !live) return;
+    if (daylight || armed || !hidden) return;
     startAt.current = null;
     litFired.current = false;
-    STAGE.ready = false; // the next visit starts mid-move again
-    STAGE.lamp = 0; // and starts dark, so re-entry cannot flash either
-    STAGE.dark = true;
+    STAGE.ready = false;
+    STAGE.lamp = 1; // the room is always lit now; a dark parked frame would pop
+    STAGE.dark = false;
     onLight?.(false);
     const g = boardGroup.current;
     if (g) {
-      g.quaternion.copy(FLAT_Q);
-      g.position.copy(FLAT_POS);
+      g.quaternion.copy(parkStanding ? FINAL_Q : FLAT_Q);
+      g.position.copy(parkStanding ? POSE_POS : FLAT_POS);
     }
-  }, [armed, live, onLight, daylight]);
+    /* after the warm-up, so this hidden frame is cheap and the shadow and
+       GPU uploads are done before the section is ever on screen */
+    let off = false;
+    warm.current?.then(() => {
+      if (off) return;
+      shadowSettled.current = false;
+      gl.shadowMap.needsUpdate = true;
+      advance(performance.now());
+    });
+    return () => {
+      off = true;
+    };
+  }, [armed, hidden, parkStanding, onLight, daylight, advance, gl]);
 
   /* Timeline (seconds from trigger, wall-clock so frame stalls cannot slow
      the choreography - a dropped frame skips ahead instead of dragging):
@@ -1175,6 +1214,10 @@ function Board({
     const u = x * x * x * (x * (x * 6 - 15) + 10);
 
     STAGE.ready = x >= 1;
+    if (x < 1 || !shadowSettled.current) {
+      state.gl.shadowMap.needsUpdate = true;
+      shadowSettled.current = x >= 1;
+    }
     g.quaternion.slerpQuaternions(FLAT_Q, FINAL_Q, u);
     g.position.lerpVectors(FLAT_POS, POSE_POS, u);
 
@@ -1476,8 +1519,12 @@ export default function Keyboard3D({
   pose,
   fill,
   onLight,
+  hidden = false,
+  parkStanding = false,
 }: {
   paused?: boolean;
+  hidden?: boolean;
+  parkStanding?: boolean;
   active?: boolean;
   /** open on the finished state instead of playing the intro */
   instant?: boolean;
@@ -1542,6 +1589,12 @@ export default function Keyboard3D({
         camera={daylight ? { position: [0, 1.2, 11.5], fov: 22 } : { position: [0, 5.5, 6.7], fov: 26 }}
         gl={{ alpha: true, antialias: true }}
         onCreated={({ gl }) => {
+          /* Shadows on demand: the shadow pass re-rendered every mesh every
+             frame even with the board sitting still. Now it runs only on
+             frames something moved (stand-up, a key travelling, the hover
+             card) - roughly halving the steady-state draw work. */
+          gl.shadowMap.autoUpdate = false;
+          gl.shadowMap.needsUpdate = true;
           gl.toneMapping = THREE.ACESFilmicToneMapping;
           // ACES desaturates as it rolls off, so an over-lit cap does not just
           // get brighter, it goes pale. Backing the exposure off keeps the
@@ -1562,6 +1615,8 @@ export default function Keyboard3D({
           daylight={daylight}
           pose={pose}
           fill={fill}
+          hidden={hidden}
+          parkStanding={parkStanding}
         />
       </Canvas>
 
