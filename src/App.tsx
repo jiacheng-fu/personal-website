@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode, useMemo } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, useMemo } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import "./App.css";
 // TEMP (debug): Space pauses the transition clip. See src/lib/debugPause.ts.
@@ -41,8 +41,20 @@ function Panel({
   className?: string;
   children: ReactNode;
 }) {
+  /* `is-active` is toggled on the element, not written into className. The
+     scenes put classes of their own on these panels by hand (is-departing
+     while a clip plays, is-lit on the keyboard), and React rewrites the whole
+     class attribute whenever className changes - which was every time a
+     section became active or inactive, i.e. in the middle of every
+     transition. Going back up from the machine, the keyboard's text showed
+     through the clip for ~15 frames that way (2026-11-25). A className that
+     never changes is never rewritten. Layout effect: set before paint. */
+  const ref = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    ref.current?.classList.toggle("is-active", active);
+  }, [active]);
   return (
-    <section id={id} className={`panel ${className ?? ""} ${active ? "is-active" : ""}`}>
+    <section ref={ref} id={id} className={`panel ${className ?? ""}`}>
       {children}
     </section>
   );

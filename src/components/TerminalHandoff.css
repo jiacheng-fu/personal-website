@@ -249,6 +249,15 @@
 .rag.is-continuing.is-scrolled .a2-perf {
   transform: translateY(calc(-1 * var(--handoff-scroll, 0px)));
 }
+/* ...unless an answer was still being played out (TerminalHandoff, run): that
+   session is still growing, so it goes, and the command types on a clear glass */
+.rag.is-continuing.is-cleared .a2-boot,
+.rag.is-continuing.is-cleared .a2-perf {
+  opacity: 0;
+  transition:
+    opacity 0.16s ease,
+    transform 0.32s cubic-bezier(0.33, 1, 0.68, 1);
+}
 
 /* The command is typed on the prompt's own line and then rides the same
    scroll up with everything else. Same duration and curve as the session

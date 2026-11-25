@@ -160,7 +160,7 @@ const TerminalHandoff = forwardRef<HandoffHandle>(function TerminalHandoff(_, re
     setNavLocked(false);
     h.classList.remove("is-on", "is-dark", "is-out", "is-instant", "is-back");
     const rag = document.querySelector<HTMLElement>(".rag");
-    rag?.classList.remove("is-handoff", "is-continuing", "is-scrolled");
+    rag?.classList.remove("is-handoff", "is-continuing", "is-scrolled", "is-cleared");
     document.documentElement.style.removeProperty("--handoff-scroll");
     document.documentElement.style.removeProperty("--handoff-scroll-screen");
     setPhase("idle");
@@ -249,6 +249,9 @@ const TerminalHandoff = forwardRef<HandoffHandle>(function TerminalHandoff(_, re
     run() {
       const h = host.current;
       if (!h) return Promise.resolve();
+      /* a boot still typing finishes now, so there is a prompt to type on and
+         nothing left printing under the command (RagSection, rag:handoff) */
+      window.dispatchEvent(new Event("rag:handoff"));
       const next = measure("down");
       if (!next) return Promise.resolve();
       const gt = glassType(document.querySelector<HTMLElement>(".a2m__screen")!);
@@ -285,6 +288,9 @@ const TerminalHandoff = forwardRef<HandoffHandle>(function TerminalHandoff(_, re
         `${projects.length * gt.line}px`
       );
       ragEl?.classList.add("is-continuing");
+      /* An answer still being played out keeps growing under the command
+         (more lines, the acts changing), so that session is cleared instead. */
+      if (ragEl?.hasAttribute("data-busy")) ragEl.classList.add("is-cleared");
 
       setDir("down");
       setLines(next);

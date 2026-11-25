@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { retrieve, chunks, addChunk, hasEvidence, type Retrieval, type ScoredChunk } from "../lib/bm25";
 import { assemblePrompt, userMessage, type PromptParts } from "../lib/ragPrompt";
@@ -380,6 +381,15 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
     const f = document.activeElement as HTMLElement | null;
     if (f?.closest(".rag")) f.blur();
   }, [active]);
+  /* ...and Escape closes it, as it does any dialog (it did nothing) */
+  useEffect(() => {
+    if (!confirming) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setConfirming(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [confirming]);
   /* documents the visitor has fed in this session */
   const [fed, setFed] = useState(0);
   const [ingested, setIngested] = useState<string | null>(null);
@@ -409,7 +419,7 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
     setAnswer(null);
     setBootPhase("off");
     const t1 = window.setTimeout(() => setBootPhase("on"), 380); // tube warms: blank green
-    const t2 = window.setTimeout(() => {
+    const t2 = (bootTimers.current[1] = window.setTimeout(() => {
       /* Coming back to a model that is already loaded: there is nothing to
          load, so there is no bar - a bar here would read as the machine
          loading itself all over again. The tube warms and the menu types
@@ -423,12 +433,33 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
       }
       loadingSince.current = performance.now();
       setBootPhase("loading"); // the model's own progress, held below
-    }, 900);
+    }, 900));
+    bootTimers.current[0] = t1;
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
     };
   }, [boot]);
+
+  /* Scrolling on to the projects while the boot is still typing. The terminal
+     handoff types `ls ~/work` on the prompt line, under the session - and
+     mid-boot there was no prompt yet, so it fell back to a spot a third of
+     the way down the glass, right on the menu, which went on typing itself
+     in underneath: the command and the names printed over it, two texts
+     stacked (Brian, 2026-11-25). So the handoff asks first (TerminalHandoff,
+     run) and the boot finishes on the spot, synchronously, with its pending
+     steps cancelled - a later one would blank the glass and type it again in
+     the middle of the scene. */
+  const bootTimers = useRef<number[]>([]);
+  useEffect(() => {
+    const finish = () => {
+      if (bootPhase === "done") return;
+      bootTimers.current.forEach(clearTimeout);
+      flushSync(() => setBootPhase("done"));
+    };
+    window.addEventListener("rag:handoff", finish);
+    return () => window.removeEventListener("rag:handoff", finish);
+  }, [bootPhase]);
 
   /* The hold. The bar stays up until the load settles (or BOOT_HOLD_MS runs
      out), and for at least BOOT_MIN_MS. Keyed on the PHASE, not the progress,
@@ -681,6 +712,18 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
      transition clips (docs/transition-kb-machine.md): no page chrome, the
      machine in the requested state. Never set in normal use. */
   const frame = new URLSearchParams(location.search).get("frame");
+  /* The root's own state classes are toggled, never written into className:
+     the terminal handoff puts is-continuing / is-scrolled / is-handoff on this
+     element by hand, and a className that changed mid-scene (the boot
+     finishing while `ls ~/work` was being typed) had React rewrite the whole
+     attribute and drop them - the session stopped scrolling, the live prompt
+     came back and the command printed over the menu (2026-11-25). */
+  useLayoutEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    el.classList.toggle("is-framing", !!frame);
+    el.classList.toggle("is-booting", bootPhase !== "done");
+  }, [frame, bootPhase]);
   const grow = frame?.match(/^grow(\d+)$/);
   const fallM = frame?.match(/^fall(\d+)$/);
   const blobM = frame?.match(/^blob(\d+)$/);
@@ -1003,7 +1046,13 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
   );
 
   return (
-    <div ref={rootRef} className={`section shell rag ${frame ? "is-framing" : ""} ${bootPhase !== "done" ? "is-booting" : ""}`}>
+    <div
+      ref={rootRef}
+      className="section shell rag"
+      /* an answer still being played out on the glass: the session is
+         growing, so the terminal handoff clears it rather than typing over it */
+      data-busy={performing && !answer?.done ? "" : undefined}
+    >
       <p className="section__label">Ask the machine</p>
 
       <div className="rag__scene">

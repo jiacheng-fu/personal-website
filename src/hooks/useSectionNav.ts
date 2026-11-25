@@ -73,6 +73,19 @@ const NEW_GESTURE_GAP = 160; // ms
 const SECTION_KEY = "nav:section";
 const GROWTH = 1.4;
 
+/* Boxes with their own scroll (the "Teach it something" note, the fragments
+   list, a code block on the glass) are marked [data-scrollable]. They used to
+   get every wheel and swipe over them, including ones they could not use: an
+   empty note cannot scroll, so the browser scrolled the PAGE instead - 120px
+   off the section, and the next wheel started the terminal handoff from
+   there. Now a box keeps an event only while it has room to move that way. */
+function boxOf(t: EventTarget | null) {
+  return ((t as HTMLElement | null)?.closest?.("[data-scrollable]") as HTMLElement | null) ?? null;
+}
+function roomIn(el: HTMLElement, dy: number) {
+  return dy > 0 ? el.scrollHeight - el.clientHeight - el.scrollTop : el.scrollTop;
+}
+
 export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
   const [index, setIndex] = useState(0);
   const busy = useRef(false);
@@ -206,9 +219,24 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
     if (!enabled) return;
     const flick = { lastT: -1e9, lastAbs: 0, spent: false };
     const onWheel = (e: WheelEvent) => {
-      // Let anything genuinely scrollable (a long card, a code block) keep its
-      // own scroll; only hijack when the page itself would move.
-      if ((e.target as HTMLElement)?.closest?.("[data-scrollable]")) return;
+      /* Ctrl + wheel is a zoom, and a trackpad pinch arrives as exactly that:
+         it was flipping sections and blocking the browser's zoom. */
+      if (e.ctrlKey) return;
+      const box = boxOf(e.target);
+      if (box && Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; // sideways in a box is the box's
+      const abs = Math.abs(e.deltaY);
+      if (e.timeStamp - flick.lastT > NEW_GESTURE_GAP || abs > flick.lastAbs * GROWTH + 4) {
+        flick.spent = false; // a new gesture
+      }
+      flick.lastT = e.timeStamp;
+      flick.lastAbs = abs;
+      /* A scrollable box keeps the wheel only while it can move that way
+         (see roomIn); the rest of that gesture is its too, so the tail of a
+         flick that scrolled the note to its end does not then turn the page. */
+      if (box && roomIn(box, e.deltaY) > 1) {
+        flick.spent = true;
+        return;
+      }
       e.preventDefault();
       /* No cooldown, no gesture debouncing. There used to be a quiet-period
          rule here meant to stop one flick walking through several sections,
@@ -225,12 +253,6 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
          gesture during 1->2 must not start 2->3 while it is still playing
          out. No cooldown beyond that: the instant the scene is off screen,
          the next input moves. */
-      const abs = Math.abs(e.deltaY);
-      if (e.timeStamp - flick.lastT > NEW_GESTURE_GAP || abs > flick.lastAbs * GROWTH + 4) {
-        flick.spent = false; // a new gesture
-      }
-      flick.lastT = e.timeStamp;
-      flick.lastAbs = abs;
       if (busy.current || isClipBusy() || abs < WHEEL_MIN) return;
       if (flick.spent) return; // the tail of the flick that already moved us
       flick.spent = true;
@@ -244,12 +266,18 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
          input, which do nothing there. The machine's prompt keeps focus after
          a question (and after any click on its screen), and the arrows used
          to do nothing at all until the visitor clicked away. */
-      const lineKey = ["ArrowDown", "ArrowUp", "PageDown", "PageUp"].includes(e.key);
+      /* Home/End move the caret - but only in a field with something in it;
+         in the empty prompt (which also takes focus when the LLM switch on the
+         glass is clicked) they did nothing at all. */
+      const emptyField = tag === "INPUT" && !(t as HTMLInputElement).value;
+      const lineKey =
+        ["ArrowDown", "ArrowUp", "PageDown", "PageUp"].includes(e.key) || (emptyField && (e.key === "Home" || e.key === "End"));
       if (tag === "TEXTAREA" || t?.isContentEditable) return;
       if (tag === "INPUT" && !(lineKey && ((t as HTMLInputElement).type === "text" || (t as HTMLInputElement).type === "search"))) return;
       /* Space advances - except in development, where the transition scrubber
          (lib/debugPause.ts) owns it. */
-      const next = { ArrowDown: 1, PageDown: 1, ArrowUp: -1, PageUp: -1, ...(import.meta.env.DEV ? {} : { " ": 1 }) }[e.key];
+      const key = { ArrowDown: 1, PageDown: 1, ArrowUp: -1, PageUp: -1, ...(import.meta.env.DEV ? {} : { " ": 1 }) }[e.key];
+      const next = key && e.key === " " && e.shiftKey ? -key : key; // Shift+Space goes back, as in any page
       if (next) {
         e.preventDefault();
         if (!busy.current) goTo(indexRef.current + next);
@@ -262,15 +290,31 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
       }
     };
 
+    /* A swipe works like the wheel: a box on the glass keeps it while it can
+       scroll, and a swipe that scrolled a box does not ALSO turn the page
+       (it used to do both: the fragments list moved and the section flipped). */
     let touchY = 0;
-    const onTouchStart = (e: TouchEvent) => (touchY = e.touches[0].clientY);
+    let lastY = 0;
+    let touchBox: HTMLElement | null = null;
+    let boxMoved = false;
+    const onTouchStart = (e: TouchEvent) => {
+      touchY = lastY = e.touches[0].clientY;
+      touchBox = boxOf(e.target);
+      boxMoved = false;
+    };
     const onTouchMove = (e: TouchEvent) => {
-      if ((e.target as HTMLElement)?.closest?.("[data-scrollable]")) return;
+      const y = e.touches[0]?.clientY ?? lastY;
+      const dy = lastY - y; // > 0: the finger goes up, the content down
+      lastY = y;
+      if (touchBox && dy && roomIn(touchBox, dy) > 1) {
+        boxMoved = true;
+        return;
+      }
       e.preventDefault();
     };
     const onTouchEnd = (e: TouchEvent) => {
       const dy = touchY - (e.changedTouches[0]?.clientY ?? touchY);
-      if (busy.current || Math.abs(dy) < 40) return;
+      if (boxMoved || busy.current || Math.abs(dy) < 40) return;
       goTo(indexRef.current + (dy > 0 ? 1 : -1));
     };
 
