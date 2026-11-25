@@ -862,7 +862,7 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
                 <>
                   {usesNote && (
                     <p className="a2-speech__unverified">
-                      ⚠ UNVERIFIED: THE MARKED PART COMES FROM A VISITOR'S NOTE, NOT FROM BRIAN.
+                      ⚠ UNVERIFIED: THE MARKED PART DRAWS ON A VISITOR'S NOTE, NOT ON BRIAN'S ARCHIVE.
                     </p>
                   )}
                   <p className={`a2-speech__text ${answer && answer.mode !== "model" ? "is-quote" : ""}`}>
