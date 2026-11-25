@@ -32,7 +32,7 @@ const RESUMES = [
 ];
 const TRUTH = [...RESUMES, path.join(ROOT, "src", "data", "content.ts"), path.join(ROOT, "src", "data", "profile.json")];
 /* numbers that are facts about the site itself, not about Brian's record */
-const SITE_NUMBERS = ["3", "25"]; // "Three.js", "BM25"
+const SITE_NUMBERS = ["3", "25", "0.6"]; // "Three.js", "BM25", "Qwen3-0.6B"
 
 const SECTIONS = new Set(["About", "Overview", "Education", "Experience", "Projects", "Skills", "Personal"]);
 

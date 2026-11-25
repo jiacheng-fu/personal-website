@@ -10,7 +10,7 @@
    query and a sentence agree exactly as a query and a passage do: stems,
    names, and the expansion synonyms at their reduced weight.
    --------------------------------------------------------------------------- */
-import { MIN_EVIDENCE, termsOf, type Retrieval, type ScoredChunk } from "./bm25";
+import { MIN_EVIDENCE, indexHas, termsOf, type Retrieval, type ScoredChunk } from "./bm25";
 
 export type Quote = { text: string; source: string; visitor: boolean };
 
@@ -52,11 +52,15 @@ function sourceOf(c: ScoredChunk["chunk"]): string {
   return c.dates ? `${name}, ${c.dates}` : name;
 }
 
+/* employers a visitor might assume; only the ones the archive never names
+   count (Apple, OpenAI and LinkedIn are in it, for other reasons) */
+const BIG_CO = /^(google|meta|facebook|amazon|microsoft|netflix|tesla|nvidia|ibm|oracle|uber|airbnb|stripe|twitter|salesforce|intel|amd|adobe|spotify|palantir|bytedance|tiktok|deepmind|anthropic|apple|openai|linkedin)$/i;
+
 /* questions that WANT the overview: lists and counts across his career */
 const LIST_Q = /\b(list|every|all|which|how many|companies|employers|jobs|internships|projects|where has|worked|anything|experience|background|career|resume)\b/i;
 
 export function extractAnswer(r: Retrieval, max = 2, debug?: (rows: string[]) => void): Quote[] {
-  const wantsList = LIST_Q.test(r.tokens.map((t) => t.raw).join(" "));
+  const wantsList = LIST_Q.test([...r.tokens.map((t) => t.raw), ...(r.corrected ?? []).map((c) => c + "s")].join(" "));
   const direct: [string, number][] = [
     ...r.tokens.filter((t) => t.term && !t.stopword).map((t): [string, number] => [t.term, t.soft ? 0.2 : 1]),
     /* a corrected typo stands for the word the visitor meant to type */
@@ -141,6 +145,20 @@ export function extractAnswer(r: Retrieval, max = 2, debug?: (rows: string[]) =>
     if (!best) break;
     picked.push(best);
     for (const h of best.hits) covered.add(h);
+  }
+  /* A FALSE PREMISE about an employer: "what did he work on at Meta", "why
+     did he quit Amazon after two months". The job sentences that match the
+     rest of the question read as confirmation under it (QA, 2026-11-25), so
+     a well-known company the archive never mentions puts the list of where
+     he HAS worked first - the quote that corrects the premise. */
+  const named = r.tokens.map((t) => t.raw).find((w) => BIG_CO.test(w) && !indexHas(w));
+  if (named) {
+    const overview = r.top.find((s) => s.chunk.section === "Overview")?.chunk;
+    const fix = overview && sentences(overview.text).find((x) => /\bhas worked at\b/.test(x));
+    if (fix && !picked.some((p) => p.text === fix)) {
+      picked.unshift({ text: fix, score: Infinity, chunk: overview, hits: [] });
+      picked.splice(max);
+    }
   }
   /* nothing matched sentence by sentence: the best passage's opening line */
   if (!picked.length && ranked[0]) {

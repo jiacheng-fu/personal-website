@@ -12,7 +12,7 @@
       "section": "About",
       "title": "About Brian",
       "dates": "",
-      "text": "Brian Fu is a software engineer and a Computer Science student at Texas A&M University, graduating in December 2027. Brian's legal first name is Jiacheng, but he goes by Brian. Brian is based in Austin, Texas, where he lives. Brian speaks English and Mandarin Chinese, both natively. Brian is a permanent U.S. resident with a green card, so he is authorized to work in the United States and does not need visa sponsorship. Brian is open to 2027 internships: he is seeking Summer 2027 software engineering and security internships. If you are looking to hire an intern for 2027, Brian is available: email him at brian.fu123321@gmail.com. Brian gravitates to problems where correctness is checkable: compilers, backends, and the security boundaries in between. Brian is currently employed part-time at ThingsX as an application security and full-stack engineer. You can contact Brian by email at brian.fu123321@gmail.com. Brian is on LinkedIn at linkedin.com/in/jiachengfu. Brian's GitHub is github.com/jiacheng-fu. Brian does not share a phone number on this site."
+      "text": "Brian Fu is a software engineer and a Computer Science student at Texas A&M University, graduating in December 2027. Brian's legal first name is Jiacheng, but he goes by Brian. Brian is based in Austin, Texas, where he lives. Brian speaks English and Mandarin Chinese, both natively. Brian is a permanent U.S. resident with a green card (not a U.S. citizen), so he is authorized to work in the United States and does not need visa sponsorship. Brian is open to 2027 internships: he is seeking Summer 2027 software engineering and security internships. If you are looking to hire an intern for 2027, Brian is available: email him at brian.fu123321@gmail.com. Brian gravitates to problems where correctness is checkable: compilers, backends, and the security boundaries in between. Brian is currently employed part-time at ThingsX as an application security and full-stack engineer. You can contact Brian by email at brian.fu123321@gmail.com. Brian is on LinkedIn at linkedin.com/in/jiachengfu. Brian's GitHub is github.com/jiacheng-fu. Brian does not share a phone number here. Brian's resume is not posted here; his LinkedIn, linkedin.com/in/jiachengfu, covers his experience."
     },
     {
       "id": 1,
@@ -61,14 +61,14 @@
       "section": "Experience",
       "title": "United Micro · software intern",
       "dates": "Jun 2024 - Aug 2024",
-      "text": "From June 2024 to August 2024, the summer of 2024, Brian was a Software Engineering Intern at United Micro Technology. Brian built a Python ingestion system that normalized third-party vendor register descriptions into United Micro Technology's internal SystemRDL representation, cutting the effort to onboard externally acquired IP by an estimated 60-70%. Brian extended the open-source SystemRDL toolchain with custom Jinja2-templated exporters that emit synthesizable RTL, C headers, and documentation in the company's internal file structure. Brian's SystemRDL tool was embedded in the production chip design flow, packaged with Poetry for reproducible installs, and used daily by 200+ engineers."
+      "text": "From June 2024 to August 2024, the summer of 2024, Brian was a Software Engineering Intern at United Micro Technology. Brian built a Python ingestion system that normalized third-party vendor register descriptions into United Micro Technology's internal SystemRDL representation, cutting the effort to onboard externally acquired IP by an estimated 60-70%. Brian extended the open-source SystemRDL toolchain with custom Jinja2-templated exporters that emit synthesizable RTL, C headers, and documentation in the company's internal file structure. Brian's SystemRDL tool shipped to real users: it was embedded in the production chip design flow, packaged with Poetry for reproducible installs, and used daily by 200+ engineers."
     },
     {
       "id": 8,
       "section": "Projects",
       "title": "Axle",
       "dates": "Jan 2026 - Present",
-      "text": "Axle is an AI-powered used-car search that Brian has been building since January 2026: describe the car you want in plain English, and it finds, ranks, and compares real listings from nearby dealers. Brian built and deployed Axle as its sole author, taking it from a TAMUhack prototype (built for the Toyota track) to a deployed product with a React and Vite frontend, a FastAPI backend, PostgreSQL, and auth. Axle's LLM pipeline (OpenRouter) turns free-form text into validated, structured JSON, with schema sanitization, a 40-entry feature-alias map with fuzzy matching, and two-tier model routing with failover: a cheap model for routine parses and a capable one when the request is ambiguous. Axle ranks results with a 10-level progressive constraint-relaxation algorithm over a weighted scoring engine, so a search returns useful matches instead of an empty page when nothing satisfies every filter. Axle stays inside a 1,000-call/month API budget, the provider's free tier, through multi-tier caching across memory, disk, and AWS DynamoDB (NoSQL, with TTL expiry). Axle runs serverless on AWS Lambda and API Gateway, with its frontend on CloudFront and S3. Axle's backend is FastAPI on AWS Lambda (Python 3.12, arm64) behind API Gateway through Mangum, defined in a SAM template, with the Lambda's role scoped to its single DynamoDB table. Axle caches listings in DynamoDB because Lambda filesystems are ephemeral and per-instance, so a disk cache stops protecting the API quota once the app runs serverless. Axle is built with React, TypeScript, Python, FastAPI, PostgreSQL, AWS, and REST APIs. Brian used Axle himself when he bought his own car. Axle's code is public on GitHub at github.com/jiacheng-fu/axle."
+      "text": "Axle is an AI-powered used-car search that Brian has been building since January 2026: describe the car you want in plain English, and it finds, ranks, and compares real listings from nearby dealers. Brian built and deployed Axle as its sole author, taking it from a TAMUhack prototype (built for the Toyota track) to a deployed product with a React and Vite frontend, a FastAPI backend, PostgreSQL, and auth. Axle's LLM pipeline (OpenRouter) turns free-form text into validated, structured JSON, with schema sanitization, a 40-entry feature-alias map with fuzzy matching, and two-tier model routing with failover: a cheap model for routine parses and a capable one when the request is ambiguous. Axle ranks results with a 10-level progressive constraint-relaxation algorithm over a weighted scoring engine, so a search returns useful matches instead of an empty page when nothing satisfies every filter. Axle stays inside a 1,000-call/month API budget, the provider's free tier, through multi-tier caching across memory, disk, and AWS DynamoDB (NoSQL, with TTL expiry). Axle runs serverless on AWS Lambda and API Gateway, with its frontend on CloudFront and S3. Axle's backend is FastAPI on AWS Lambda (Python 3.12, arm64) behind API Gateway through Mangum, defined in a SAM template, with the Lambda's role scoped to its single DynamoDB table. Axle caches listings in DynamoDB because Lambda filesystems are ephemeral and per-instance, so a disk cache stops protecting the API quota once the app runs serverless. Axle is built with React, TypeScript, Python, FastAPI, PostgreSQL, AWS, and REST APIs. Brian used Axle himself when he bought his own car. Axle's source code is public on GitHub at github.com/jiacheng-fu/axle."
     },
     {
       "id": 9,
@@ -96,21 +96,21 @@
       "section": "Projects",
       "title": "CarStatus",
       "dates": "2026",
-      "text": "CarStatus is a command-line tool that Brian built in 2026 to fetch a car's odometer, fuel, and battery through Smartcar's v3 API. Brian built CarStatus against a BMW, pulling its odometer, fuel, battery, and GPS position through the Smartcar API. CarStatus includes the webhook setup that Smartcar's documentation skips. CarStatus is written in JavaScript on Node.js. The CarStatus recording on the projects page runs the tool in a real terminal against a Smartcar Simulator car, through Smartcar's real v3 API."
+      "text": "CarStatus is a command-line tool that Brian built in 2026 to fetch a car's odometer, fuel, and battery through Smartcar's v3 API. Brian built CarStatus against a BMW, pulling its odometer, fuel, battery, and GPS coordinates through the Smartcar API. CarStatus includes the webhook setup that Smartcar's documentation skips. CarStatus is written in JavaScript on Node.js. The CarStatus recording on the projects page runs the tool in a real terminal against a Smartcar Simulator car, through Smartcar's real v3 API."
     },
     {
       "id": 13,
       "section": "Projects",
       "title": "This website",
       "dates": "2026 - Present",
-      "text": "Brian built this website in 2026 with React, TypeScript, Vite, and Three.js. The 3D keyboard on this website shows Brian's stack; the keyboard idea and keycaps are from Naresh Khatri's MIT-licensed portfolio. The photo at the top of this website was taken on the Space Needle in Seattle, not in Austin. This website's question machine works by searching this archive about Brian with BM25 scoring inside your browser, and quoting the closest-matching sentences word for word. This website has no server and no API key, and nothing you type into this machine leaves your browser. A note a visitor teaches this machine stays only in that visitor's browser tab and is gone on reload."
+      "text": "Brian built this website, his portfolio, in 2026 with the React framework, TypeScript, Vite, and Three.js; it is his own build, not a template. The 3D keyboard on this website shows Brian's stack; the keyboard idea and keycaps are from Naresh Khatri's MIT-licensed portfolio. The photo at the top of this website was taken on the Space Needle in Seattle, not in Austin. This website's question machine works by retrieval: it searches this archive about Brian with BM25 keyword scoring (no embeddings) inside your browser, and quotes the closest-matching sentences word for word. Switched on, the machine's optional LLM, Qwen3-0.6B, runs in your browser on your own GPU. This website has no server and no API key, and nothing you type into this machine leaves your browser. A note a visitor teaches this machine stays only in that visitor's browser tab and is gone on reload."
     },
     {
       "id": 14,
       "section": "Skills",
       "title": "Languages",
       "dates": "",
-      "text": "Brian speaks two languages natively, English and Mandarin Chinese. Brian codes in C++, Java, Python, TypeScript, JavaScript, C#, SQL (PostgreSQL and PL/pgSQL), Bash, Haskell, HTML, and CSS. Brian has also written Swift, for DeskStats, and a GLSL shader for an earlier version of this website. The programming languages Brian is most comfortable in are Python, JavaScript/TypeScript, and C++. In a technical interview, Brian prefers to code in Python 3."
+      "text": "Brian's tech stack spans programming languages, full-stack web and machine learning tools, and systems, cloud, and security work. Brian speaks two languages natively, English and Mandarin Chinese. Brian codes in C++, Java, Python, TypeScript, JavaScript, C#, SQL (PostgreSQL and PL/pgSQL), Bash, Haskell, HTML, and CSS. Brian has also written Swift, for DeskStats, and a GLSL shader for an earlier version of this website. The programming languages Brian is most comfortable in are Python, JavaScript/TypeScript, and C++. In a coding interview, Brian prefers to code in Python 3."
     },
     {
       "id": 15,
@@ -124,7 +124,7 @@
       "section": "Skills",
       "title": "Systems, Cloud & Security",
       "dates": "",
-      "text": "For version control and CI, Brian uses Git, GitHub, and GitHub Actions, and he has built CI/CD pipelines. Brian ships with Docker and Docker Compose, tests with pytest, and has built job queues and TOCTOU race-condition tests. For cloud, Brian uses AWS (Lambda, API Gateway, DynamoDB, IAM, S3, and CloudFront), and he has also used Supabase (PostgREST and Auth), MinIO, and Vercel. Brian's systems work includes LLVM compiler backends and SystemRDL/RTL code generation. Brian's security skills include multi-tenant isolation, Row-Level Security, threat modeling, OWASP vulnerability classes, and exploit-regression validation."
+      "text": "For version control and CI, Brian uses Git, GitHub, and GitHub Actions, and he has built CI/CD pipelines. Brian ships with Docker and Docker Compose, tests with pytest and unit tests, and has built job queues and TOCTOU race-condition tests. For cloud, Brian uses AWS (Lambda, API Gateway, DynamoDB, IAM, S3, and CloudFront), and he has also used Supabase (PostgREST and Auth), MinIO, and Vercel. Brian's systems work includes LLVM compiler backends and SystemRDL/RTL code generation. Brian's security skills include multi-tenant isolation, Row-Level Security, threat modeling, OWASP vulnerability classes, and exploit-regression validation."
     },
     {
       "id": 17,
@@ -138,7 +138,7 @@
       "section": "Projects",
       "title": "Class work & open source",
       "dates": "",
-      "text": "In CSCE 331, Foundations of Software Engineering, Brian's Team 14 built a point-of-sale system for Sharetea as its second project; its generated Javadoc is public on Brian's GitHub, and the source is in the private class repository. Brian forked PeakRDL-html, the open-source tool that generates address-space documentation from SystemRDL, the register-description format he worked with at United Micro Technology. Brian's code is on GitHub at github.com/jiacheng-fu, including his TAMUhack 2025 team project."
+      "text": "In CSCE 331, Foundations of Software Engineering, Brian's Team 14 built a point-of-sale system for Sharetea as its second project; its generated Javadoc is public on Brian's GitHub, and the rest lives in the private class repository. Brian forked PeakRDL-html, the open-source tool that generates register-map documentation from SystemRDL, the register-description format he worked with at United Micro Technology. Brian's code is on GitHub at github.com/jiacheng-fu, including his TAMUhack 2025 team project."
     },
     {
       "id": 19,
@@ -159,14 +159,14 @@
       "section": "Personal",
       "title": "Favorites",
       "dates": "",
-      "text": "Brian's favorite color is green. Brian's favorite ice cream flavor is cookies and cream. Brian's favorite foods are the carbs of Xi'an: jianbing guozi, roujiamo, yangrou paomo, and biangbiang noodles, which he misses; he also loves Texas barbecue. Brian's favorite movie of all time is Interstellar. For music, Brian listens to Tyler, the Creator and Kanye West, and his favorite song is probably Homecoming. Brian used to watch One Piece, until its pacing lost him. Brian's favorite programming language is Python: it is easy and simple, with lots of built-in functions and no braces to type, though he admits it is slow and interpreted."
+      "text": "Brian's favorite color is green. Brian's favorite ice cream flavor is cookies and cream. Brian's favorite foods are the carbs of Xi'an: jianbing guozi, roujiamo, yangrou paomo, and biangbiang noodles, which he misses; he also loves Texas barbecue. Brian's favorite movie of all time is Interstellar. For music, Brian listens to Tyler, the Creator and Kanye West, and his favorite song is probably Homecoming. Brian used to watch the anime show One Piece, until its pacing lost him. Brian's favorite programming language is Python: it is easy and simple, with lots of built-in functions and no braces to type, though he admits it is slow and interpreted."
     },
     {
       "id": 22,
       "section": "Personal",
       "title": "Games",
       "dates": "",
-      "text": "Brian plays video games, mostly shooters, because he is mechanically skilled; these days he plays Deadlock. Brian used to play Valorant, where he peaked at Immortal 2. In Overwatch 1, Brian was top 500 on tank. Brian loves 2.5D art styles, because each one is unique and plays as if you were inside a diorama; that is why Project Horizon looks the way it does."
+      "text": "Brian plays video games, mostly shooters, because he is mechanically skilled; these days he plays Deadlock. Brian used to play Valorant, where his peak rank was Immortal 2. In Overwatch 1, Brian was top 500 on tank. Brian loves 2.5D art styles, because each one is unique and plays as if you were inside a diorama; that is why Project Horizon looks the way it does."
     },
     {
       "id": 23,
@@ -180,7 +180,7 @@
       "section": "Personal",
       "title": "What's next",
       "dates": "",
-      "text": "Asked what he wants to work on after graduating, Brian's honest first answer is anything that pays in this market. After he graduates, the field Brian finds most interesting is robotics, AI, and autonomous decision-making with hardware. Brian's experience leans full-stack. Brian's proudest projects are Axle and then DeskStats, because both fix problems he actually had: he used Axle to buy his own car, and built DeskStats for his own MacBook."
+      "text": "Brian's honest first answer to what he wants to work on after graduating is anything that pays in this market. After he graduates, the field Brian finds most interesting is robotics, AI, and autonomous decision-making with hardware. Brian's experience leans full-stack. Brian's proudest projects are Axle and then DeskStats, because both fix problems he actually had: he used Axle to buy his own car, and built DeskStats for his own MacBook."
     }
   ]
 }

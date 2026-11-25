@@ -15,6 +15,7 @@ import {
   type EngineState,
 } from "../lib/ragEngine";
 import { extractAnswer, type Quote } from "../lib/extract";
+import { cleanModelAnswer, isRefusal } from "../lib/answerGuard";
 
 import Apple2Front from "./Apple2Front";
 import FeedShred from "./FeedShred";
@@ -54,7 +55,7 @@ interface Answer {
   stats?: { tokens: number; seconds: number };
   done: boolean;
   /* why the model didn't answer, when it didn't */
-  fallback?: "loading" | "absent" | "stumbled";
+  fallback?: "loading" | "absent" | "stumbled" | "empty";
   /* the evidence came (at least partly) from something a visitor typed */
   fromVisitor?: boolean;
 }
@@ -90,6 +91,8 @@ function narration(act: Act, run: Run | null, answer: Answer | null, engine: Eng
             ? "MODEL STUMBLED ON THAT ONE — QUOTING THE ARCHIVE:"
             : answer.fallback === "absent"
               ? "NO MODEL ON THIS MACHINE — QUOTING THE ARCHIVE:"
+              : answer.fallback === "empty"
+                ? "THE MODEL CAME UP EMPTY — THE ARCHIVE HAS IT:"
               : "QUOTING THE ARCHIVE, WORD FOR WORD:";
       if (answer?.mode === "none") return "ARCHIVE MISS.";
       if (engine.phase === "generating" || !answer?.done) return "MODEL READING BRIEFING…";
@@ -567,14 +570,28 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
        answer must say where it came from, and that is decided here, not
        left to the model's discretion */
     const fromVisitor = r.retrieval.top.some((s) => s.chunk.section === "Visitor" && s.score >= MIN_EVIDENCE);
+    /* the model's words pass through answerGuard.ts: its own instructions
+       repeated back are dropped, and so is "According to a visitor note"
+       when no note was in the briefing */
+    const notesBriefed = r.prompt.contextBlocks.some((b) => b.label.includes("VISITOR NOTE"));
+    let said = "";
     const result = await generate(
       r.prompt.system,
       userMessage(r.prompt),
-      (text) => !signal.aborted && setAnswer({ mode: "model", text, quotes, done: false, fromVisitor }),
+      (text) => {
+        if (signal.aborted) return;
+        said = cleanModelAnswer(text, notesBriefed);
+        setAnswer({ mode: "model", text: said, quotes, done: false, fromVisitor });
+      },
       signal
     );
     if (signal.aborted) return;
-    if (result) {
+    if (result && isRefusal(said) && quotes.length) {
+      /* "The context does not mention..." about something retrieval DID
+         find (9 of 50 in QA, 2026-11-25): the archive's own words are the
+         better answer */
+      setAnswer(quoted("empty"));
+    } else if (result) {
       setAnswer((a) => a && { ...a, stats: { tokens: result.tokens, seconds: result.seconds }, done: true });
     } else {
       const phase = engineState().phase;

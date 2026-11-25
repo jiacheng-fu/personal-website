@@ -81,7 +81,10 @@ const STOPWORDS = new Set(
        found "got into programming", "a morning PERSON" found "third-person
        movement", "which city does he CALL home" found "1,000-call/month",
        "has he USED kubernetes" found "used to play Valorant" */
-    "into person call use used uses using still outside " +
+    "into person call use used uses using still outside just professional " +
+    /* filler a visitor types that carries no subject: "who EVEN is he" */
+    "even really actually basically literally lol pls please hey hi hello yo bro um uh ok okay " +
+    "anything something everything nothing since but got single all time like take taken took technical " +
     /* a lone digit is arithmetic or a version suffix, never the subject:
        "solve 2 + 2" used to find Valorant's "Immortal 2" (2026-11-25) */
     "0 1 2 3 4 5 6 7 8 9").split(" ")
@@ -111,6 +114,10 @@ const SOFT_WEIGHT = 0.2;
    "compilers" meet "compiler". A real Porter stemmer buys nothing here and
    its stems ("compil") would look like bugs in a UI built to be read. */
 function stem(w: string): string {
+  if (IRREGULAR[w]) return IRREGULAR[w];
+  /* "embeddings": the plural comes off first, then the -ing, so it meets
+     "embedding" (one rule per word used to leave them apart) */
+  if (w.length > 6 && w.endsWith("ings")) w = w.slice(0, -1);
   if (w.length > 4 && w.endsWith("ing")) w = restoreE(w.slice(0, -3));
   else if (w.length > 4 && w.endsWith("ies")) w = w.slice(0, -3) + "y";
   else if (w.length > 3 && w.endsWith("ed")) w = restoreE(w.slice(0, -2));
@@ -123,7 +130,21 @@ function stem(w: string): string {
    "graduate" - so a visitor's note saying Brian graduated was invisible to
    "when does he graduate" (QA, 2026-11-25). The same for created, updated,
    automated, troubled, sized. */
-const restoreE = (w: string) => (/(?:at|bl|iz)$/.test(w) ? w + "e" : w);
+const restoreE = (w: string) =>
+  /(?:at|bl|iz)$/.test(w) ? w + "e" : /([bdfgmnprt])\1$/.test(w) ? w.slice(0, -1) : w;
+/* ...and the doubled consonant before -ed/-ing: "shipped" and "running" left
+   "shipp" and "runn", which met nothing (QA, 2026-11-25). */
+
+/* Irregular past forms, to their base: "ran" never met "run", "wrote" never
+   met "write". Short and common only; the synonym table covers the rest. */
+const IRREGULAR: Record<string, string> = {
+  ran: "run", won: "win", wrote: "write", taught: "teach", bought: "buy", led: "lead", went: "go",
+  gone: "go", ate: "eat", eaten: "eat", drove: "drive", driven: "drive", spoke: "speak", spoken: "speak", knew: "know",
+  known: "know", grew: "grow", grown: "grow", began: "begin", begun: "begin", chose: "choose", chosen: "choose",
+  felt: "feel", kept: "keep", met: "meet", paid: "pay", sold: "sell", sent: "send", spent: "spend", took: "take",
+  taken: "take", thought: "think", told: "tell", understood: "understand", lost: "lose", flew: "fly", swam: "swim",
+  sang: "sing", fought: "fight", caught: "catch", brought: "bring", sought: "seek", held: "hold", stood: "stand",
+};
 
 function words(s: string): string[] {
   /* Unicode letters, not just a-z: a visitor's note may be in any language or
@@ -150,13 +171,8 @@ function words(s: string): string[] {
     .toLowerCase()
     .replace(/(\d),(?=\d{3}(?!\d))/g, "$1")
     .replace(/\b(?:by (?:him|my|your)self|on (?:his|my|your) own)\b/g, "solo")
-    /* phrases whose words mean something else on their own (QA, 2026-11-25):
-       "for a living" found his hometown through "living"; "when he's not
-       coding" found the Aggie Coding Club; "every day" missed "daily" */
-    .replace(/\bfor a living\b/g, "job")
-    .replace(/\b(?:when (?:he'?s|he is|hes) not (?:coding|working|programming|at work)|in his (?:free|spare) time|(?:free|spare) time|for fun|outside (?:of )?(?:work|coding|school))\b/g, "hobbies")
-    .replace(/\bevery ?day\b/g, "daily")
-    .replace(/\b(?:on|during|over) (?:the )?weekends?\b/g, "hobbies")
+    .replace(/\bopen[- ]source\b/g, "opensource")
+    .replace(/\bspring ?boot\b/g, "springboot")
   return (joined.match(/[\p{L}\p{N}][\p{L}\p{N}+#.]*/gu) ?? []).flatMap((w) => {
     if (CJK.test(w)) return cjk(w);
     const t = w.replace(/\.+$/, "");
@@ -171,6 +187,16 @@ function words(s: string): string[] {
    become overlapping character pairs - the standard way to search text with
    no word breaks - so "布莱恩喜欢吃什么" meets a note "布莱恩喜欢吃饺子" on
    布莱, 莱恩, 恩喜, 喜欢, 欢吃. */
+/* Chinese words a visitor asks about Brian with -> the archive's English */
+const ZH_EN: [string, string][] = [
+  ["签证", "visa sponsorship"], ["担保", "sponsorship"], ["绿卡", "green card permanent"], ["工作", "job work"], ["实习", "internship intern"],
+  ["毕业", "graduate"], ["大学", "university"], ["学校", "school university"], ["专业", "major"], ["课程", "coursework"], ["成绩", "gpa"], ["绩点", "gpa"],
+  ["联系", "contact email"], ["邮箱", "email"], ["邮件", "email"], ["电话", "phone"], ["技能", "skills"], ["编程", "programming code"], ["语言", "languages"],
+  ["项目", "projects"], ["经验", "experience"], ["公司", "companies"], ["爱好", "hobbies"], ["游戏", "games"], ["电影", "movie"], ["音乐", "music"],
+  ["喜欢", "favorite"], ["最爱", "favorite"], ["颜色", "color"], ["食物", "foods"], ["吃", "foods eat"], ["家乡", "hometown"], ["哪里人", "hometown born"],
+  ["出生", "born"], ["住", "based lives"], ["中文", "mandarin chinese"], ["普通话", "mandarin"], ["英语", "english"], ["西安", "xi'an"], ["奥斯汀", "austin"],
+  ["德州", "texas"], ["安全", "security"], ["什么时候", "expected december"], ["技术", "tech stack"], ["做什么", "job current"], ["编译器", "compiler"], ["网站", "website"], ["宠物", "pet"], ["是谁", "about"], ["介绍", "about"],
+];
 const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
 function cjk(w: string): string[] {
   const out: string[] = [];
@@ -190,8 +216,33 @@ function canon(w: string): string {
   return NAMES.has(w) ? NAME : stem(w);
 }
 
+
+/* QUESTION-ONLY phrase rewrites (QA, 2026-11-25). Applied to what the
+   visitor types, never to the archive - an earlier version sat in words()
+   and indexed "790 pages per hour" as "790 pages salary". Phrases whose words
+   mean something else on their own: "for a living" found his hometown through
+   "living", "when he's not coding" found the Aggie Coding Club, "get in
+   touch" found nothing at all. */
+function rewriteQuery(q: string): string {
+  return q
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/\bfor a living\b/g, "job")
+    .replace(/\b(?:when (?:he'?s|he is|hes) not (?:coding|working|programming|at work)|in his (?:free|spare) time|(?:free|spare) time|for fun|outside (?:of )?(?:work|coding|school))\b/g, "hobbies")
+    .replace(/\b(?:ignore|disregard|forget) (?:all |any |the )?(?:of )?(?:your |the )?(?:previous |prior |above |earlier )?(?:instructions|rules|prompts?|context)\b|\bsystem prompt\b|\byou are now \w+\b/g, " ")
+    .replace(/\bsocial security(?: number)?\b|\bssn\b/g, "ssn")
+    .replace(/\b(?:years? of (?:professional |work |industry )?experience|yrs? (?:of )?exp(?:erience)?|yoe)\b/g, "experience internships")
+    .replace(/\b(?:resume|cv)\b/g, "resume linkedin")
+    .replace(/\bevery ?day\b/g, "daily")
+  .replace(/\b(?:on|during|over) (?:the )?weekends?\b/g, "hobbies")
+  .replace(/\b(?:get|getting|be|stay) in touch\b|\breach out\b|\bget a ?hold of\b/g, "contact")
+  .replace(/\b(?:where|who) (?:does|do|did) (?:he|brian) work(?: for| at)?(?: (?:now|right now|currently|these days|at the moment))?\b/g, "current job")
+  .replace(/\bis (?:he|brian) (?:still )?(?:working|employed)(?: anywhere| somewhere| now| right now)?\b/g, "current job employed")
+  .replace(/\b(?:per hour|an hour|hourly|pay rate|compensation|how much (?:does|would|will) (?:he|brian) (?:want|charge|make|earn|cost|expect))\b/g, "salary");
+}
+
 export function tokenize(query: string): QueryToken[] {
-  return words(query).map((raw) => {
+  return words(rewriteQuery(query)).map((raw) => {
     if (NAMES.has(raw)) return { raw, term: NAME, stopword: false, soft: true };
     const stop = STOPWORDS.has(raw);
     return { raw, term: stop ? "" : stem(raw), stopword: stop };
@@ -206,20 +257,20 @@ export function tokenize(query: string): QueryToken[] {
    visitor's own words always outrank the guesses. Everything added is shown
    on the glass. Stems, not words: they must match what stem() produces. */
 const SYNONYMS: string[][] = [
-  ["company", "employer", "job", "work", "intern", "internship", "career", "experience", "position", "role", "employ", "engineer",
+  ["company", "employer", "job", "work", "intern", "internship", "career", "experience", "position", "role", "employ", "engineer", "exp", "yoe",
    /* a recruiter's vocabulary, which the resume answers without using */
    "hire", "hiring", "recruit", "candidate", "resume", "cv", "qualified", "background", "history"],
   ["project", "build", "built", "made", "make", "create", "develop", "app", "game", "platform", "ship", "side", "personal", "portfolio",
    /* the two hackathons are named on the resume and called "hackathon" nowhere */
    "hackathon", "howdyhack", "tamuhack"],
-  ["school", "study", "university", "college", "degree", "graduate", "education", "gpa", "major", "class", "course", "coursework", "student",
+  ["school", "study", "university", "college", "degree", "graduate", "education", "gpa", "major", "class", "course", "coursework", "student", "grad", "graduation",
    "year", "senior", "junior", "sophomore", "freshman", "undergrad", "undergraduate", "tamu", "aggie", "aggies"],
   ["skill", "know", "use", "tool", "stack", "technology", "language", "framework", "proficient", "familiar", "tech", "code",
    /* "impressive" and "best" are deliberately absent: they attach to whatever
       the visitor is asking about ("his most impressive PROJECT") and pulling
       them into the skills vocabulary answered that question with a list of
       programming languages. */
-   "good", "strong", "strength", "talent", "expert", "specialty"],
+   "good", "strong", "strength", "talent", "expert", "specialty", "strongest", "comfortable"],
   ["contact", "email", "reach", "phone", "linkedin", "github", "message"],
   /* No "live" here on purpose. It is a real word in the About card ("Brian
      lives in Austin") and a visitor who types it matches that directly - but
@@ -243,6 +294,13 @@ const SYNONYMS: string[][] = [
   ["daily", "everyday"],
   ["gamer", "gaming", "game", "video", "shooter", "esports"],
   ["surprising", "fun", "interesting", "trivia", "quirk", "random"],
+  /* the box itself, by whatever the visitor calls it */
+  ["machine", "box", "bot", "chatbot", "assistant", "terminal", "rag", "search", "thing"],
+  ["user", "users", "customer", "adoption"],
+  ["music", "artist", "musician", "song", "rapper", "band", "album", "listen"],
+  ["movie", "film", "show", "tv", "anime", "series", "watch", "cinema"],
+  ["website", "site", "portfolio", "webpage", "page"],
+  ["impressive", "proudest", "proud", "accomplishment", "achievement"],
   ["compiler", "llvm", "backend", "isa", "npu", "hardware", "chip", "silicon"],
   ["database", "sql", "postgresql", "postgres", "dynamodb", "schema", "data"],
   /* "does he test his code" has to reach the passage that says "unit tests"
@@ -533,6 +591,7 @@ export function retrieve(query: string, k = 3): Retrieval {
      intent, or by the identity fallback. They may rank; they may not be the
      only reason a chunk is called evidence. See `grounded`. */
   const inferred = new Set<string>();
+  const corrected_zh: string[] = [];
   const add = (term: string, weight: number) => {
     if (typed.has(term) || !docTerms.some((tf) => tf.has(term))) return;
     const had = weights.get(term);
@@ -552,6 +611,14 @@ export function retrieve(query: string, k = 3): Retrieval {
     const common = docTerms.some((tf) => tf.has(t)) && idf(t) < EXPAND_MIN_IDF;
     for (const x of EXPAND.get(t) ?? []) add(x, common ? COMMON_EXPANSION_WEIGHT : EXPANSION_WEIGHT);
   }
+    /* A Chinese question reaching the English archive: the words visitors
+     actually ask about, from a small table, at expansion weight (Brian is a
+     native Mandarin speaker; so are some of the people he will send here).
+     Typed in Chinese, so they count as the visitor's own words. */
+  const zh = query.normalize("NFKC");
+  if (CJK.test(zh)) {
+    for (const [cn, en] of ZH_EN) if (zh.includes(cn)) for (const e of en.split(" ")) { add(stem(e), EXPANSION_WEIGHT * 2); corrected_zh.push(stem(e)); }
+  }
   /* FUZZY: a word the archive does not contain is probably a typo of one it
      does - "intenship", "pyhton", "valorent", "interstelar". Each is matched
      to the archive's nearest words within one slip of the finger (two for a
@@ -561,7 +628,7 @@ export function retrieve(query: string, k = 3): Retrieval {
      "java script", "git hub") are read together. Both show on the glass as
      +TERMS like any expansion, so a correction is never invisible. */
   const vocab = vocabulary();
-  const corrected: string[] = [];
+  const corrected: string[] = [...corrected_zh];
   for (const t of own) {
     if (vocab.has(t) || t.length < FUZZY_MIN || /^[\d.]+$/.test(t) || CJK.test(t)) continue;
     for (const v of nearest(t, vocab)) {
@@ -616,12 +683,12 @@ export function retrieve(query: string, k = 3): Retrieval {
        subway into the food words, and the Favorites card's ice, cream, food,
        noodle, barbecue and carbs added up to more than the visitor's own note
        that literally says Subway (QA, 2026-11-25). Together, expansion terms
-       may add at most one and a half times their single best match. Scaled,
+       may add at most twice their single best match. Scaled,
        not dropped, so the parts still sum to the score on the glass. */
     const viaThesaurus = contributions.filter((c) => !typed.has(c.term) && !corrected.includes(c.term));
     if (viaThesaurus.length > 1) {
       const sum = viaThesaurus.reduce((a, c) => a + c.score, 0);
-      const cap = 1.5 * Math.max(...viaThesaurus.map((c) => c.score));
+      const cap = 2 * Math.max(...viaThesaurus.map((c) => c.score));
       if (sum > cap) {
         const f = cap / sum;
         for (const c of viaThesaurus) {
