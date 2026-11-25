@@ -232,8 +232,7 @@
   "hobbies": {
     "gunRange": {
       "value": "enjoys going to the gun range",
-      "source": "brian",
-      "_note": "Which guns he owns is deliberately NOT published: firearm ownership plus a city on a public page is a burglary risk. Brian may opt in."
+      "source": "brian"
     },
     "funFact": {
       "value": "can crack all his fingers just by making a fist",
