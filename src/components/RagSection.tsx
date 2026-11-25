@@ -367,9 +367,14 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
   const [confirming, setConfirming] = useState(false);
   /* Leaving the machine, in either direction, dismisses an open LLM opt-in:
      coming back should find the terminal, not a question asked of someone who
-     had already left (Brian, 2026-11-25). The handoff hides it on the way out. */
+     had already left (Brian, 2026-11-25). The handoff hides it on the way out.
+     Focus leaves with the visitor too, or typing on the next section lands in
+     this prompt, off screen. */
   useEffect(() => {
-    if (!active) setConfirming(false);
+    if (active) return;
+    setConfirming(false);
+    const f = document.activeElement as HTMLElement | null;
+    if (f?.closest(".rag")) f.blur();
   }, [active]);
   /* documents the visitor has fed in this session */
   const [fed, setFed] = useState(0);

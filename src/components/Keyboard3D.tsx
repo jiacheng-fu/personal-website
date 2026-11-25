@@ -83,9 +83,9 @@ const ROWS: { caps: Cap[] }[] = [
       { label: "Email", w: 1.5, action: "email" },
       /* no legend: an empty label prints nothing and shows no caption, but the
          cap still presses and still fires the wave */
-      /* TEMP (debug): `code: "Space"` lifted while the transition scrubber owns
-         the key. Restore it to bring the wave easter egg back. */
-      { label: "", w: 6, blank: true, action: "wave" },
+      /* Space presses this cap (the wave easter egg) - except in development,
+         where the transition scrubber (lib/debugPause.ts) owns the key. */
+      { label: "", w: 6, blank: true, action: "wave", ...(import.meta.env.DEV ? {} : { code: "Space" }) },
       { label: "Source", w: 1.5, action: "source" },
       { label: "LinkedIn", w: 1.5, action: "linkedin" },
     ],

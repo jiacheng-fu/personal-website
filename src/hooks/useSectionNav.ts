@@ -52,6 +52,25 @@ function sectionTop(i: number) {
  *  wait - the hero uses it to play the robot beat before handing over. */
 export type Gate = (from: number, to: number) => Promise<void> | null | undefined;
 
+/* A reload starts at the top. The browser's own scroll restoration would put
+   the page back on, say, the projects while the nav (and every section's
+   "active" state) starts at the hero: titles never drawn, dots on the wrong
+   section. The site is meant to be entered from the hero anyway. */
+if (typeof history !== "undefined" && "scrollRestoration" in history) {
+  history.scrollRestoration = "manual";
+}
+
+/* Trackpad momentum. One flick keeps sending wheel events for a second or more
+   after the finger lifts, ever smaller. The plain scrolls (work <-> contact,
+   hero <-> keyboard) finish inside that tail, and the tail then moved the page
+   AGAIN - one flick from contact went past the projects into the machine.
+   So a move spends its gesture: further events belong to it until the stream
+   pauses (NEW_GESTURE_GAP) or the deltas grow again (a new flick, or a finger
+   still pushing), which is what keeps deliberate continued scrolling moving -
+   the reason the old quiet-period rule, which waited for a pause only, felt dead. */
+const NEW_GESTURE_GAP = 160; // ms
+const GROWTH = 1.4;
+
 export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
   const [index, setIndex] = useState(0);
   const busy = useRef(false);
@@ -124,8 +143,16 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
     [count]
   );
 
+  /* Keep the page on the section the nav believes it is on from the first
+     frame (and after a dev hot-reload remount, which resets the index). */
+  useEffect(() => {
+    if (enabled) window.scrollTo(0, sectionTop(indexRef.current));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (!enabled) return;
+    const flick = { lastT: -1e9, lastAbs: 0, spent: false };
     const onWheel = (e: WheelEvent) => {
       // Let anything genuinely scrollable (a long card, a code block) keep its
       // own scroll; only hijack when the page itself would move.
@@ -146,16 +173,31 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
          gesture during 1->2 must not start 2->3 while it is still playing
          out. No cooldown beyond that: the instant the scene is off screen,
          the next input moves. */
-      if (busy.current || isClipBusy() || Math.abs(e.deltaY) < WHEEL_MIN) return;
+      const abs = Math.abs(e.deltaY);
+      if (e.timeStamp - flick.lastT > NEW_GESTURE_GAP || abs > flick.lastAbs * GROWTH + 4) {
+        flick.spent = false; // a new gesture
+      }
+      flick.lastT = e.timeStamp;
+      flick.lastAbs = abs;
+      if (busy.current || isClipBusy() || abs < WHEEL_MIN) return;
+      if (flick.spent) return; // the tail of the flick that already moved us
+      flick.spent = true;
       goTo(indexRef.current + (e.deltaY > 0 ? 1 : -1));
     };
 
     const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
-      /* TEMP (debug): Space is on loan to the transition scrubber, so it is
-         not listed here. Restore `" ": 1` to give it back. See lib/debugPause.ts. */
-      const next = { ArrowDown: 1, PageDown: 1, ArrowUp: -1, PageUp: -1 }[e.key];
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName;
+      /* Typing is left alone - except Up/Down and Page Up/Down in a one-line
+         input, which do nothing there. The machine's prompt keeps focus after
+         a question (and after any click on its screen), and the arrows used
+         to do nothing at all until the visitor clicked away. */
+      const lineKey = ["ArrowDown", "ArrowUp", "PageDown", "PageUp"].includes(e.key);
+      if (tag === "TEXTAREA" || t?.isContentEditable) return;
+      if (tag === "INPUT" && !(lineKey && ((t as HTMLInputElement).type === "text" || (t as HTMLInputElement).type === "search"))) return;
+      /* Space advances - except in development, where the transition scrubber
+         (lib/debugPause.ts) owns it. */
+      const next = { ArrowDown: 1, PageDown: 1, ArrowUp: -1, PageUp: -1, ...(import.meta.env.DEV ? {} : { " ": 1 }) }[e.key];
       if (next) {
         e.preventDefault();
         if (!busy.current) goTo(indexRef.current + next);

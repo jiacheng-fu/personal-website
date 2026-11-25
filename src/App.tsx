@@ -113,7 +113,8 @@ export default function App() {
 
   // TEMP (debug): Space pauses/resumes the transition clip; , and . step a
   // frame while paused. Delete this effect and the import to remove.
-  useEffect(() => installDebugPause(), []);
+  /* development only: on the live site Space is the section nav's again */
+  useEffect(() => (import.meta.env.DEV ? installDebugPause() : undefined), []);
 
   const [clips, setClips] = useState(transitionsEnabled());
 
@@ -145,6 +146,14 @@ export default function App() {
   /* set when the keyboard->machine clip has already ticked `boot`, so the
      arrival effect below does not boot the machine a second time */
   const bootedByClip = useRef(false);
+  /* A clip that has not buffered must never freeze the page. Wait for it
+     briefly (a cached clip is ready in milliseconds); if it is still not
+     there, the move happens as a plain cut, the same as with Motion off. */
+  const clipWithin = (p: TransitionHandle, src: string, ms: number) =>
+    Promise.race([
+      p.whenReady(src).then(() => true),
+      new Promise<boolean>((r) => window.setTimeout(() => r(false), ms)),
+    ]);
   const gate = useCallback((from: number, to: number) => {
     if (!transitionAllowed() || !player.current) return null;
     const p = player.current;
@@ -152,14 +161,22 @@ export default function App() {
     if (from === 1 && to === 2) {
       /* the section's own text fades first; the clip has none of it */
       kbPanel?.classList.add("is-departing");
-      return new Promise<void>((r) => window.setTimeout(r, 220))
-        .then(() => p.play(CLIPS.kbToMachine))
-        .then(() => {
+      return Promise.all([
+        new Promise<void>((r) => window.setTimeout(r, 220)),
+        clipWithin(p, CLIPS.kbToMachine, 1200),
+      ]).then(([, ready]) => {
+        if (!ready) {
+          // plain cut; the machine's arrival effect boots it as usual
+          window.setTimeout(() => kbPanel?.classList.remove("is-departing"), 400);
+          return;
+        }
+        return p.play(CLIPS.kbToMachine).then(() => {
           bootedByClip.current = true;
           setBoot((n) => n + 1);
           hideAfterLand.current = true;
           window.setTimeout(() => kbPanel?.classList.remove("is-departing"), 800);
         });
+      });
     }
     if (from === 2 && to === 3 && handoff.current) {
       return handoff.current.run().then(() => {
@@ -178,6 +195,11 @@ export default function App() {
       return handoff.current.runBack().finally(() => setLifting(false));
     }
     if (from === 2 && to === 1) {
+      /* This one covers the screen the instant it starts, so an unbuffered
+         clip here would be a black screen, not just a pause: check first,
+         and cut plainly (nothing covered yet) if it is not there. */
+      return clipWithin(p, CLIPS.machineToKb, 600).then((ready) => {
+      if (!ready) return;
       kbPanel?.classList.add("is-departing"); // arrive text-less, like the clip
       /* black the machine's glass so the instant cover matches the clip's
          first frame (M, dark screen), then reveal instantly.
@@ -194,6 +216,7 @@ export default function App() {
            still fading out - a visible flash of the forward clip's frame */
         hideAfterLand.current = true;
         window.setTimeout(() => kbPanel?.classList.remove("is-departing"), 700);
+      });
       });
     }
     return null;
