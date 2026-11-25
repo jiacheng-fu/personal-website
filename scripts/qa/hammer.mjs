@@ -22,7 +22,18 @@ const failures = [];
 const PROBE = () => {
   const vis = (el) => { for (let e = el; e && e !== document.body; e = e.parentElement) { const cs = getComputedStyle(e); if (+cs.opacity < 0.15 || cs.visibility === "hidden" || cs.display === "none") return false; } return true; };
   const clipShown = (el) => { const cp = getComputedStyle(el).clipPath; return !cp || cp === "none" || !/inset\(0(px)? 100%/.test(cp); };
-  const log = { stacked: [], kbTextUnderClip: 0, departingLostUnderClip: 0, ragClassLost: [], frames: 0, overlayFrames: 0 };
+  /* an element's rect as actually seen: cut by every scrolling/clipping box above it */
+  const clipped = (el) => {
+    let r = el.getBoundingClientRect(); r = { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+    for (let a = el.parentElement; a && !a.classList.contains("a2m__screen"); a = a.parentElement) {
+      const o = getComputedStyle(a); if (o.overflowY === "visible" && o.overflowX === "visible") continue;
+      const b = a.getBoundingClientRect();
+      r = { left: Math.max(r.left, b.left), top: Math.max(r.top, b.top), right: Math.min(r.right, b.right), bottom: Math.min(r.bottom, b.bottom) };
+    }
+    return { ...r, width: r.right - r.left, height: r.bottom - r.top };
+  };
+  let speech0 = null;
+  const log = { speechMoved: [], stacked: [], kbTextUnderClip: 0, departingLostUnderClip: 0, ragClassLost: [], frames: 0, overlayFrames: 0 };
   let lastRag = "";
   const tick = () => {
     if (!window.__probeOn) { window.__probe = log; return; }
@@ -30,13 +41,16 @@ const PROBE = () => {
     const clip = document.querySelector(".transition.is-on");
     const ho = document.querySelector(".handoff.is-on");
     if (clip || ho) log.overlayFrames++;
+    const sp = document.querySelector(".a2-speech, [data-scroll-main]");
+    if (ho && sp) { if (speech0 === null) speech0 = sp.scrollTop; else if (Math.abs(sp.scrollTop - speech0) > 1 && log.speechMoved.length < 3) log.speechMoved.push(`${Math.round(speech0)} -> ${Math.round(sp.scrollTop)}`); }
+    if (!ho) speech0 = null;
     /* (a) the handoff's text over live session text on the glass */
     if (ho) {
       const glass = document.querySelector(".a2m__screen")?.getBoundingClientRect();
       const session = glass ? [...document.querySelectorAll(".a2-boot > *, .a2-boot li, .a2-perf *, .a2-prompt")]
         .filter((e) => (e.children.length === 0 || e.tagName === "LI" || e.classList.contains("a2-prompt")) && (e.innerText || "").trim() && vis(e) && clipShown(e))
-        .map((e) => ({ t: e.innerText.trim().slice(0, 22), r: e.getBoundingClientRect() }))
-        .filter(({ r }) => r.width && r.height && r.bottom > glass.top + 2 && r.top < glass.bottom - 2) : [];
+        .map((e) => ({ t: e.innerText.trim().slice(0, 22), r: clipped(e) }))
+        .filter(({ r }) => r && r.width > 0 && r.height > 2 && r.bottom > glass.top + 2 && r.top < glass.bottom - 2) : [];
       const over = [...document.querySelectorAll(".handoff.is-on .handoff__cmd, .handoff.is-on .handoff__line.is-in")]
         .filter((e) => vis(e) && (e.innerText || "").trim()).map((e) => ({ t: e.innerText.trim().replace(/\s+/g, " ").slice(0, 16), r: e.getBoundingClientRect() }));
       for (const o of over) for (const s of session) {
@@ -138,13 +152,15 @@ async function hit(name, { setup, move, want, wait = SETTLE + 3000, filmMs = 0, 
     const s = await state(p);
     const probs = problemsOf(s, want);
     if (pr.stacked.length) probs.push("STACKED: " + pr.stacked.join("; "));
+    if (pr.speechMoved.length) probs.push("answer scrolled under the overlay: " + pr.speechMoved.join(", "));
     if (pr.departingLostUnderClip > 2) probs.push(`keyboard text showing under the clip for ${pr.departingLostUnderClip} frames (is-departing lost)`);
     if (pr.ragClassLost.length) probs.push("handoff class wiped mid-scene: " + pr.ragClassLost.slice(0, 2).join(" | "));
     if (extra) probs.push(...(await extra(p, s)));
     // still answers
     const dir = s.idx < 4 ? "ArrowDown" : "ArrowUp";
-    await p.keyboard.press(dir); await sleep(SETTLE);
-    if ((await state(p)).idx === s.idx) probs.push(`nav dead (${dir} did nothing)`);
+    if (s.idx === 2) await outFlick(1)(p); else await p.keyboard.press(dir);
+    await sleep(SETTLE);
+    if ((await state(p)).idx === s.idx) probs.push(`nav dead (${s.idx === 2 ? "wheel outside the glass" : dir} did nothing)`);
     if (p.__errs.length) probs.push("pageerror: " + [...new Set(p.__errs)].join(" | "));
     probs.length ? (fail++, failures.push({ name, probs })) : pass++;
     console.log(`${probs.length ? "FAIL" : "ok  "} ${name} -> ${NAMES[s.idx]} (overlay ${pr.overlayFrames}/${pr.frames} frames)${probs.length ? "\n      - " + probs.join("\n      - ") : ""}`);
@@ -156,6 +172,13 @@ async function hit(name, { setup, move, want, wait = SETTLE + 3000, filmMs = 0, 
 }
 
 const key = (k) => async (p) => p.keyboard.press(k);
+/* Since dc45ec8 the wheel on the machine's screen only scrolls its text, and
+   arrows read a long answer on before the page turns: leaving the machine is
+   a wheel OUTSIDE the glass (bottom-right corner, clear of the cards). */
+const outPoint = (p) => { const v = p.viewportSize(); return [Math.round(v.width * 0.93), Math.round(v.height * 0.9)]; };
+const outFlick = (dir) => async (p) => { const [x, y] = outPoint(p); await p.mouse.move(x, y); for (const v of [40, 120, 240]) { await p.mouse.wheel(0, dir * v); await sleep(10); } };
+const glassCenter = (p) => p.evaluate(() => { const r = document.querySelector(".a2m__screen").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
+const LONG_Q = "tell me about axle";
 const toCraft = async (p) => { await p.keyboard.press("ArrowDown"); await sleep(5000); };
 const toAskByClip = async (p) => { await toCraft(p); await p.keyboard.press("ArrowDown"); await sleep(SETTLE); };
 /* the arrival clip still fading holds the nav (by design); a real visitor's
@@ -180,7 +203,7 @@ for (const [label, setup] of [
   ["opt-in open", async (p) => { await toAskSettled(p); await p.locator(".a2-llm").first().click(); await p.waitForSelector(".a2-optin"); }],
   ["note shredding", async (p) => { await toAskSettled(p); await p.locator(".feed textarea").fill("a fact"); await p.locator(".feed button[type=submit]").click(); await sleep(200); }],
 ]) {
-  await hit(`machine->kb (reverse clip): leave with ${label}`, { setup, move: key("ArrowUp"), want: 1, filmMs: label === "boot menu typing" ? 4500 : 0 });
+  await hit(`machine->kb (reverse clip): leave with ${label}`, { setup, move: outFlick(-1), want: 1, filmMs: label === "boot menu typing" ? 4500 : 0 });
 }
 
 /* ---- 2 -> 3: the handoff, leaving the machine in every state ---- */
@@ -202,8 +225,15 @@ for (const [label, setup] of [
   ["note just ingested", async (p) => { await toAskSettled(p); await p.locator(".feed textarea").fill("Brian likes trains."); await p.locator(".feed button[type=submit]").click(); await sleep(2600); }],
 ]) {
   const filmIt = ["menu typing, early", "answer: scanning", "answer: just landed", "note just ingested"].includes(label);
-  await hit(`machine->work (handoff): leave with ${label}`, { setup, move: key("ArrowDown"), want: 3, filmMs: filmIt ? 5500 : 0 });
+  await hit(`machine->work (handoff): leave with ${label}`, { setup, move: outFlick(1), want: 3, filmMs: filmIt ? 5500 : 0 });
 }
+
+/* ---- the machine's screen as a scroll zone (dc45ec8) ---- */
+await hit("zone: wheel spun over the glass during the handoff (long answer)", { setup: async (p) => { await toAskSettled(p); await ask(p, LONG_Q); await sleep(7000); }, move: async (p) => { const g = await glassCenter(p); await outFlick(1)(p); await sleep(250); await p.mouse.move(g[0], g[1]); for (let i = 0; i < 40; i++) { await p.mouse.wheel(0, i % 3 ? 120 : -120); await sleep(30); } }, want: 3, filmMs: 0 });
+await hit("zone: ArrowDown held during the handoff (long answer)", { setup: async (p) => { await toAskSettled(p); await ask(p, LONG_Q); await sleep(7000); }, move: async (p) => { await outFlick(1)(p); await sleep(200); for (let i = 0; i < 25; i++) { await p.keyboard.press(i % 4 ? "ArrowDown" : "ArrowUp"); await sleep(70); } }, want: null });
+await hit("zone: wheel over the glass during the scene back up (long answer)", { setup: async (p) => { await toAskSettled(p); await ask(p, LONG_Q); await sleep(7000); await outFlick(1)(p); await sleep(SETTLE); }, move: async (p) => { await p.keyboard.press("ArrowUp"); await sleep(150); const g = await glassCenter(p); await p.mouse.move(g[0], g[1]); for (let i = 0; i < 50; i++) { await p.mouse.wheel(0, i % 2 ? 120 : -120); await sleep(30); } }, want: 2 });
+await hit("zone: wheel over the glass while the boot types, then leave", { setup: async (p) => { await toCraft(p); await p.keyboard.press("ArrowDown"); await p.waitForSelector(".a2-boot--typing", { timeout: 20000 }); const g = await glassCenter(p); await p.mouse.move(g[0], g[1]); for (let i = 0; i < 12; i++) { await p.mouse.wheel(0, 150); await sleep(40); } await sleep(300); }, move: outFlick(1), want: 3 });
+await hit("zone: wheel on the glass edge as the handoff starts", { setup: async (p) => { await toAskSettled(p); await ask(p, LONG_Q); await sleep(7000); }, move: async (p) => { const r = await p.evaluate(() => { const b = document.querySelector(".a2m__screen").getBoundingClientRect(); return [b.right, b.bottom]; }); await outFlick(1)(p); for (let i = 0; i < 30; i++) { await p.mouse.move(r[0] + (i % 2 ? -2 : 2), r[1] - 40); await p.mouse.wheel(0, 120); await sleep(25); } }, want: 3 });
 
 /* ---- 3 -> 2: the scene back up, and the machine it lands on ---- */
 for (const [label, setup] of [

@@ -268,6 +268,13 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
       const zone = zoneOf(e.target);
       if (zone) {
         flick.spent = true;
+        /* A scene owns the glass while it plays (the handoff draws over this
+           exact text): nothing may scroll under it, or the answer slid up to
+           37px beneath `ls ~/work` - the stacked text again (2026-11-25). */
+        if (busy.current || isClipBusy() || isNavLocked()) {
+          e.preventDefault();
+          return;
+        }
         const roomy = scrollersAt(e.target).find((el) => roomIn(el, e.deltaY) > 1);
         if (roomy && roomy === box) return; // the box under the pointer scrolls itself
         e.preventDefault();
@@ -329,7 +336,8 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
         const main = document
           .querySelectorAll<HTMLElement>(".panel")
           [indexRef.current]?.querySelector<HTMLElement>("[data-scroll-zone] [data-scroll-main]");
-        if (main && roomIn(main, next) > 1) {
+        /* ...but never while a scene is playing over it (same as the wheel) */
+        if (main && !busy.current && !isClipBusy() && !isNavLocked() && roomIn(main, next) > 1) {
           main.scrollBy({ top: next * (e.key.startsWith("Arrow") ? 48 : main.clientHeight * 0.85), behavior: "smooth" });
           return;
         }

@@ -68,7 +68,7 @@ async function check(name, page, expectIdx, more = {}, opts = {}) {
 }
 const key = async (p, k, n = 1, gap = 0) => { for (let i = 0; i < n; i++) { await p.keyboard.press(k); if (gap) await sleep(gap); } };
 const dot = (p, i) => p.locator(`.dots__dot[aria-label="${NAMES[i]}"]`).click({ force: true });
-async function flick(p, dir, ms = 1300) { await p.mouse.move(700, 400); const t0 = Date.now(); let d = 140; while (Date.now() - t0 < ms) { await p.mouse.wheel(0, dir * Math.max(1, Math.round(d))); d *= 0.93; await sleep(16); } }
+async function flick(p, dir, ms = 1300) { { const v = p.viewportSize(); await p.mouse.move(Math.round(v.width * 0.93), Math.round(v.height * 0.9)); } const t0 = Date.now(); let d = 140; while (Date.now() - t0 < ms) { await p.mouse.wheel(0, dir * Math.max(1, Math.round(d))); d *= 0.93; await sleep(16); } }
 
 const codecs = await (await fresh(400, 300)).evaluate(() => document.createElement("video").canPlayType('video/mp4; codecs="avc1.42E01E"'));
 console.log(`[${ENGINE}] H.264 mp4 support: "${codecs}"`);

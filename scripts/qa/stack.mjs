@@ -41,7 +41,7 @@ async function scenario(name, prep) {
   const p = await ctx.newPage();
   await p.goto(BASE, { waitUntil: "load" }); await sleep(2500);
   await prep(p);
-  await p.keyboard.press("ArrowDown");
+  await p.mouse.move(1785, 972); for (const v of [40, 120, 240]) { await p.mouse.wheel(0, v); await sleep(10); }
   const seen = [];
   for (const t of [300, 700, 1100, 1500, 1900, 2400, 3000, 3600]) {
     await sleep(t - (seen.length ? [300, 700, 1100, 1500, 1900, 2400, 3000, 3600][seen.length - 1] : 0));

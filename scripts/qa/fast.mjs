@@ -88,7 +88,7 @@ async function check(name, p, expectIdx, opts = {}) {
 function info(line) { console.log(`      ${line}`); }
 const dot = (p, i) => p.locator(`.dots__dot[aria-label="${NAMES[i]}"]`).click({ force: true });
 const goto = async (p, i) => { await dot(p, i); await sleep(SETTLE); };
-const center = (p) => p.mouse.move(960, 540);
+const center = (p) => { const v = p.viewportSize(); return p.mouse.move(Math.round(v.width * 0.93), Math.round(v.height * 0.9)); }; // off the machine's screen (a scroll zone since dc45ec8)
 /* a mouse wheel spun hard: same-size notches, very fast */
 async function spin(p, dy, ms, gap = 8) { await center(p); const t0 = Date.now(); while (Date.now() - t0 < ms) { await p.mouse.wheel(0, dy); await sleep(gap); } }
 /* a trackpad flick: a fast ramp-up then a long momentum tail */
@@ -188,7 +188,7 @@ if (want("optin")) {
     const p = await fresh(); await openOptin(p);
     const b = await p.locator(".a2-optin").boundingBox(); await p.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
     for (const v of [40, 120, 240, 300]) { await p.mouse.wheel(0, v); await sleep(10); }
-    await sleep(SETTLE); await check("O3 wheel with the pointer ON the opt-in text", p, 3, { live: false }); await p.context().close();
+    await sleep(SETTLE); await check("O3 wheel with the pointer ON the opt-in text stays on the machine (screen is a scroll zone)", p, 2, { live: false }); await p.context().close();
   }
   { const p = await fresh(); await openOptin(p); await p.keyboard.press("ArrowDown"); await sleep(SETTLE); await check("O4 opt-in up, ArrowDown", p, 3, { live: false, note: (s) => `focus ${s.active}` }); await p.keyboard.press("ArrowUp"); await sleep(SETTLE + 2000); await check("O4b ...ArrowUp back: opt-in gone", p, 2, { more: { optin: false } }); await p.context().close(); }
   { const p = await fresh(); await openOptin(p); await p.keyboard.press("End"); await sleep(SETTLE); await check("O5 opt-in up, End", p, 4, { live: false }); await p.keyboard.press("Home"); await sleep(SETTLE); await check("O5b ...Home", p, 0, { live: false }); await goto(p, 2); await check("O5c ...dot back to the machine: opt-in gone", p, 2, { more: { optin: false } }); await p.context().close(); }
