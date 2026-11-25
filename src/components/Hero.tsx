@@ -234,6 +234,7 @@ export default function Hero({ active }: { active: boolean }) {
       <div className="hx__rail hx__rail--top">
         <span>{profile.location}</span>
       </div>
+
     </section>
   );
 }
