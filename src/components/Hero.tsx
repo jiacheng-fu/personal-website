@@ -194,16 +194,20 @@ export default function Hero({ active }: { active: boolean }) {
           {layout && (
             <g clipPath="url(#hx-slot)">
               {layout.letters.map((l, i) => (
-                <text
-                  key={`${i}${l.ch}`}
-                  className="hx__letter"
-                  x={l.x}
-                  y={layout.base}
-                  fontSize={layout.fs}
-                  style={{ "--d": `${l.delay.toFixed(3)}s`, "--rise": `${(cap * 1.08).toFixed(1)}px` } as CSSProperties}
-                >
-                  {l.ch}
-                </text>
+                /* each letter lifts a touch on hover; the rect is its hit area,
+                   since a weight-200 stroke is too thin to find */
+                <g key={`${i}${l.ch}`} className="hx__glyph" data-cursor="hover">
+                  <rect className="hx__glyphHit" x={l.x} y={layout.base - cap} width={l.x1 - l.x} height={cap} />
+                  <text
+                    className="hx__letter"
+                    x={l.x}
+                    y={layout.base}
+                    fontSize={layout.fs}
+                    style={{ "--d": `${l.delay.toFixed(3)}s`, "--rise": `${(cap * 1.08).toFixed(1)}px` } as CSSProperties}
+                  >
+                    {l.ch}
+                  </text>
+                </g>
               ))}
             </g>
           )}
