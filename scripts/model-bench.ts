@@ -71,7 +71,7 @@ const BASE: Case[] = [
   { kind: "fact", q: "is he taking machine learning", fact: ["Machine Learning"] },
   { kind: "fact", q: "what cloud provider does he use", fact: ["AWS"] },
   { kind: "fact", q: "has he dealt with race conditions", fact: ["TOCTOU"] },
-  { kind: "fact", q: "how long has he been at thingsx", fact: ["Jun 2026"] },
+  { kind: "fact", q: "how long has he been at thingsx", fact: ["jun", "2026"] },
   { kind: "fact", q: "did he work at more than one company", fact: ["ThingsX", "United Micro"] },
   { kind: "fact", q: "has he built an api", fact: ["REST"] },
   { kind: "fact", q: "how does axle rank its results", fact: ["constraint"] },

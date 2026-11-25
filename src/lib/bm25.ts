@@ -195,7 +195,11 @@ const SYNONYMS: string[][] = [
   ["devops", "ci", "cd", "pipeline", "docker", "deploy", "infrastructure", "automated", "git"],
   /* work authorisation, which a resume states in three words and nobody asks
      for in those three words */
-  ["visa", "sponsorship", "sponsor", "citizen", "citizenship", "resident", "permanent", "authorized", "eligible", "status"],
+  ["visa", "sponsorship", "sponsor", "citizen", "citizenship", "resident", "permanent", "authorized", "eligible", "status",
+   "green", "greencard"],
+  /* availability: the archive says "open to 2027 internships"; visitors ask
+     "is he looking", "is he available", "can we hire him" */
+  ["open", "available", "availability", "looking", "seeking", "opportunity", "opportunities", "hire", "hiring"],
   /* Everyday vocabulary. Inert against the resume - none of these words is in
      it - and that is exactly the point: expansion only ever adds a term the
      corpus actually contains, so this table lies dormant until a visitor
