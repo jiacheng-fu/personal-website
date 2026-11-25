@@ -11,9 +11,13 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=Inter+Tight:wght@400;500;600;700;800;900&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;700&family=VT323&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@200;400;500;600;700;800;900&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;700&family=VT323&display=swap"
       rel="stylesheet"
     />
+    <!-- the hero's photo and head cutout, fetched alongside the app bundle
+         instead of after it -->
+    <link rel="preload" as="image" href="/hero/background1.webp" type="image/webp" />
+    <link rel="preload" as="image" href="/hero/background1-head.webp" type="image/webp" />
     <title>Brian Fu — Software Engineer</title>
     <meta property="og:title" content="Brian Fu — Software Engineer" />
     <meta property="og:description" content="CS at Texas A&M, graduating December 2027. Compilers, backends, and application security." />

@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hero demos</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@100..900&family=Geist:wght@100..900&family=Manrope:wght@200..800&family=JetBrains+Mono:wght@100..800&family=VT323&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --paper: #f3f1ed;
+        --ink: #16150f;
+        --red: #cf3f22;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #000;
+      }
+
+      .stage {
+        --dfont: "Inter Tight";
+        --dw: 300;
+        --fg: #fff;
+        --shadow: 0 1px 14px rgba(0, 0, 0, 0.3);
+        position: fixed;
+        inset: 0;
+        overflow: hidden;
+        background: var(--paper);
+        color: var(--fg);
+        font-family: var(--dfont), system-ui, sans-serif;
+        font-weight: var(--dw);
+      }
+      .stage.is-paper {
+        --fg: var(--ink);
+        --shadow: none;
+      }
+
+      /* The photo's own box, cover-fitted and anchored to the bottom so the
+         face is never the part that gets cropped. Everything is placed in
+         the photo's pixel space (1672x941) inside it. */
+      .frame {
+        position: absolute;
+        left: 50%;
+        bottom: 0;
+        width: max(100vw, 177.68vh);
+        aspect-ratio: 1672 / 941;
+        transform: translateX(-50%);
+        container-type: inline-size;
+      }
+      .layer {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      .layer[hidden] {
+        display: none;
+      }
+      img.layer {
+        user-select: none;
+        -webkit-user-drag: none;
+        pointer-events: none;
+      }
+      #bgImg,
+      #bgCanvas {
+        z-index: 1;
+      }
+      .behind {
+        z-index: 2;
+        pointer-events: none;
+        overflow: hidden;
+      }
+      /* the base: the name sits over every effect, under the head */
+      .name {
+        z-index: 3;
+        pointer-events: none;
+      }
+      .head {
+        z-index: 4;
+        pointer-events: none;
+      }
+      .front {
+        z-index: 5;
+        pointer-events: none;
+      }
+      .stage:not(.is-paper) .behind > svg,
+      .stage:not(.is-paper) .name > svg {
+        filter: drop-shadow(0 0 18px rgba(0, 0, 0, 0.18));
+      }
+
+      /* ---- the rail: the hero's mono metadata, for context ---- */
+      .rail {
+        position: absolute;
+        z-index: 10;
+        top: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 24px 40px;
+        font: 300 12px/1 "JetBrains Mono", monospace;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--fg);
+        text-shadow: var(--shadow);
+        pointer-events: none;
+      }
+      /* ---- the base: the name ---- */
+      .cover {
+        font-family: var(--dfont);
+        font-weight: var(--dw);
+        fill: var(--fg);
+        letter-spacing: -0.01em;
+      }
+
+      /* ---- 2 tree ---- */
+      .branch {
+        fill: none;
+        stroke: var(--fg);
+        stroke-width: 2;
+        stroke-dasharray: 1;
+        stroke-dashoffset: 1;
+      }
+      .node {
+        fill: var(--red);
+      }
+      .chip {
+        position: absolute;
+        transform: translate(-50%, -50%);
+        display: flex;
+        align-items: center;
+        gap: 0.45cqw;
+        padding: 0.42cqw 0.7cqw;
+        background: var(--paper);
+        color: var(--ink);
+        font: 300 0.8cqw/1 "JetBrains Mono", monospace;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        white-space: nowrap;
+        box-shadow: 0 0.2cqw 0.9cqw rgba(0, 0, 0, 0.14);
+      }
+      .chip img {
+        width: 1.25cqw;
+        height: 1.25cqw;
+      }
+      .chip--cat {
+        font-family: var(--dfont);
+        font-weight: var(--dw);
+        font-size: 1.55cqw;
+        letter-spacing: -0.005em;
+        text-transform: none;
+        padding: 0.5cqw 0.9cqw;
+      }
+      .chip--cat b {
+        font: 400 0.7cqw/1 "JetBrains Mono", monospace;
+        color: var(--red);
+        letter-spacing: 0.1em;
+      }
+
+      /* ---- 3 eruption ---- */
+      .word {
+        position: absolute;
+        left: 0;
+        top: 0;
+        white-space: nowrap;
+        font-family: var(--dfont);
+        font-weight: var(--dw);
+        color: var(--fg);
+        text-shadow: var(--shadow);
+        opacity: 0;
+        will-change: transform, opacity;
+      }
+
+      /* ---- logo eruption: bare marks ---- */
+      .blogo {
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: auto;
+        opacity: 0;
+        user-select: none;
+        filter: drop-shadow(0 0.15cqw 0.45cqw rgba(0, 0, 0, 0.3));
+        will-change: transform, opacity;
+      }
+
+      /* ---- logo arc ---- */
+      .logo {
+        position: absolute;
+        width: 3.1cqw;
+        height: 3.1cqw;
+        transform: translate(-50%, -50%);
+        pointer-events: auto;
+      }
+      /* bare marks: the logo itself, nothing drawn around it. The shadow is
+         only a soft lift off the photo so a dark mark survives dark water. */
+      .logo__mark {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        filter: drop-shadow(0 0.15cqw 0.45cqw rgba(0, 0, 0, 0.3));
+        animation: bob 4.6s ease-in-out infinite;
+        transition: transform 0.25s cubic-bezier(0.2, 1.4, 0.4, 1);
+      }
+      .logo:hover .logo__mark {
+        transform: scale(1.18);
+      }
+      .logo__name {
+        position: absolute;
+        left: 50%;
+        top: 112%;
+        transform: translateX(-50%);
+        font: 300 0.75cqw/1 "JetBrains Mono", monospace;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        white-space: nowrap;
+        color: var(--fg);
+        text-shadow: var(--shadow);
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+      .logo:hover .logo__name {
+        opacity: 1;
+      }
+      .arc {
+        fill: none;
+        stroke: var(--fg);
+        stroke-width: 1.3;
+        stroke-dasharray: 1;
+        stroke-dashoffset: 1;
+        opacity: 0.55;
+      }
+      @keyframes bob {
+        50% {
+          translate: 0 -0.35cqw;
+        }
+      }
+
+      /* ---- the switcher ---- */
+      /* bottom-right, clear of the face; faded until it is used */
+      .ui {
+        position: fixed;
+        z-index: 20;
+        right: 14px;
+        bottom: 14px;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+        padding: 9px 10px;
+        opacity: 0.5;
+        transition: opacity 0.2s;
+        background: rgba(17, 17, 20, 0.86);
+        backdrop-filter: blur(8px);
+        border: 1px solid #33333a;
+        border-radius: 6px;
+        font: 400 11px/1 "JetBrains Mono", monospace;
+        color: #9a9aa6;
+        letter-spacing: 0.06em;
+      }
+      .ui:hover {
+        opacity: 1;
+      }
+      .ui[hidden] {
+        display: none;
+      }
+      .ui__grp {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px;
+      }
+      .ui__grp > span {
+        width: 52px;
+        margin-right: 4px;
+        text-transform: uppercase;
+      }
+      .ui button {
+        font: inherit;
+        color: #e8e8ea;
+        background: #24242b;
+        border: 1px solid #3a3a44;
+        border-radius: 3px;
+        padding: 5px 8px;
+        cursor: pointer;
+      }
+      .ui button:hover {
+        background: #32323c;
+      }
+      .ui button.is-on {
+        background: var(--red);
+        border-color: var(--red);
+        color: #fff;
+      }
+      .ui__hint {
+        color: #6c6c78;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stage" id="stage">
+      <div class="frame" id="frame">
+        <img class="layer" id="bgImg" alt="" />
+        <canvas class="layer" id="bgCanvas" hidden></canvas>
+        <div class="layer behind" id="behind"></div>
+        <div class="layer name" id="nameLayer"></div>
+        <img class="layer head" id="headImg" alt="" />
+        <canvas class="layer head" id="headCanvas" hidden></canvas>
+        <div class="layer front" id="front"></div>
+      </div>
+      <header class="rail">
+        <span>Software Engineer</span>
+        <span>Austin, Texas</span>
+      </header>
+      <nav class="ui" id="ui"></nav>
+    </div>
+    <script type="module" src="./hero-demos.ts"></script>
+  </body>
+</html>

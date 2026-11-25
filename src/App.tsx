@@ -315,6 +315,17 @@ export default function App() {
         frame === "kb-ui" ? "is-framing-kb-ui" : "is-framing-kb",
       );
       goTo(1, false);
+    } else if (frame === "hero" || frame === "hero-ui") {
+      /* The hero at rest: the start frame for a hero->keyboard clip. Same
+         split as the board plates above - `hero` is the bare object on the
+         sheet, `hero-ui` keeps the section's own type and annotation (which
+         the wipe is allowed to erase) but still drops the nav, dots and
+         cursor (which stay live on top of the clip). On the photo hero,
+         `hero` is the bare photo: no name, no rails, no eruption. */
+      document.documentElement.classList.add(
+        frame === "hero-ui" ? "is-framing-hero-ui" : "is-framing-hero",
+      );
+      goTo(0, false);
     } else if (frame) goTo(2, false);
 
     /* Plate capture MUST nudge the r3f canvas to re-measure.
@@ -336,8 +347,21 @@ export default function App() {
        canvas actually matches its container, then stop. */
     let tries = 0;
     const tick = window.setInterval(() => {
-      const canvas = document.querySelector<HTMLCanvasElement>(".panel--void canvas");
-      const box = document.querySelector<HTMLElement>(".panel--void .kb");
+      /* Whichever section this plate is of. A hero that owned an r3f canvas
+         would mis-measure in exactly the same way; the photo hero has none,
+         so it is ready at once. */
+      const hero = document.documentElement.className.includes("is-framing-hero");
+      const canvas = document.querySelector<HTMLCanvasElement>(
+        hero ? ".hx__frame canvas" : ".panel--void canvas",
+      );
+      const box = document.querySelector<HTMLElement>(
+        hero ? ".hx__frame" : ".panel--void .kb",
+      );
+      if (hero && box && !canvas) {
+        window.clearInterval(tick);
+        document.documentElement.setAttribute("data-plate-ready", "1");
+        return;
+      }
       if (canvas && box) {
         const c = canvas.getBoundingClientRect();
         const b = box.getBoundingClientRect();
@@ -439,7 +463,7 @@ export default function App() {
         </motion.nav>
 
         <Panel id="top" active={index === 0}>
-          <Hero active={index === 0} onWork={() => goTo(3)} />
+          <Hero active={index === 0} />
         </Panel>
 
         <Panel id="craft" active={index === 1} className="panel--void">

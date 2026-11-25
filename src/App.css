@@ -2162,6 +2162,58 @@ html.is-framing-kb .kb__sound {
   visibility: hidden !important;
 }
 
+/* The hero plates, for a hero->keyboard clip. Same split as the board
+   plates above: `hero-ui` keeps the section's own type and annotation,
+   because the wipe is allowed to erase those; `hero` strips the sheet back
+   to the bare object. Both drop the nav, dots and cursor, which stay LIVE on
+   top of the clip and must not be baked into a frame the model then redraws. */
+html.is-framing-hero-ui .nav,
+html.is-framing-hero-ui .dots,
+html.is-framing-hero-ui .cursor {
+  visibility: hidden !important;
+}
+
+html.is-framing-hero .nav,
+html.is-framing-hero .dots,
+html.is-framing-hero .cursor,
+html.is-framing-hero .hx__rail,
+html.is-framing-hero .hx__role,
+html.is-framing-hero .hx__name,
+html.is-framing-hero .hx__spray {
+  visibility: hidden !important;
+}
+
+/* ---- chrome over the hero photo -------------------------------------------
+   The nav's difference blend turns muddy over a photograph; on the hero it
+   is plain white with a soft shadow, like the hero's own rails. */
+html:has(#top.is-active) .nav {
+  mix-blend-mode: normal;
+  color: #fff;
+  /* same edge-then-halo as the hero's own metadata (Hero.css --hx-shadow) */
+  text-shadow: 0 0 1px rgba(0, 0, 0, 0.6), 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 16px rgba(0, 0, 0, 0.35);
+}
+/* full strength over the photo: the 0.8 the links wear elsewhere reads as
+   grey against a pale sky */
+html:has(#top.is-active) .nav__links a,
+html:has(#top.is-active) .nav__sound {
+  color: #fff;
+  opacity: 1;
+  font-weight: 500;
+}
+html:has(#top.is-active) .dots__dot {
+  border-color: rgba(255, 255, 255, 0.85);
+}
+/* The "Brian Fu" mark (and its dot) steps aside on the hero: the name is
+   already the size of the screen, and the hero's role line takes its place
+   (Hero.css, .hx__role). Every other section keeps it as the way home. */
+html:has(#top.is-active) .nav__mark {
+  opacity: 0;
+  pointer-events: none;
+}
+.nav__mark {
+  transition: opacity 0.4s ease;
+}
+
 /* ---- boot: the short progress bar on the blank glass ---- */
 .a2-progress {
   position: absolute;

@@ -1,274 +1,200 @@
-import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { profile } from "../data/content";
+import { PHOTO, createEruption, type Eruption } from "../lib/eruption";
 import "./Hero.css";
 
-/* three + r3f is ~215KB gzipped, more than the rest of the site together. It
-   is split out and only fetched when the board is actually going to be shown,
-   so the type, the rails and the annotation - the things that are legible in
-   the first paint - do not wait on a renderer. */
-const Keyboard3D = lazy(() => import("./Keyboard3D"));
-
-function webglAvailable() {
-  try {
-    const c = document.createElement("canvas");
-    return !!(c.getContext("webgl2") || c.getContext("webgl"));
-  } catch {
-    return false;
-  }
-}
-
-/** The hero object. WebGL when it can be had, the photograph when it cannot -
- *  the composition depends on SOMETHING crossing the letters, so the fallback
- *  is a real picture rather than empty space. */
-function KeyboardBoard() {
-  const [ok, setOk] = useState<boolean | null>(null);
-  useEffect(() => {
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    setOk(!reduce && webglAvailable());
-  }, []);
-
-  if (ok === null) return <div className="hx__boardHold" aria-hidden="true" />;
-  if (!ok) return <HeroStill />;
-
-  return (
-    <Suspense fallback={<div className="hx__boardHold" aria-hidden="true" />}>
-      <Keyboard3D daylight active instant />
-    </Suspense>
-  );
-}
-
-function HeroStill() {
-  return (
-    <img
-      className="hx__art"
-      src="/hero/hero-object.webp"
-      width={1500}
-      height={1628}
-      alt=""
-      draggable={false}
-    />
-  );
-}
-
 /* ---------------------------------------------------------------------------
-   Hero — Swiss editorial / industrial spec sheet
+   Hero — Brian, with ideas coming out of his head (2026-11-25)
 
-   A composition, not a stack. Three things carry it:
+   A photo of Brian, full bleed. His name sits BEHIND his head: the photo,
+   then the name, then his head cut out of the same photo and laid back on
+   top, so the head crops the middle letters like a magazine cover. Between
+   the photo and the name, his tools erupt out of his hair as bare logos
+   (lib/eruption.ts) - on arrival for a few seconds, and again for as long as
+   the visitor keeps clicking.
 
-     1  the name, set enormous and cropped by the viewport, used as architecture
-     2  the object IN FRONT of it, occluding letters
-     3  technical annotation - mono metadata, leader lines, ticks, a crosshair
+   Picked from the prototypes in scripts/hero-demos.ts: photo 1, full colour,
+   Inter Tight 200. The Swiss spec-sheet hero this replaced is parked in
+   media/abandoned-hero/ (Hero-swiss.*.snapshot).
 
-   The scale contrast between 1 and 3 is the whole effect: a name at ~19vw
-   against labels at 11px is what makes this read as a specification sheet
-   rather than a heading with a subtitle underneath it.
-
-   DEPTH
-   Every layer sits on its own plane and moves a different amount with the
-   pointer - ground barely at all, type a little, the object most, because it
-   is nearest. That difference is the parallax; matching amounts would just be
-   the whole page sliding. The object also takes a fractional rotation, which
-   is what stops it reading as a sticker on glass.
-
-   Written as two custom properties from inside a rAF: this fires on every
-   mousemove and re-rendering the tree at that rate is how a hero starts
-   dropping frames. Nothing here is React state, so moving the mouse renders
-   nothing.
+   Everything inside the frame is placed in the PHOTO's pixels (1672x941):
+   the frame is the photo, cover-fitted and anchored to the bottom so the face
+   is never what gets cropped, and an SVG with the photo's viewBox puts the
+   name exactly where the head is at any window size.
    --------------------------------------------------------------------------- */
 
-/** Where each layer actually SITS, in px along Z.
- *
- *  Not offsets - depths. The scene is a real perspective space that tilts
- *  toward the pointer, and the differential motion falls out of the
- *  projection: things nearer the viewer sweep further across the frame than
- *  things behind them, and they do it with the slight shear that flat
- *  translation can never fake. Sliding each layer by a hand-picked number of
- *  pixels is what made the earlier version read as cut-out paper.
- *
- *  The object is furthest forward because it is the thing being held out. */
-const Z = {
-  grid: -190,
-  type: -55,
-  guide: 30,
-  object: 120,
-  note: 45,
+/** Where the name's baseline sits relative to the crown, in cap heights
+ *  (positive = below it, so the head covers the letters). Brian, 2026-11-25:
+ *  "a bit higher" (0.46 -> 0.28), then "it needs to clear my head" (-0.08:
+ *  the baseline just above the crown, so nothing of the name is covered). */
+const NAME_DROP = -0.08;
+/** the name's width as a fraction of the photo ... */
+const NAME_WIDTH = 0.86;
+/** ... but never wider than this much of what is actually on screen, which
+ *  is what binds on a portrait phone, where the photo is cropped to the head */
+const NAME_FIT = 0.92;
+/** Inter Tight's cap height, as a fraction of its size */
+const CAP = 0.727;
+/** the name has the stage to itself for this long before the eruption */
+const ERUPT_AFTER_MS = 900;
+
+type Layout = {
+  fs: number;
+  base: number;
+  letters: { ch: string; x: number; delay: number }[];
 };
 
-/** How far the scene tilts, in degrees at the extremes. Small on purpose: past
- *  a few degrees the type starts to look like it is lying down. */
-const TILT = 4.2;
+export default function Hero({ active }: { active: boolean }) {
+  const section = useRef<HTMLElement>(null);
+  const frame = useRef<HTMLDivElement>(null);
+  const probe = useRef<SVGTextElement>(null);
+  const spray = useRef<HTMLDivElement>(null);
+  const engine = useRef<Eruption | null>(null);
+  const [layout, setLayout] = useState<Layout | null>(null);
+  const name = profile.name.toUpperCase();
 
-/* The right-hand column. Real work, not pseudo-technical filler. */
-const SPEC: [string, string][] = [
-  ["FOCUS", "Compilers · Backends"],
-  ["ALSO", "Application security"],
-  ["STACK", "TypeScript · Python · C++"],
-  ["SCHOOL", "Texas A&M · CS"],
-];
-
-export default function Hero({
-  active,
-  onWork,
-}: {
-  active: boolean;
-  /** Jump to the work section. An editorial link, not a button. */
-  onWork?: () => void;
-}) {
-  const stage = useRef<HTMLElement>(null);
-
+  /* Lay the name out from the font's real metrics: fit its width, then hang
+     its baseline off the crown of the head. Measured once the face has
+     loaded (a fallback face would measure wrong), and again on resize,
+     because the on-screen fit changes with the window's shape. */
   useEffect(() => {
-    const el = stage.current;
-    if (!el) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-
-    let raf = 0;
-    const onMove = (e: PointerEvent) => {
-      if (raf) return;
-      raf = requestAnimationFrame(() => {
-        raf = 0;
-        el.style.setProperty("--px", (e.clientX / window.innerWidth - 0.5).toFixed(4));
-        el.style.setProperty("--py", (e.clientY / window.innerHeight - 0.5).toFixed(4));
-      });
+    let dead = false;
+    const measure = () => {
+      const p = probe.current;
+      const f = frame.current;
+      const sec = section.current;
+      if (dead || !p || !f || !sec) return;
+      p.setAttribute("font-size", "100");
+      const w100 = p.getComputedTextLength();
+      if (!w100) return;
+      const s = f.clientWidth / PHOTO.w;
+      const target = Math.min(PHOTO.w * NAME_WIDTH, (sec.clientWidth * NAME_FIT) / s);
+      const fs = (100 * target) / w100;
+      p.setAttribute("font-size", String(fs));
+      const letters: Layout["letters"] = [];
+      for (let i = 0; i < name.length; i++) {
+        if (name[i] === " ") continue;
+        const x = p.getStartPositionOfChar(i).x;
+        /* nearest the head rises first, as if it is coming out of it */
+        const d = Math.abs(x + fs * 0.3 - PHOTO.crownX) / PHOTO.w;
+        letters.push({ ch: name[i], x, delay: 0.2 + d * 1.1 });
+      }
+      setLayout({ fs, base: PHOTO.crownY + fs * CAP * NAME_DROP, letters });
     };
-    const rest = () => {
-      el.style.setProperty("--px", "0");
-      el.style.setProperty("--py", "0");
-    };
-    window.addEventListener("pointermove", onMove, { passive: true });
-    window.addEventListener("pointerleave", rest);
-    window.addEventListener("blur", rest);
+    document.fonts.load('200 100px "Inter Tight"').then(measure, measure);
+    window.addEventListener("resize", measure);
     return () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerleave", rest);
-      window.removeEventListener("blur", rest);
-      if (raf) cancelAnimationFrame(raf);
+      dead = true;
+      window.removeEventListener("resize", measure);
+    };
+  }, [name]);
+
+  /* The eruption engine lives as long as the hero does. */
+  useEffect(() => {
+    if (!spray.current) return;
+    const e = createEruption(spray.current);
+    engine.current = e;
+    return () => {
+      e.destroy();
+      engine.current = null;
     };
   }, []);
 
-  const [first, last] = profile.name.split(" ");
+  /* Arriving on the hero erupts; leaving stops throwing. Not under reduced
+     motion, and not while a clean plate is being rendered for a clip. */
+  const still = () =>
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+    document.documentElement.className.includes("is-framing-hero");
+  useEffect(() => {
+    const e = engine.current;
+    if (!e) return;
+    if (!active || still()) {
+      e.stop();
+      return;
+    }
+    const t = window.setTimeout(() => e.arrive(), ERUPT_AFTER_MS);
+    return () => window.clearTimeout(t);
+  }, [active]);
+
+  /* A click anywhere on the hero keeps it erupting - except on a link. */
+  const onPointerDown = (ev: React.PointerEvent) => {
+    if (!active || still()) return;
+    if ((ev.target as HTMLElement).closest("a, button")) return;
+    engine.current?.extend();
+  };
+
+  const cap = layout ? layout.fs * CAP : 0;
 
   return (
-    <section
-      ref={stage}
-      className={`hx ${active ? "is-in" : ""}`}
-      style={
-        {
-          "--z-grid": `${Z.grid}px`,
-          "--z-type-d": `${Z.type}px`,
-          "--z-guide-d": `${Z.guide}px`,
-          "--z-object-d": `${Z.object}px`,
-          "--z-note-d": `${Z.note}px`,
-          "--tilt": `${TILT}deg`,
-        } as React.CSSProperties
-      }
-    >
-      {/* Everything lives inside one 3D space. `.hx` owns the perspective and
-          the clipping; the scene owns the rotation and preserve-3d - they
-          cannot be the same element, because overflow:hidden flattens a
-          preserve-3d subtree. */}
-      <div className="hx__scene">
-      {/* plane 0 — the grid, made just visible enough to feel */}
-      <div className="hx__columns" aria-hidden="true">
-        {Array.from({ length: 5 }, (_, i) => (
-          <span key={i} />
-        ))}
-      </div>
+    <section ref={section} className={`hx ${active ? "is-in" : ""}`} onPointerDown={onPointerDown}>
+      {/* the only real heading on the page; the drawn name is decoration */}
+      <h1 className="hx__sr">{profile.name}</h1>
 
-      {/* ----------------------------- top rail ---------------------------- */}
-      <div className="hx__rail hx__rail--top">
-        <span className="hx__idx">01 /</span>
-        <span className="hx__label">{profile.role}</span>
-        <span className="hx__rule" aria-hidden="true" />
-        <span className="hx__label hx__label--end">{profile.location}</span>
-      </div>
+      <div className="hx__frame" ref={frame}>
+        <img
+          className="hx__layer hx__photo"
+          src="/hero/background1.webp"
+          width={PHOTO.w}
+          height={PHOTO.h}
+          alt=""
+          draggable={false}
+        />
 
-      {/* plane 1 — the name. The only real heading on the page, so there is
-          nothing here for a screen reader to hear twice. */}
-      <h1 className="hx__display">
-        <span className="hx__word">{first}</span>
-        <span className="hx__word">{last}</span>
-      </h1>
+        {/* the logos: behind the name, coming out from behind the head */}
+        <div className="hx__layer hx__spray" ref={spray} aria-hidden="true" />
 
-      {/* planes 2 + 3 — guides behind, object in front, both occluding type */}
-      <div className="hx__objectWrap">
         <svg
-          className="hx__guides"
-          viewBox="0 0 100 100"
+          className="hx__layer hx__name"
+          viewBox={`0 0 ${PHOTO.w} ${PHOTO.h}`}
           preserveAspectRatio="none"
           aria-hidden="true"
         >
-          <rect className="hx__box" x="4" y="10" width="92" height="86" fill="none" />
-          <circle className="hx__node" cx="4" cy="10" r="1" />
-          <circle className="hx__node" cx="96" cy="10" r="1" />
-          <path className="hx__tick" d="M50 3v9M45.5 7.5h9" fill="none" />
+          <defs>
+            {/* the slot each letter rises out of: nothing below the baseline */}
+            <clipPath id="hx-slot">
+              <rect x={0} y={0} width={PHOTO.w} height={layout ? layout.base + layout.fs * 0.03 : PHOTO.h} />
+            </clipPath>
+          </defs>
+          {/* measures the name; never seen */}
+          <text ref={probe} className="hx__letter hx__probe" x={PHOTO.w / 2} y={PHOTO.h / 2} textAnchor="middle">
+            {name}
+          </text>
+          {layout && (
+            <g clipPath="url(#hx-slot)">
+              {layout.letters.map((l, i) => (
+                <text
+                  key={`${i}${l.ch}`}
+                  className="hx__letter"
+                  x={l.x}
+                  y={layout.base}
+                  fontSize={layout.fs}
+                  style={{ "--d": `${l.delay.toFixed(3)}s`, "--rise": `${(cap * 1.08).toFixed(1)}px` } as CSSProperties}
+                >
+                  {l.ch}
+                </text>
+              ))}
+            </g>
+          )}
         </svg>
 
-        {/* The foreground subject: the REAL board, the same component the
-            keyboard section runs, in daylight instead of a black studio. It
-            is live here - keys press, legends light, the whole thing is
-            hoverable - which is the point of merging the two sections. */}
-        <div className="hx__board">
-          <KeyboardBoard />
-        </div>
+        {/* his head, cut from the same photo, back on top of the name */}
+        <img
+          className="hx__layer hx__head"
+          src="/hero/background1-head.webp"
+          width={PHOTO.w}
+          height={PHOTO.h}
+          alt=""
+          draggable={false}
+        />
       </div>
 
-      {/* plane 4 — editorial columns */}
-      <div className="hx__col hx__col--left">
-        <span className="hx__idx">01/</span>
-        <p className="hx__caption">
-          I build things where correctness is checkable — compilers, backends,
-          and the security boundaries in between.
-        </p>
-      </div>
+      {/* In the nav's own row, where its "Brian Fu" mark sits on every other
+          section - the mark is hidden on the hero (App.css), because the
+          name is already the size of the screen. Brian, 2026-11-25. */}
+      <p className="hx__role">{profile.role}</p>
 
-      <div className="hx__col hx__col--right">
-        <span className="hx__idx">02/</span>
-        <dl className="hx__spec">
-          {SPEC.map(([k, v]) => (
-            <div className="hx__specRow" key={k}>
-              <dt>{k}</dt>
-              <dd>{v}</dd>
-            </div>
-          ))}
-        </dl>
-      </div>
-
-      {/* --------------------------- bottom rail --------------------------- */}
-      <div className="hx__rail hx__rail--bottom">
-        <span className="hx__status">
-          <i className="hx__dot" aria-hidden="true" />
-          Open to 2027 internships
-        </span>
-        <span className="hx__rule" aria-hidden="true" />
-        <a
-          className="hx__cta"
-          href="#work"
-          data-cursor="hover"
-          onClick={(e) => {
-            if (!onWork) return;
-            e.preventDefault();
-            onWork();
-          }}
-        >
-          Selected work
-          <svg className="hx__arrow" viewBox="0 0 46 8" aria-hidden="true">
-            <path
-              d="M0 4h42M38 1l4 3-4 3"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1"
-              strokeLinecap="square"
-            />
-          </svg>
-        </a>
-      </div>
-
-        {/* measurement scale down the left edge */}
-        <div className="hx__ticks" aria-hidden="true">
-          {Array.from({ length: 17 }, (_, i) => (
-            <span key={i} className={i % 4 === 0 ? "is-major" : ""} />
-          ))}
-        </div>
+      <div className="hx__rail hx__rail--top">
+        <span>{profile.location}</span>
       </div>
     </section>
   );

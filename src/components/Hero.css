@@ -1,556 +1,184 @@
 /* ---------------------------------------------------------------------------
-   Hero — Swiss editorial / industrial spec sheet
+   Hero — the photo, the name behind the head, the eruption
 
-   Own file, like the other pieces of this site: App.css is being worked in by
-   someone else and nothing here needs to reach into it. The section extends
-   the existing token system (--bg, --ink, --line, --accent, the fonts) rather
-   than declaring a palette of its own.
-
-   STACKING
-   One ladder, declared once, so no rule ever needs a z-index: 999 to win:
-
-        0   ground + column guides
-       10   the name, enormous
-       20   guide geometry - box, nodes, crosshair
-       30   the object, occluding the letters
-       40   annotation: rails, columns, ticks
-
-   Everything below is placed on that ladder and nowhere else.
+   Stack, back to front:
+     photo  ->  logos (.hx__spray)  ->  name (.hx__name)  ->  head  ->  rails
+   The head is cut from the same photo and sits pixel-for-pixel over it, so
+   whatever is drawn between the two disappears behind his head.
    --------------------------------------------------------------------------- */
 
 .hx {
   --gutter: clamp(18px, 3.2vw, 56px);
-  --rail: clamp(11px, 1.4vw, 13px);
-  --z-ground: 0;
-  --z-type: 10;
-  --z-guide: 20;
-  --z-object: 30;
-  --z-note: 40;
-
-  /* pointer position, -0.5..0.5, written from the component */
-  --px: 0;
-  --py: 0;
+  /* A tight dark edge first, then a soft halo: white on a pale sky needs
+     the edge, or the letters melt into the blue (Brian, 2026-11-25:
+     "Austin Texas is kinda blending in"). */
+  --hx-shadow: 0 0 1px rgba(0, 0, 0, 0.6), 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 16px rgba(0, 0, 0, 0.35);
+  /* the role and the location are one pair, one size */
+  --hx-meta: clamp(12px, 1.12vw, 16px);
 
   position: relative;
   height: 100svh;
   height: 100dvh;
   overflow: hidden;
-  background: var(--bg);
-  /* The viewer's eye. Far enough back that a 4 degree tilt shears the scene
-     rather than throwing it - a short perspective on type this large looks
-     like a fisheye. */
-  perspective: 1600px;
-  perspective-origin: 50% 46%;
+  /* the sky, for the moment before the photo decodes */
+  background: #6f9fd6;
+  color: #fff;
+  /* the frame below sizes itself against this box */
+  container-type: size;
 }
 
-/* One 3D space holding every layer. This cannot be `.hx` itself: overflow
-   hidden flattens a preserve-3d subtree, and the hero needs BOTH - the crop is
-   what lets the name and the object run off the edges. */
-.hx__scene {
-  position: relative;
-  height: 100%;
-  transform-style: preserve-3d;
-  /* Tilts toward the pointer. Every layer's motion comes out of this one
-     rotation plus its own Z, which is why the parallax is internally
-     consistent instead of five numbers that happen to look right. */
-  transform: rotateX(calc(var(--py) * var(--tilt) * 1)) rotateY(calc(var(--px) * var(--tilt) * -1));
-  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  grid-template-rows: auto 1fr auto;
-  column-gap: clamp(10px, 1.4vw, 24px);
-  padding: clamp(74px, 9vh, 104px) var(--gutter) clamp(20px, 3.4vh, 34px);
-}
-
-/* ------------------------------- plane 0 --------------------------------- */
-
-.hx__columns {
+.hx__sr {
   position: absolute;
-  inset: 0 var(--gutter);
-  z-index: var(--z-ground);
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 1.2s ease 0.5s;
-  transform: translateZ(var(--z-grid));
-}
-.hx.is-in .hx__columns {
-  opacity: 1;
-}
-.hx__columns span {
-  border-left: 1px solid var(--line);
-  opacity: 0.5;
-}
-.hx__columns span:first-child {
-  border-left: 0;
-}
-
-/* --------------------------------- rails ---------------------------------- */
-
-.hx__rail {
-  grid-column: 1 / -1;
-  z-index: var(--z-note);
-  display: flex;
-  align-items: center;
-  gap: clamp(10px, 1.4vw, 20px);
-  font-family: var(--font-mono);
-  font-size: var(--rail);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ink-dim);
-  transform: translateZ(var(--z-note-d));
-}
-.hx__rail--top {
-  grid-row: 1;
-  align-self: start;
-}
-.hx__rail--bottom {
-  grid-row: 3;
-  align-self: end;
-}
-
-/* the index motif - 01/ 02/ - carried through the whole section */
-.hx__idx {
-  font-family: var(--font-mono);
-  font-size: var(--rail);
-  letter-spacing: 0.1em;
-  color: var(--accent);
-  flex: none;
-}
-.hx__label {
-  white-space: nowrap;
-}
-.hx__label--end {
-  color: var(--ink);
-}
-/* the rule that carries the eye between two labels */
-.hx__rule {
-  flex: 1 1 auto;
+  width: 1px;
   height: 1px;
-  min-width: 12px;
-  background: var(--line);
-  transform: scaleX(0);
-  transform-origin: 0 50%;
-}
-.hx.is-in .hx__rule {
-  transform: scaleX(1);
-  transition: transform 1s cubic-bezier(0.22, 1, 0.36, 1) 0.34s;
-}
-
-.hx__status {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.6em;
-  white-space: nowrap;
-}
-.hx__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  flex: none;
-}
-
-/* CTA as a rule with a head on it, not a pill */
-.hx__cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.85em;
-  color: var(--ink);
-  white-space: nowrap;
-  padding-bottom: 2px;
-  border-bottom: 1px solid transparent;
-  transition: border-color 0.4s var(--ease-out), color 0.4s var(--ease-out);
-}
-.hx__cta:hover,
-.hx__cta:focus-visible {
-  color: var(--accent);
-  border-bottom-color: currentColor;
-}
-.hx__arrow {
-  width: clamp(30px, 4vw, 46px);
-  height: 8px;
-  overflow: visible;
-}
-.hx__cta:hover .hx__arrow {
-  translate: 5px 0;
-}
-.hx__arrow {
-  transition: translate 0.4s var(--ease-out);
-}
-
-/* -------------------------- plane 1: the name ----------------------------- */
-
-.hx__display {
-  grid-column: 1 / -1;
-  grid-row: 2;
-  z-index: var(--z-type);
-  /* HIGH, not centred. In the reference the cap-top lands about a quarter of
-     the way down and the baseline around three-fifths, and the whole lower
-     half is air with the caption dropped into it. Vertically centring the
-     word is what made this read as a heading with things arranged around it
-     rather than as the architecture of the page. */
-  align-self: start;
-  margin: clamp(6px, 3.4vh, 44px) 0 0;
-  display: flex;
-  justify-content: flex-start;
-  gap: 0.2em;
-  font-family: var(--font-poster);
-  /* 700, not 900. Measured off the reference: its stems are about 0.18 of the
-     cap height, where a Black grotesk runs about 0.23. The extra quarter of
-     stem weight is the whole of "too thick". */
-  font-weight: 700;
-  /* The height comes from HERE. Condensing to 86% lets the caps stay tall
-     while the line still fits the measure; at normal width the same line has
-     to shrink to fit, which is what trades the poster for a headline. */
-  font-stretch: 86%;
-  /* Sized in vw ALONE, deliberately. A clamp() whose ceiling engages at one
-     viewport width and whose floor engages at another is precisely what put
-     the object on different letters on a laptop and on a 27in display: the
-     type stopped growing while the object kept going. One unit, one growth
-     curve, and the composition is identical at every width. The vh term is
-     not a second curve - it is a guard that only engages past a 2.25 aspect
-     ratio (ultrawide), and the object carries the SAME guard at the same
-     ratio so the two can never come apart. */
-  /* 20.4 is CHOSEN, not derived. It deliberately stops short of the right
-     margin rather than bleeding to it: sized to fill the measure exactly the
-     word gets heavy and the air on the right - which is what the lower half
-     of the composition is balanced against - disappears. Do not "fix" this
-     by stretching it to the gutter. */
-  font-size: min(20.4vw, 46vh);
-  line-height: 0.78;
-  /* Closed up until the sidebearings stop reading as gaps and the word turns
-     into a single mass. Less negative than the old setting needed, because a
-     condensed face has tighter sidebearings to begin with. */
-  letter-spacing: -0.035em;
-  color: var(--ink);
-  white-space: nowrap;
-  text-transform: uppercase;
-  transform: translateZ(var(--z-type-d));
-}
-/* each word rises out of its own mask */
-.hx__word {
-  display: block;
+  margin: -1px;
   overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
-.hx__word > * {
+
+/* The photo's own box, cover-fitted and anchored to the BOTTOM, so the face
+   is never the part that gets cropped: wider windows lose sky, taller ones
+   lose the sides. Its children size themselves against it (cqw). */
+.hx__frame {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: max(100cqw, 177.68cqh);
+  aspect-ratio: 1672 / 941;
+  transform: translateX(-50%);
+  container-type: inline-size;
+}
+.hx__layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   display: block;
 }
-.hx.is-in .hx__word {
-  animation: hx-rise 1s cubic-bezier(0.22, 1, 0.36, 1) both;
+.hx__photo,
+.hx__head {
+  user-select: none;
+  pointer-events: none;
 }
-.hx.is-in .hx__word:nth-child(2) {
-  animation-delay: 0.08s;
+.hx__spray {
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.hx__name {
+  z-index: 2;
+  overflow: visible;
+  pointer-events: none;
+  filter: drop-shadow(0 0 18px rgba(0, 0, 0, 0.18));
+}
+.hx__head {
+  z-index: 3;
+}
+
+/* ---- the name ---- */
+.hx__letter {
+  font-family: "Inter Tight", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 200;
+  letter-spacing: -0.01em;
+  fill: #fff;
+}
+.hx__probe {
+  visibility: hidden;
+}
+/* each letter rises out of its slot, nearest the head first (--d) */
+.hx.is-in .hx__letter:not(.hx__probe) {
+  animation: hx-rise 1.15s cubic-bezier(0.2, 0.9, 0.25, 1) var(--d, 0s) both;
 }
 @keyframes hx-rise {
   from {
-    opacity: 0;
-    transform: translateY(0.16em);
+    transform: translateY(var(--rise, 0px));
   }
   to {
-    opacity: 1;
     transform: none;
   }
 }
 
-/* ------------------ planes 2 + 3: guides and the object ------------------- */
-
-.hx__objectWrap {
+/* ---- the eruption: bare logos, nothing drawn around them. The shadow is
+   only a soft lift so a dark mark survives the dark water. ---- */
+.hx__logo {
   position: absolute;
-  z-index: var(--z-object);
-  /* Anchored to the BOTTOM: the forearm runs off the frame, so the object has
-     to be cropped by the edge rather than float above it. Sat slightly right
-     of centre - optical, not mathematical: the caption block weights the
-     lower left, and dead-centre made the composition feel like it was leaning. */
-  left: 50%;
-  /* Hung below the fold by MORE than this plane's own parallax travel. The
-     forearm is a cut edge, and with the object flush to the bottom the pointer
-     lifting it by a few pixels was enough to show that cut floating above the
-     edge of the screen. The slack is derived from the depth so the two can
-     never drift apart. */
-  bottom: -54px;
-  /* Sized so it crosses the LOWER half of the letters rather than swallowing
-     them - the reference works because the tops of the word still read over
-     the object. Scales with the viewport rather than capping early, so the
-     object and the name grow together on a large display instead of the type
-     running away from it. */
-  /* Pure vw, matching the type's pure vw, so the object sits on the SAME
-     letters at every viewport width. The vh guard is the type's guard at the
-     identical trigger ratio - 36/81 and 20.4/46 are both 0.44 - so past an
-     ultrawide aspect the two shrink in lockstep instead of drifting apart. */
-  width: min(36vw, 81vh);
-  transform: translateX(-50%) translateZ(var(--z-object-d));
-  pointer-events: none;
-}
-
-.hx__art {
-  display: block;
-  width: 100%;
+  left: 0;
+  top: 0;
   height: auto;
-  /* a single soft contact shadow, no card float */
-  filter: drop-shadow(0 24px 34px rgba(22, 21, 15, 0.16));
-  transform-origin: 50% 100%;
+  opacity: 0;
+  user-select: none;
+  filter: drop-shadow(0 0.15cqw 0.45cqw rgba(0, 0, 0, 0.3));
+  will-change: transform, opacity;
 }
-.hx.is-in .hx__art {
-  animation: hx-object 1.15s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
-}
-@keyframes hx-object {
-  from {
-    opacity: 0;
-    transform: translateY(46px) scale(0.985);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-/* The wrapper owns the Z; the <img> inside owns the entrance. Animating both
-   on one element would have the keyframe overwrite the depth every frame. */
 
-/* the engineering box around the subject - behind it, so the object cuts it */
-.hx__guides {
+/* ---- the role and the rail: mono metadata, in white over the photo ----
+   The bottom rail (Open to 2027 internships / Selected work) was removed on
+   2026-11-25 at Brian's request. */
+.hx__rail {
   position: absolute;
-  inset: -3% -9% 8%;
-  z-index: -1;
-  overflow: visible;
-  color: var(--ink-dim);
-  transform: translateZ(calc(var(--z-guide-d) - var(--z-object-d)));
-}
-.hx__box,
-.hx__tick {
-  stroke: currentColor;
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
-  opacity: 0.45;
-}
-.hx__node {
-  fill: var(--accent);
-}
-.hx.is-in .hx__box {
-  stroke-dasharray: 360;
-  stroke-dashoffset: 360;
-  animation: hx-draw 1.5s cubic-bezier(0.22, 1, 0.36, 1) 0.42s forwards;
-}
-@keyframes hx-draw {
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-.hx.is-in .hx__node,
-.hx.is-in .hx__tick {
-  animation: hx-fade 0.7s ease 1s both;
-}
-@keyframes hx-fade {
-  from {
-    opacity: 0;
-  }
-}
-
-/* ----------------------- plane 4: editorial columns ----------------------- */
-
-.hx__col {
-  grid-row: 2;
-  z-index: var(--z-note);
-  align-self: end;
-  padding-bottom: clamp(6px, 2vh, 26px);
-  transform: translateZ(var(--z-note-d));
-}
-.hx__col--left {
-  grid-column: 1 / span 4;
-}
-.hx__col--right {
-  grid-column: 9 / -1;
-}
-.hx__col .hx__idx {
-  display: block;
-  margin-bottom: 0.9em;
-}
-.hx.is-in .hx__col {
-  animation: hx-note 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-.hx.is-in .hx__col--left {
-  animation-delay: 0.5s;
-}
-.hx.is-in .hx__col--right {
-  animation-delay: 0.6s;
-}
-@keyframes hx-note {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-/* Editorial caption, not a résumé paragraph: narrow measure, small. */
-.hx__caption {
-  margin: 0;
-  max-width: 30ch;
+  z-index: 5;
+  left: var(--gutter);
+  right: var(--gutter);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 1.5rem;
   font-family: var(--font-mono);
-  font-size: clamp(11px, 0.86vw, 13px);
-  line-height: 1.75;
-  color: var(--ink-dim);
+  font-size: var(--hx-meta);
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-shadow: var(--hx-shadow);
+  opacity: 0;
+  transition: opacity 1s ease 0.6s;
+}
+.hx.is-in .hx__rail {
+  opacity: 1;
+}
+/* clear of the fixed nav above it */
+.hx__rail--top {
+  top: clamp(64px, 9.5vh, 96px);
 }
 
-.hx__spec {
-  margin: 0;
-  display: grid;
-  gap: 0.55em;
-  font-family: var(--font-mono);
-  font-size: clamp(10px, 0.8vw, 12px);
-  letter-spacing: 0.04em;
-}
-.hx__specRow {
-  display: grid;
-  grid-template-columns: 4.6em 1fr;
-  gap: 0.8em;
-  align-items: baseline;
-}
-.hx__specRow dt {
-  color: var(--ink-dim);
-  letter-spacing: 0.14em;
-}
-.hx__specRow dd {
-  margin: 0;
-  color: var(--ink);
-}
-
-/* ------------------------------ ruler ticks ------------------------------- */
-
-.hx__ticks {
+/* The role takes the nav mark's place: the same padding box as .nav, and the
+   same line height as the nav row, so it sits on the row the links sit on.
+   A step bigger than the rail. */
+.hx__role {
   position: absolute;
-  left: calc(var(--gutter) * 0.34);
-  top: 50%;
-  translate: 0 -50%;
-  z-index: var(--z-note);
-  display: grid;
-  gap: 7px;
-  pointer-events: none;
+  z-index: 5;
+  top: 1.4rem;
+  left: min(5vw, 3rem);
+  height: 1.35rem;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: var(--hx-meta);
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-shadow: var(--hx-shadow);
+  opacity: 0;
+  transition: opacity 1s ease 0.6s;
 }
-.hx__ticks span {
-  display: block;
-  width: 5px;
-  height: 1px;
-  background: var(--ink-dim);
-  opacity: 0.4;
-}
-.hx__ticks span.is-major {
-  width: 11px;
-  opacity: 0.75;
-}
-.hx.is-in .hx__ticks {
-  animation: hx-fade 0.9s ease 0.9s both;
+.hx.is-in .hx__role {
+  opacity: 1;
 }
 
-/* -------------------------------- tablet ---------------------------------- */
-
-@media (max-width: 1024px) {
-  .hx__col--left {
-    grid-column: 1 / span 5;
-  }
-  .hx__col--right {
-    grid-column: 8 / -1;
-  }
-  .hx__objectWrap {
-    width: clamp(280px, 38vw, 520px);
+@media (max-width: 640px) {
+  .hx__rail,
+  .hx__role {
+    letter-spacing: 0.12em;
   }
 }
-
-/* -------------------------------- mobile ---------------------------------- */
-
-/* NOT a stack. The type stays oversized and crops, the object still overlaps
-   it, and the annotation survives - just less of it. The columns move to the
-   two bottom corners so the object keeps the middle. */
-@media (max-width: 720px) {
-  .hx {
-    padding-top: clamp(66px, 11vh, 96px);
-    row-gap: 0;
-  }
-  .hx__display {
-    /* stacked and hard left, so it can run off the right edge on purpose */
-    display: block;
-    gap: 0;
-    align-self: start;
-    margin-top: clamp(20px, 7vh, 62px);
-    /* One word per line here, so the measure is BRIAN rather than BRIAN FU
-       and the same face fills a narrow screen at a much larger size. */
-    font-size: 34vw;
-    line-height: 0.84;
-    letter-spacing: -0.035em;
-  }
-  .hx__objectWrap {
-    /* Deliberately WIDER than the viewport. The forearm has to stay cropped by
-       the bottom edge, so the object cannot be lifted to meet the type - it has
-       to grow until it reaches it. Shrinking it into a slot under the heading
-       is exactly the stacked-mobile-layout this composition is avoiding. */
-    width: min(124vw, 540px);
-    left: 56%;
-    bottom: -24px;
-  }
-  .hx__col--left {
-    grid-column: 1 / span 7;
-  }
-  .hx__col--right {
-    display: none; /* the spec list is the first thing to go */
-  }
-  .hx__caption {
-    font-size: 11px;
-    max-width: 26ch;
-  }
-  .hx__ticks,
-  .hx__columns {
-    display: none;
-  }
-  .hx__rail {
-    font-size: 10px;
-    letter-spacing: 0.1em;
-  }
-  .hx__rail--top .hx__label--end {
-    display: none; /* location survives on the wider layouts only */
-  }
-}
-
-/* Very short viewports. Both terms tighten TOGETHER and at the same trigger
-   ratio - 20.4/40 and 36/70 are both 0.51 - so the object still lands on the
-   same letters here as it does everywhere else. */
-@media (max-height: 620px) {
-  .hx__objectWrap {
-    width: min(36vw, 70vh);
-  }
-  .hx__display {
-    font-size: min(20.4vw, 40vh);
-  }
-}
-
-/* ----------------------------- reduced motion ----------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
-  .hx__scene {
-    transform: none !important;
-    transition: none;
-  }
-  .hx.is-in .hx__word,
-  .hx.is-in .hx__art,
-  .hx.is-in .hx__col,
-  .hx.is-in .hx__ticks,
-  .hx.is-in .hx__node,
-  .hx.is-in .hx__tick {
+  .hx.is-in .hx__letter:not(.hx__probe) {
     animation: none;
   }
-  .hx.is-in .hx__box {
-    animation: none;
-    stroke-dashoffset: 0;
-  }
-  .hx.is-in .hx__rule {
-    transition: none;
-    transform: scaleX(1);
-  }
-  .hx__cta,
-  .hx__arrow {
+  .hx__rail,
+  .hx__role {
     transition: none;
   }
 }
