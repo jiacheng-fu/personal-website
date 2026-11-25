@@ -913,7 +913,7 @@
   /* + the cover surface's overhang, or this measures from an edge that is
      off-screen (see --frame-overhang-x in lib/transitions.ts) */
   right: calc(min(5vw, 3rem) + var(--frame-overhang-x, 0px));
-  top: 14vh;
+  top: calc(14vh + var(--frame-overhang-y, 0px));
   bottom: auto;
   z-index: 3;
   text-align: right;
@@ -2086,6 +2086,16 @@ html {
     height: min(74vh, 620px);
   }
 }
+/* a phone on its side or a tiny window: label + 74vh of machine + a
+   three-line caption came to more than 400px, cutting both ends off */
+@media (max-height: 520px) {
+  .rag__scene {
+    height: 62vh;
+  }
+  .rag__foot {
+    font-size: 0.72rem;
+  }
+}
 @media (max-width: 640px) {
   .a2-frags {
     grid-template-columns: repeat(2, 1fr);
@@ -2314,6 +2324,11 @@ html {
   .brain {
     display: none;
   }
+}
+/* too narrow for the machine and both cards (Apple2Front decides) */
+.a2m[data-cards="off"] ~ .feed,
+.a2m[data-cards="off"] ~ .brain {
+  display: none;
 }
 
 /* ---- clean-plate rendering for the transition clips (?frame=...) ---- */

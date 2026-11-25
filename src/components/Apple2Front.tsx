@@ -23,6 +23,8 @@ const DESIGN_W = 700;
 const DESIGN_H = 600;
 /* where the glass sits on the drawing, and its drawn size (3:2, like the div) */
 const SCR = { x: 95, y: 62, w: 510, h: 340 };
+/* the smallest glass worth keeping the side cards for (a 1366x768 laptop's is 390) */
+const MIN_GLASS = 380;
 
 /* palette: paper family, three light levels + ink hairlines */
 const TOP = "#ece3cc";
@@ -254,6 +256,15 @@ export default function Apple2Front({
      clip, so the machine simply fits its box (docs/transition-kb-machine.md). */
   const REF = { x: 778.3, y: 279.84, s: 1.433, w: 2560, h: 1440 };
   let fit: number, tx: number, ty: number;
+  /* The note ("Teach it something") and the LLM card stand at this box's two
+     edges (App.css .feed / .brain, gone at 720px and under). The clip
+     placement always leaves them room (measured from 1.45:1 out to 21:9), but
+     the plain fit below - no clip: 4:3, a half-width window, a tablet - drew
+     the machine over both, its glass 30-170px under their paper. So the fit
+     keeps the glass clear of them, unless that would shrink it below what a
+     1366x768 laptop gets; then the cards go instead, as on a phone (the LLM
+     switch is still item 5 on the glass). */
+  let cards = true;
   if (transitionAllowed()) {
     const cs = Math.max(host.vh / REF.h, host.vw / REF.w);
     const offX = (host.vw - REF.w * cs) / 2;
@@ -263,12 +274,19 @@ export default function Apple2Front({
     ty = offY + REF.y * cs - host.top;
   } else {
     fit = Math.min(host.w / DESIGN_W, host.h / DESIGN_H);
+    const vw = typeof window === "undefined" ? 0 : window.innerWidth;
+    const side = vw > 720 ? Math.min(250, 0.38 * vw) + 16 : 0; // a card's width + a gap
+    const room = host.w - 2 * side; // for the glass, centred between the cards
+    if (side && fit * SCR.w > room) {
+      if (room >= MIN_GLASS) fit = room / SCR.w;
+      else cards = false;
+    }
     tx = (host.w - DESIGN_W * fit) / 2;
     ty = (host.h - DESIGN_H * fit) / 2;
   }
 
   return (
-    <div className="a2m" ref={hostRef}>
+    <div className="a2m" ref={hostRef} data-cards={cards ? undefined : "off"}>
       <div
         className="a2m__stage"
         style={{ transform: `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px) scale(${fit.toFixed(3)})` }}

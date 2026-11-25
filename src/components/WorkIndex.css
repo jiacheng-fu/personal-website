@@ -408,6 +408,60 @@
   }
 }
 
+/* A phone on its side (844x390, 932x430) or a tiny window. The rule above
+   still stacked six rows over the card, which cannot fit 400px of height:
+   centred, the label and the first two titles went up past the top edge,
+   out of reach. The screen is wide, so it keeps the two columns, sized by
+   its height, and drops the tags (the one thing that does not fit). */
+@media (max-height: 560px) and (max-width: 1100px) and (min-aspect-ratio: 13/10) {
+  .wx {
+    gap: 0.55rem;
+    padding-block: 3.3rem 0.8rem; /* clear of the fixed nav */
+  }
+  .wx.shell {
+    width: 94vw;
+    padding-inline: 3vw;
+  }
+  .wx__body {
+    grid-template-columns: minmax(0, 50fr) minmax(0, 40fr);
+    gap: 4vw;
+  }
+  .wx__ghost {
+    display: none;
+  }
+  .wx__label {
+    font-size: 0.66rem;
+  }
+  .wx__title {
+    font-size: clamp(1rem, 5.4dvh, 1.7rem);
+  }
+  .wx__row {
+    gap: 0.6rem;
+    padding: clamp(0.15rem, 1.1dvh, 0.45rem) 0;
+  }
+  .wx__frame {
+    --wx-cap: 30dvh;
+  }
+  .wx__detail {
+    min-height: 0;
+    gap: 0.5rem;
+  }
+  .wx__yr--card {
+    margin-bottom: 0.3rem;
+  }
+  .wx__blurb {
+    font-size: 0.74rem;
+    line-height: 1.45;
+    margin-bottom: 0.5rem;
+  }
+  .wx__stack {
+    display: none;
+  }
+  .wx__aside {
+    font-size: 0.62rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .wx__row,
   .wx__rule,

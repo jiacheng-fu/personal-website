@@ -104,6 +104,11 @@ function applyFrameVars() {
      into nowhere. Published so that CSS can pin to the SCREEN edge instead. */
   const surfaceW = Math.max(f.w, (f.h * 16) / 9);
   s.setProperty("--frame-overhang-x", `${Math.max(0, (surfaceW - f.w) / 2)}px`);
+  /* ...and the same on the other axis: wider than 16:9 the surface is taller
+     than the screen, and the caption's `top: 14vh` from its top edge was
+     above the screen (-45px at 21:9, -517px at 32:9) */
+  const surfaceH = Math.max(f.h, (f.w * 9) / 16);
+  s.setProperty("--frame-overhang-y", `${Math.max(0, (surfaceH - f.h) / 2)}px`);
 }
 
 export function setBoxed(on: boolean) {
@@ -165,9 +170,14 @@ export function initFrame() {
   return stored; // "1" | "0" | null (never asked)
 }
 
+/** Worth asking about the 16:9 frame: wider than the clips allow, and the box
+ *  would be big enough to play them (>= 720 wide). Not on touch screens: a
+ *  phone turned sideways (844x390) is "ultrawide" too, and was asked - though
+ *  its box (693 wide) could not have played a clip anyway. */
 export function isUltrawide() {
   const { vw, vh } = layoutViewport();
-  return vw >= 720 && vw / vh > 2.05;
+  const desk = window.matchMedia("(pointer: fine)").matches;
+  return desk && vw >= 720 && vw / vh > 2.05 && Math.round(vh * REF_ASPECT) >= 720;
 }
 
 /** May a clip play right now? Wide enough, aspect in the 16:9 family, motion

@@ -36,6 +36,16 @@ const NAME_WIDTH = 0.86;
 /** ... but never wider than this much of what is actually on screen, which
  *  is what binds on a portrait phone, where the photo is cropped to the head */
 const NAME_FIT = 0.92;
+/** On windows wider than ~2:1 the photo's top (and the name with it) is
+ *  cropped away, so two limits, as fractions of the visible height. Neither
+ *  binds at 16:9 (caps 0.256, top 0.143) or in a Chrome window on a 16:9
+ *  monitor (0.283, 0.044-0.054); they hold the name on screen at 21:9, 32:9
+ *  and a short window with devtools docked. */
+const NAME_MAX_CAP = 0.3;
+const NAME_TOP_CLEAR = 0.04;
+/** ...and never under the fixed nav's links (CSS px), which on a short
+ *  screen (a phone on its side) 4% of the height does not clear */
+const NAV_CLEAR_PX = 46;
 /** Inter Tight's cap height, as a fraction of its size */
 const CAP = 0.727;
 /** the marker colour of the doodles (Brian: "doodle in yellow") */
@@ -115,8 +125,14 @@ export default function Hero({ active }: { active: boolean }) {
       const w100 = p.getEndPositionOfChar(name.length - 1).x - p.getStartPositionOfChar(0).x;
       if (!w100) return;
       const s = f.clientWidth / PHOTO.w;
+      /* how much of the photo is on screen, in its own units: the frame hangs
+         from the bottom, so a window wider than about 2:1 loses the sky the
+         name is set in (21:9 cut its top off, 32:9 and a short window with
+         devtools docked lost the name and the role entirely) */
+      const visH = sec.clientHeight / s;
+      const visTop = PHOTO.h - visH;
       const target = Math.min(PHOTO.w * NAME_WIDTH, (sec.clientWidth * NAME_FIT) / s);
-      const fs = (100 * target) / w100;
+      const fs = Math.min((100 * target) / w100, (NAME_MAX_CAP * visH) / CAP);
       p.setAttribute("font-size", String(fs));
       const letters: Line["letters"] = [];
       for (let i = 0; i < name.length; i++) {
@@ -127,7 +143,8 @@ export default function Hero({ active }: { active: boolean }) {
         const d = Math.abs(x + fs * 0.3 - PHOTO.crownX) / PHOTO.w;
         letters.push({ ch: name[i], x, x1, delay: 0.2 + d * 1.1 });
       }
-      const base = PHOTO.crownY + fs * CAP * NAME_DROP;
+      const clear = Math.max(NAME_TOP_CLEAR * visH, NAV_CLEAR_PX / s);
+      const base = Math.max(PHOTO.crownY + fs * CAP * NAME_DROP, visTop + clear + fs * CAP);
       ledges.current = letters.flatMap((l) =>
         (LEDGES[l.ch] ?? [[0.1, 0.9]]).map(([a, b]) => ({
           x0: l.x + (l.x1 - l.x) * a,
