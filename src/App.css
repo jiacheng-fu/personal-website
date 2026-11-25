@@ -2817,26 +2817,27 @@ html.is-boxed .grain {
   width: 68%;
 }
 
-/* ---- chrome over paper ---------------------------------------------------
+/* ---- chrome over cork ------------------------------------------------------
    .nav is fixed and uses mix-blend-mode: difference, which reads correctly on
-   the dark sections but washes out to near-invisible on the printout's paper.
-   On this panel it goes to plain dark ink instead. */
+   the dark sections but turns to mud on the notice board's cork. On this
+   panel it goes to plain cream with a shadow instead. */
 html:has(.panel--sheet.is-active) .nav {
   mix-blend-mode: normal;
-  color: #3a3225;
+  color: #fbf3e4;
+  text-shadow: 0 1px 2px rgba(30, 15, 0, 0.55);
 }
 html:has(.panel--sheet.is-active) .nav__links a,
 html:has(.panel--sheet.is-active) .nav__sound,
 html:has(.panel--sheet.is-active) .nav__switch {
-  color: #6b6047;
+  color: #f6ecd8;
 }
 html:has(.panel--sheet.is-active) .nav__links a:hover,
 html:has(.panel--sheet.is-active) .nav__sound:hover,
 html:has(.panel--sheet.is-active) .nav__switch:hover {
-  color: #2a2418;
+  color: #ffffff;
 }
 html:has(.panel--sheet.is-active) .dots__dot {
-  border-color: rgba(42, 36, 24, 0.42);
+  border-color: rgba(251, 243, 228, 0.75);
 }
 html:has(.panel--sheet.is-active) .dots__dot[aria-current="true"],
 html:has(.panel--sheet.is-active) .dots__dot.is-on {

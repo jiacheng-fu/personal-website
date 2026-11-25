@@ -1,56 +1,74 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { profile } from "../data/content";
 import { backend } from "../lib/ragEngine";
 import "./GroundFloor.css";
 
 /* ---------------------------------------------------------------------------
-   The last page: the ground floor.
+   The last page: a cork notice board.
 
-   The site opens 520 ft up, on the Space Needle's observation deck (the hero
-   photo). It ends at the bottom of it: an elevator lobby. The building
-   directory is the credits - the jokes, and the real attributions - and the
-   call button rides you back up to the top: the doors close over the screen,
-   a floor counter climbs to 520 FT, and they open on the hero.
+   Everything the old building directory said is still here, each line as
+   its own pinned thing: the credits on a clapperboard, the jokes on sticky
+   notes, the attributions the site owes on a typed card, a Polaroid, a
+   ticket stub to the observation deck. One of them is a call panel: press ▲
+   and it counts up to 520 ft and takes you back to the top (the hero photo
+   is the Space Needle's observation deck, 520 ft up).
 
-   Replaced "print contact.txt" (Brian, 2026-11-25: the nav carries GitHub,
-   Email and LinkedIn now, so a page of the same three links was redundant).
-   That sheet is parked in media/abandoned-contact/.
+   History: "print contact.txt" (parked in media/abandoned-contact/), then an
+   elevator lobby (media/abandoned-ground-floor-lobby/; Brian, 2026-11-25:
+   "make the entire thing like a scrapbook/bulletin board ... the content
+   currently on the directory ... as different post it notes, pinned things").
+   The Polaroid is the other hero candidate, the one not used (the Chihuly
+   glasshouse at Seattle Center; Brian: "use the other background image").
 
-   Flat CSS, no images: steel, felt and paper are gradients. Every line is
-   true (or plainly a joke): 46 keys, no sounds, BM25 doing the talking and
-   the model on the bench until a visitor switches it on.
+   Cork, paper, tape and pins are gradients over two small generated textures
+   (scripts/gen-grain.cjs). Layout is in 1760x990 design units (--u) on a 16:9
+   stage, so the collage scales as one piece. Every line is true, or plainly
+   a joke.
    --------------------------------------------------------------------------- */
 
 /** the observation deck, where the hero was taken */
 const TOP_FT = 520;
 
-type Row = { k: string; v: string; href?: string };
+type Ride = "idle" | "riding" | "leaving" | "arriving";
+type Pin = "red" | "blue" | "yellow" | "green" | "white";
 
-/* The directory. Plain jokes, and the attributions the site owes. */
-const ROWS: Row[] = [
-  { k: "Observation deck", v: `${TOP_FT} ft ▲` },
-  { k: "Directed by", v: profile.name },
-  { k: "Written by", v: profile.name },
-  { k: "Bugs", v: "also Brian" },
-  { k: "Stunt head", v: profile.name },
-  { k: "The machine", v: "BM25 (unpaid)" },
-  { k: "Its understudy", v: `${backend.name} (opt-in)` },
-  { k: "Keyboard", v: "46 keys, 0 clicks" },
-  { k: "Sound design", v: "none (we tried)" },
-  { k: "Filmed on location", v: "Seattle, not Austin" },
-  { k: "Keyboard idea & keycaps", v: "Naresh Khatri (MIT)", href: "https://github.com/Naresh-Khatri/3d-portfolio" },
-  { k: "Logos", v: "Simple Icons · Devicon", href: "https://simpleicons.org" },
-  { k: "Complaints", v: "email ↗", href: `mailto:${profile.email}` },
-  { k: "Lost & found", v: "GitHub ↗", href: profile.github },
-  { k: "Special thanks", v: "you, for scrolling this far" },
-];
-
-/* a hand-placed letterboard: every row sits a hair crooked, and always the
-   same hair (seeded, so it does not jitter between renders) */
-const tilt = (i: number) => (((i * 7919) % 13) - 6) * 0.09;
-
-type Ride = "idle" | "closing" | "riding" | "opening";
+/** One pinned thing, placed in design units, a hair crooked. */
+function Item({
+  x,
+  y,
+  w,
+  r,
+  z,
+  className = "",
+  children,
+}: {
+  x: number;
+  y: number;
+  w: number;
+  r: number;
+  z?: number;
+  className?: string;
+  children: ReactNode;
+}) {
+  const style = { "--x": x, "--y": y, "--w": w, "--r": `${r}deg`, zIndex: z } as CSSProperties;
+  return (
+    <div className={`nb__item ${className}`} style={style}>
+      {children}
+    </div>
+  );
+}
+const PinHead = ({ c, at = 50 }: { c: Pin; at?: number }) => (
+  <i className={`nb__pin nb__pin--${c}`} style={{ left: `${at}%` }} aria-hidden />
+);
+const Tape = ({ x, y, r, w = 110 }: { x: string; y: string; r: number; w?: number }) => (
+  <i
+    className="nb__tape"
+    style={{ left: x, top: y, "--tw": w, transform: `translate(-50%, -50%) rotate(${r}deg)` } as CSSProperties}
+    aria-hidden
+  />
+);
+const ext = { target: "_blank", rel: "noreferrer" } as const;
 
 export default function GroundFloor({ active, onRideUp }: { active: boolean; onRideUp: () => void }) {
   const [ride, setRide] = useState<Ride>("idle");
@@ -73,129 +91,294 @@ export default function GroundFloor({ active, onRideUp }: { active: boolean; onR
       return;
     }
     const at = (ms: number, fn: () => void) => timers.current.push(window.setTimeout(fn, ms));
+    const CLIMB = 1150;
     setFt(0);
-    setRide("closing");
-    /* doors shut (550 ms), then the counter climbs */
-    at(560, () => {
-      setRide("riding");
-      const t0 = performance.now();
-      const DUR = 1300;
-      const tick = (now: number) => {
-        const x = Math.min(1, (now - t0) / DUR);
-        const e = x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2; // ease in-out
-        setFt(Math.round(e * TOP_FT));
-        if (x < 1) raf.current = requestAnimationFrame(tick);
-      };
-      raf.current = requestAnimationFrame(tick);
-    });
-    /* arrived: jump to the top behind the closed doors, then open on it */
-    at(560 + 1300 + 180, () => {
+    setRide("riding");
+    const t0 = performance.now();
+    const tick = (now: number) => {
+      const k = Math.min(1, (now - t0) / CLIMB);
+      const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; // ease in-out
+      setFt(Math.round(e * TOP_FT));
+      if (k < 1) raf.current = requestAnimationFrame(tick);
+    };
+    raf.current = requestAnimationFrame(tick);
+    /* arrived: a quick fade over the screen, the jump happens behind it */
+    at(CLIMB + 250, () => setRide("leaving"));
+    at(CLIMB + 250 + 320, () => {
       onRideUp();
-      setRide("opening");
+      setRide("arriving");
     });
-    at(560 + 1300 + 180 + 700, () => setRide("idle"));
+    at(CLIMB + 250 + 320 + 520, () => setRide("idle"));
   };
 
+  const riding = ride !== "idle";
+
   return (
-    <div className={`section shell gf ${active ? "is-in" : ""}`}>
-      <p className="section__label">Ground floor</p>
+    <div className={`section shell nb ${active ? "is-in" : ""}`}>
+      <p className="section__label">Notice board</p>
 
-      <div className="gf__lobby">
-        {/* the directory: the credits */}
-        <div className="gf__board" role="list" aria-label="Building directory">
-          <p className="gf__boardHead">Directory</p>
-          {ROWS.map((r, i) => {
-            const inner = (
-              <>
-                <span className="gf__k">{r.k}</span>
-                <span className="gf__dots" aria-hidden />
-                <span className="gf__v">{r.v}</span>
-              </>
-            );
-            return (
-              <div key={r.k} role="listitem" className="gf__row" style={{ transform: `rotate(${tilt(i)}deg)` }}>
-                {r.href ? (
-                  <a
-                    href={r.href}
-                    {...(r.href.startsWith("http") ? { target: "_blank", rel: "noreferrer" } : {})}
-                    data-cursor="hover"
-                  >
-                    {inner}
-                  </a>
+      <div className="nb__stage">
+        <div className="nb__board">
+          {/* a few spare pins, as every board has */}
+          <i className="nb__pin nb__pin--yellow nb__pin--loose" style={{ left: "21.6%", top: "48.6%" }} aria-hidden />
+          <i className="nb__pin nb__pin--green nb__pin--loose" style={{ left: "77.4%", top: "92.2%" }} aria-hidden />
+          <i className="nb__pin nb__pin--blue nb__pin--loose" style={{ left: "46.2%", top: "95.6%" }} aria-hidden />
+
+          {/* filmed on location */}
+          <Item x={40} y={92} w={285} r={-6} className="nb__polaroid">
+            <PinHead c="red" />
+            <img src="/board/polaroid.webp" alt="Brian under a glass sculpture in a glasshouse in Seattle" loading="lazy" decoding="async" />
+            <p>
+              <small>filmed on location:</small> Seattle, not Austin
+            </p>
+          </Item>
+
+          {/* his name, the long way */}
+          <Item x={52} y={530} w={240} r={3} className="nb__hello">
+            <p className="nb__helloHead">
+              <b>Hello</b>
+              <span>my name is</span>
+            </p>
+            <p className="nb__helloName">
+              Jiacheng
+              <small>(call me Brian)</small>
+            </p>
+          </Item>
+
+          {/* the observation deck */}
+          <Item x={30} y={790} w={330} r={-3} className="nb__ticket">
+            <Tape x="50%" y="2%" r={-3} w={90} />
+            <div className="nb__ticketMain">
+              <span className="nb__ticketKicker">Admit one</span>
+              <strong>Observation deck</strong>
+              <span>
+                {TOP_FT} ft ▲ <em>one way, up</em>
+              </span>
+            </div>
+            <div className="nb__ticketStub">
+              <span>Nº</span>
+              <b>000{TOP_FT}</b>
+            </div>
+          </Item>
+
+          {/* directed by, written by, stunt head */}
+          <Item x={372} y={46} w={390} r={2.5} className="nb__clap">
+            <PinHead c="white" at={86} />
+            <div className="nb__clapStick" aria-hidden />
+            <div className="nb__clapBody">
+              <dl>
+                <dt>Production</dt>
+                <dd>this website</dd>
+                <dt>Directed by</dt>
+                <dd>{profile.name}</dd>
+                <dt>Written by</dt>
+                <dd>{profile.name}</dd>
+                <dt>Stunt head</dt>
+                <dd>{profile.name}</dd>
+              </dl>
+              <p className="nb__clapFoot">
+                <span>Scene: the end</span>
+                <span>Take: 1</span>
+              </p>
+            </div>
+          </Item>
+
+          {/* bugs */}
+          <Item x={362} y={420} w={165} r={-7} className="nb__sticky nb__sticky--yellow">
+            <p>
+              <small>bugs:</small> also Brian
+            </p>
+          </Item>
+
+          {/* a fortune */}
+          <Item x={828} y={500} w={225} r={5} className="nb__fortune">
+            <p>You will scroll back up.</p>
+            <span>Lucky numbers: 46 · {TOP_FT}</span>
+          </Item>
+
+          {/* Xi'an, from the photo's own metadata: the Drum Tower, June 2024 */}
+          <Item x={560} y={402} w={232} r={4} className="nb__polaroid">
+            <PinHead c="green" />
+            <img src="/board/xian.webp" alt="The Drum Tower in Xi'an, under a tree" loading="lazy" decoding="async" />
+            <p>Xi&apos;an, summer 2024</p>
+          </Item>
+
+          {/* a meme, and the machine's opt-in */}
+          <Item x={1295} y={60} w={200} r={6} className="nb__polaroid">
+            <Tape x="50%" y="1%" r={-4} w={80} />
+            <img src="/board/glow.webp" alt="A blown-out, glowing meme photo" loading="lazy" decoding="async" />
+            <p>your GPU, LLM on</p>
+          </Item>
+
+          {/* special thanks */}
+          <Item x={372} y={750} w={330} r={1.5} className="nb__notebook">
+            <Tape x="18%" y="4%" r={-8} w={80} />
+            <p>
+              <small>special thanks:</small>
+              <br />
+              you, for scrolling this far <span className="nb__heart">♥</span>
+            </p>
+          </Item>
+
+          {/* sound design */}
+          <Item x={722} y={786} w={160} r={-4} className="nb__sticky nb__sticky--pink">
+            <p>
+              <small>sound design:</small> none
+              <br />
+              (we tried)
+            </p>
+          </Item>
+
+          {/* the machine, its understudy */}
+          <Item x={808} y={50} w={395} r={-2} className="nb__card nb__cast">
+            <PinHead c="blue" at={12} />
+            <h3>Cast</h3>
+            <p>
+              <span>The machine</span>
+              <i />
+              <span>BM25 (unpaid)</span>
+            </p>
+            <p>
+              <span>Its understudy</span>
+              <i />
+              <span>{backend.name} (opt-in)</span>
+            </p>
+          </Item>
+
+          {/* the keyboard */}
+          <Item x={826} y={252} w={200} r={5} className="nb__kraft">
+            <Tape x="50%" y="3%" r={4} w={100} />
+            <span className="nb__keycap" aria-hidden>
+              <span>46</span>
+            </span>
+            <p>
+              <small>keyboard:</small> 46 keys, 0 clicks
+            </p>
+          </Item>
+
+          {/* the to-do list */}
+          <Item x={884} y={596} w={272} r={-3} className="nb__todo">
+            <PinHead c="red" at={50} />
+            <p className="nb__todoHead">to do:</p>
+            <ul>
+              <li className="is-done">build this website</li>
+              <li className="is-done">teach the machine to quote</li>
+              <li className="is-done">keep the phone number off it</li>
+              <li>graduate (Dec 2027)</li>
+              <li>
+                2027 internship <em>← you?</em>
+              </li>
+            </ul>
+          </Item>
+
+          {/* the flyer, with tabs to tear off */}
+          <Item x={1052} y={232} w={250} r={-2} className="nb__flyer">
+            <PinHead c="yellow" at={50} />
+            <p className="nb__flyerKicker">Now accepting</p>
+            <p className="nb__flyerHead">2027 internships</p>
+            <p className="nb__flyerBody">
+              Software engineer · CS at Texas A&amp;M, graduating December 2027 · no visa sponsorship needed
+            </p>
+            <div className="nb__tabs">
+              {Array.from({ length: 6 }, (_, i) =>
+                i === 2 ? (
+                  <span key={i} className="nb__tab is-torn" aria-hidden />
                 ) : (
-                  inner
-                )}
-              </div>
-            );
-          })}
-        </div>
+                  <a key={i} className="nb__tab" href={`mailto:${profile.email}`} data-cursor="hover">
+                    email Brian
+                  </a>
+                ),
+              )}
+            </div>
+          </Item>
 
-        {/* the doors, with the floor indicator over them */}
-        <div className="gf__shaft" aria-hidden="true">
-          <div className="gf__indicator">
-            <span className="gf__arrow">▲</span>
-            <span className="gf__floor">G</span>
-          </div>
-          <div className="gf__doors">
-            <i />
-            <i />
-          </div>
-        </div>
+          {/* complaints */}
+          <Item x={1530} y={640} w={160} r={7} z={3} className="nb__sticky nb__sticky--blue">
+            <a href={`mailto:${profile.email}`} data-cursor="hover">
+              <small>complaints:</small> email me ↗
+            </a>
+          </Item>
 
-        {/* the call panel, and the certificate pinned beside it */}
-        <div className="gf__side">
-          <div className="gf__panel">
-            <button
-              type="button"
-              className={`gf__call ${ride !== "idle" ? "is-lit" : ""}`}
-              onClick={goUp}
-              data-cursor="hover"
-              aria-label={`Ride the elevator back up to the top (${TOP_FT} ft)`}
-            >
-              ▲
-            </button>
-            <button
-              type="button"
-              className="gf__call gf__call--down"
-              disabled
-              title="You are already at the bottom"
-              aria-label="Down (you are already at the bottom)"
-            >
-              ▼
-            </button>
-            <p className="gf__engrave">Press ▲ for the top</p>
-          </div>
+          {/* the way back up */}
+          <Item x={1500} y={110} w={245} r={-3} z={4} className="nb__panel">
+            <PinHead c="red" />
+            <div className="nb__led" aria-hidden>
+              <span className={`nb__ledArrow ${riding ? "is-on" : ""}`}>▲</span>
+              <span>{ride === "idle" ? "G" : `${ft} FT`}</span>
+            </div>
+            <div className="nb__buttons">
+              <button
+                type="button"
+                className={`nb__call ${riding ? "is-lit" : ""}`}
+                onClick={goUp}
+                data-cursor="hover"
+                aria-label={`Ride back up to the top (${TOP_FT} ft)`}
+              >
+                <span>▲</span>
+              </button>
+              <button
+                type="button"
+                className="nb__call nb__call--down"
+                disabled
+                title="You are already at the bottom"
+                aria-label="Down (you are already at the bottom)"
+              >
+                <span>▼</span>
+              </button>
+            </div>
+            <p className="nb__engrave">Press ▲ for the top</p>
+          </Item>
 
-          <div className="gf__cert">
-            <p className="gf__certHead">Elevator certificate</p>
-            <dl>
-              <dt>Capacity</dt>
-              <dd>1 recruiter</dd>
-              <dt>Inspected by</dt>
-              <dd>B. Fu</dd>
-              <dt>Maintained by</dt>
-              <dd>the sole maintainer</dd>
-              <dt>Rise</dt>
-              <dd>{TOP_FT} ft, one stop</dd>
-            </dl>
-          </div>
+          {/* the elevator's certificate, taped under its panel */}
+          <Item x={1508} y={390} w={232} r={2} z={3} className="nb__slip">
+            <Tape x="50%" y="0%" r={-2} w={70} />
+            <h3>Certificate of operation</h3>
+            <p>capacity: 1 recruiter</p>
+            <p>inspected by: B. Fu</p>
+            <p>maintained by: the sole maintainer</p>
+            <p>rise: {TOP_FT} ft, one stop</p>
+            <span className="nb__stamp" aria-hidden>
+              Passed
+            </span>
+          </Item>
+
+          {/* the attributions the site owes */}
+          <Item x={1172} y={668} w={350} r={2.5} className="nb__card nb__thanks">
+            <Tape x="8%" y="6%" r={-35} w={80} />
+            <Tape x="92%" y="6%" r={35} w={80} />
+            <h3>Borrowed, with thanks</h3>
+            <p>
+              <span>Keyboard idea &amp; keycaps</span>
+              <a href="https://github.com/Naresh-Khatri/3d-portfolio" {...ext} data-cursor="hover">
+                Naresh Khatri (MIT) ↗
+              </a>
+            </p>
+            <p>
+              <span>Logos</span>
+              <span className="nb__links">
+                <a href="https://simpleicons.org" {...ext} data-cursor="hover">
+                  Simple Icons
+                </a>{" "}
+                ·{" "}
+                <a href="https://devicon.dev" {...ext} data-cursor="hover">
+                  Devicon
+                </a>
+              </span>
+            </p>
+          </Item>
+
+          {/* lost & found */}
+          <Item x={1420} y={812} w={160} r={-5} z={4} className="nb__sticky nb__sticky--green">
+            <a href={profile.github} {...ext} data-cursor="hover">
+              <small>lost &amp; found:</small> GitHub ↗
+            </a>
+          </Item>
         </div>
       </div>
 
-      {/* the ride itself: doors over the whole screen */}
-      {ride !== "idle" &&
-        createPortal(
-          <div className={`gf__ride is-${ride}`} aria-hidden="true">
-            <i />
-            <i />
-            <div className="gf__counter">
-              <span className="gf__counterArrow">▲</span>
-              <span className="gf__counterFt">{ft} FT</span>
-              <span className="gf__counterTo">Observation deck</span>
-            </div>
-          </div>,
-          document.body,
-        )}
+      {/* the jump to the top happens behind a quick fade */}
+      {(ride === "leaving" || ride === "arriving") &&
+        createPortal(<div className={`nb__curtain is-${ride}`} aria-hidden="true" />, document.body)}
     </div>
   );
 }
