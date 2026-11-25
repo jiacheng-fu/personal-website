@@ -61,7 +61,12 @@ export const skills = [
  * Only real material: CarScout is a capture of the live site, Wild West is
  * the game's own background art from its repo. Horizon and CarStatus need
  * footage recorded - neither can be captured from here (one is a Unity
- * build, the other a CLI against a live car). */
+ * build, the other a CLI against a live car).
+ *
+ * DeskStats is the real app's own code (unmodified sources, driven by real
+ * click events) recorded on this machine with live readings; only the pointer
+ * is drawn in, to show where each click lands. "Personal Website" is a
+ * headless capture of the dev build. */
 /** `clip` is an mp4 and wins when present; `still` is the fallback frame, and
  *  also the poster the video shows before its first frame decodes. Neither is
  *  required - a project with no reel keeps the numeral instead. */
@@ -78,7 +83,7 @@ export type Project = {
 export const projects: Project[] = [
   {
     title: "Axle",
-    reel: { clip: "/reels/axle.mp4", still: "/shots/carscout.jpg" },
+    reel: { clip: "/reels/axle.mp4", still: "/shots/axle.jpg" },
     years: "2026 — now",
     repo: "https://github.com/jiacheng-fu/axle",
     blurb:
@@ -102,6 +107,24 @@ export const projects: Project[] = [
     blurb:
       "Live multiplayer party game built in 24 hours at HowdyHack. Team project — I built the frontend: inter-scene mechanics, transitions, and UI across distinct client states.",
     stack: ["TypeScript", "React"],
+  },
+  {
+    title: "DeskStats",
+    reel: { clip: "/reels/deskstats.mp4", still: "/shots/deskstats.jpg" },
+    years: "2026",
+    repo: "https://github.com/jiacheng-fu/DeskStats",
+    blurb:
+      "A native desktop widget for Apple Silicon: per-core CPU, GPU, memory, power draw and charging rate, read straight from IOKit. No permissions, about 1.4% of one core.",
+    stack: ["Swift", "SwiftUI", "AppKit", "IOKit"],
+  },
+  {
+    title: "Personal Website",
+    reel: { clip: "/reels/personal-website.mp4", still: "/shots/personal-website.jpg" },
+    years: "2026 — now",
+    repo: "https://github.com/jiacheng-fu/personal-website",
+    blurb:
+      "The page you're on: a 3D keyboard of my stack (after Naresh Khatri's), and a retro terminal that answers questions about me with an LLM running on your GPU. No server, no API key.",
+    stack: ["React", "TypeScript", "Three.js", "WebGPU"],
   },
   {
     title: "CarStatus",

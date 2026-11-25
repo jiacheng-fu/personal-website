@@ -168,10 +168,11 @@ export default function ContactSheet({
             <span>&copy; 2026 {profile.name}</span>
             <span aria-hidden> · </span>
             <span>
-              WebGL · no template · keycap mesh from{" "}
+              WebGL · no template · the skills keyboard is after{" "}
               <a href="https://github.com/Naresh-Khatri/3d-portfolio" target="_blank" rel="noreferrer" data-cursor="hover">
-                Naresh Khatri
+                Naresh Khatri&rsquo;s 3d-portfolio
               </a>{" "}
+              (MIT), keycap mesh his{" "}
               · projector and screen from{" "}
               <a href="https://polyhaven.com" target="_blank" rel="noreferrer" data-cursor="hover">
                 Poly Haven
