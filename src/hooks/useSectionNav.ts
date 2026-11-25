@@ -87,6 +87,13 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
          comes through goTo. */
       if (isNavLocked()) return;
       const i = Math.max(0, Math.min(count - 1, target));
+      /* One move at a time, whatever asked for it. The wheel used to be the
+         only input that waited for a clip's fade-out (isClipBusy), and the
+         progress dots did not even wait for a scroll in flight - a key or a
+         dot click in that window started the next scene on top of this one,
+         or two scroll animations that fought. Re-aligning to the section we
+         are already on (after a resize) is not a move and is always allowed. */
+      if ((busy.current || isClipBusy()) && i !== indexRef.current) return;
       const from = window.scrollY;
       const to = sectionTop(i);
       if (i === indexRef.current && Math.abs(from - to) < 2) return;
@@ -136,7 +143,12 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
         const p = Math.min(1, (now - start) / DURATION);
         window.scrollTo(0, from + (to - from) * ease(p));
         if (p < 1) requestAnimationFrame(step);
-        else window.setTimeout(() => (busy.current = false), COOLDOWN);
+        else {
+          /* land on where the section is NOW: a resize during the glide
+             moves it, and `to` was measured before */
+          window.scrollTo(0, sectionTop(i));
+          window.setTimeout(() => (busy.current = false), COOLDOWN);
+        }
       };
       requestAnimationFrame(step);
     },
@@ -146,9 +158,22 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
   /* Keep the page on the section the nav believes it is on from the first
      frame (and after a dev hot-reload remount, which resets the index). */
   useEffect(() => {
-    if (enabled) window.scrollTo(0, sectionTop(indexRef.current));
+    if (!enabled) return;
+    const realign = () => window.scrollTo(0, sectionTop(indexRef.current));
+    realign();
+    /* ...and again whenever the browser might have put the scroll back on its
+       own: at `load` (a restore applied late, after the first frame) and on
+       `pageshow` (a page brought back from the back/forward cache). A page
+       scrolled to one section while the nav believes another is the black,
+       "broken on reload" page - nothing on that section was ever activated. */
+    window.addEventListener("load", realign);
+    window.addEventListener("pageshow", realign);
+    return () => {
+      window.removeEventListener("load", realign);
+      window.removeEventListener("pageshow", realign);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
     if (!enabled) return;
