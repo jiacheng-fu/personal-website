@@ -946,3 +946,28 @@ and 260/700 ms post-landing timers are all independent of the rate, and the
 `hideBeforeEndS` check compares clip seconds to clip seconds.
 
 No cache bump: the file did not change.
+
+
+## 20 · The shift came back: scrollbars (2026-11-25)
+
+Brian: "the shift is back... a very noticeable positional shift from the
+video transition's final position and the actual position."
+
+**Cause.** A classic scrollbar (Windows always; macOS whenever a mouse is
+plugged in; Chrome, Firefox and Safari alike). The clip overlay is
+`position: fixed; inset: 0`, which excludes the 15px bar; the machine was
+placed from `window.innerWidth`, which includes it. Measured with a bar:
+the clip's machine 7-8px left of the live one, plus 2px and a ~1% scale miss
+on wide windows. Every earlier fix was measured on a machine with overlay
+scrollbars, so none of them could see it.
+
+**Fix.** `viewportFrame()` measures `documentElement.clientWidth/Height` -
+the box the overlay fills - so placement agrees with the clip with or
+without a bar. And the bar is hidden site-wide (index.css), since the site
+moves by section. Either one alone fixes it; both together keep it fixed.
+
+**Guard.** `npm run seam:check` plays the real clip headlessly at five
+window setups, four with a scrollbar forced on, and fails past 1px. With the
+old `innerWidth` line put back it fails 4 of 5 at exactly the reported
+7-8px. Run it after touching anything in transitions.ts, Apple2Front's
+placement, the keyboard surface, TransitionPlayer, or page-wide CSS.

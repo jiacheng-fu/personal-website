@@ -11,7 +11,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "rag:eval": "esbuild scripts/rag-eval.ts --bundle --format=esm --platform=node --loader:.json=json --outfile=node_modules/.cache/rag-eval.mjs --log-level=error && node node_modules/.cache/rag-eval.mjs",
-    "rag:gates": "esbuild scripts/engine-gates.ts --bundle --format=esm --platform=node --external:@mlc-ai/web-llm --external:@huggingface/transformers --outfile=node_modules/.cache/engine-gates.mjs --log-level=error && node node_modules/.cache/engine-gates.mjs"
+    "rag:gates": "esbuild scripts/engine-gates.ts --bundle --format=esm --platform=node --external:@mlc-ai/web-llm --external:@huggingface/transformers --outfile=node_modules/.cache/engine-gates.mjs --log-level=error && node node_modules/.cache/engine-gates.mjs",
+    "seam:check": "node scripts/seam-check.mjs"
   },
   "dependencies": {
     "@mlc-ai/web-llm": "^0.2.84",
@@ -29,6 +30,7 @@
     "@types/react-dom": "^18.3.5",
     "@types/three": "^0.185.1",
     "@vitejs/plugin-react": "^4.3.4",
+    "playwright-core": "^1.65.1",
     "typescript": "^5.7.2",
     "vite": "^6.0.7"
   }
