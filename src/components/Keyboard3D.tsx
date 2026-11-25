@@ -153,27 +153,40 @@ const HERO_Q = new THREE.Quaternion()
   .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), HERO_TIP));
 const HERO_POS = new THREE.Vector3(0, 0, 0);
 
+/** A pose driven from outside, in DEGREES, for the tuning panel. Composed in
+ *  the same order as the constants above so the numbers mean the same thing. */
+export type HeroPose = { tip: number; roll: number; yaw: number; lean: number };
+
+const D2R = Math.PI / 180;
+const _qa = new THREE.Quaternion();
+const _qb = new THREE.Quaternion();
+const _ax = new THREE.Vector3(1, 0, 0);
+const _ay = new THREE.Vector3(0, 1, 0);
+const _az = new THREE.Vector3(0, 0, 1);
+
+/** Build a pose quaternion into `out`. Allocates nothing: this runs per frame
+ *  while a slider is being dragged. */
+function heroQuat(out: THREE.Quaternion, p: HeroPose): THREE.Quaternion {
+  out.setFromAxisAngle(_ax, p.lean * D2R);
+  out.multiply(_qa.setFromAxisAngle(_ay, p.yaw * D2R));
+  out.multiply(_qb.setFromAxisAngle(_az, p.roll * D2R));
+  out.multiply(_qa.setFromAxisAngle(_ax, p.tip * D2R));
+  return out;
+}
+
+/** Scratch for the fit solver and the frame loop; never held across a frame. */
+const _poseQ = new THREE.Quaternion();
+
 /* Everything the whole board shares per frame; Key legends read the lamp so
    the unlit logo materials cannot glow before the spotlight is on. */
 /* `ready` is false until the board has finished standing up. A stray mouse
    position over where a key WILL be was popping company names on screen
    mid-move, before the board had even landed. */
-/* lamp STARTS at 0, and that matters. The canvas mounts before the section is
-   entered (an IntersectionObserver brings it in early) and R3F renders that
-   commit immediately - before any useFrame has run. At lamp 1 the legends,
-   which are unlit and multiplied by it, drew at full brightness for that one
-   frame: every logo flashing white against black caps just as the section
-   arrives. Measured at 612ms after the scroll: max channel 241 with zero
-   saturation, black either side of it. */
-const STAGE = { lamp: 0, dark: true, ready: false };
-
-/* Full black before the lamp strikes. Measured from when the section ARMS,
-   which is the start of the 850ms scroll, not the end of it - so this has to
-   cover the journey as well as the pause. Nets out around 1.5s of black once
-   the page has actually settled. */
-const BLACKOUT = 2.4;
-/** And then it is just ON - a switch thrown, not a fade. */
-const STRIKE = 0.2;
+/* lamp starts at 1 now that there is no blackout to come up from. It used to
+   start at 0 to stop the legends - which are unlit and multiplied by it -
+   flashing at full brightness on the commit R3F renders before the first
+   useFrame. With the room lit from the start there is nothing to flash. */
+const STAGE = { lamp: 1, dark: false, ready: false };
 
 /** Timestamp of the last spacebar hit; every key ripples off it. */
 const WAVE = { at: 0 };
@@ -277,6 +290,20 @@ function legendPlane(cap: Cap) {
 /* `?dpr=1` / `?dpr=1.75` / `?dpr=2` forces the render scale, so the board can
    be A/B'd on a real Retina display without a rebuild. Unset = the normal
    [1, 2] range. Debug aid; absent from normal URLs. */
+/* Most pixels we are willing to shade per frame. 3.2 MP is ~1080p worth of
+   work: comfortable for integrated graphics, and on a Retina panel it still
+   lands above 1x so the board keeps its edge definition. */
+const PIXEL_BUDGET = 3_200_000;
+
+/** The highest device-pixel ratio that keeps a surface inside the budget,
+ *  clamped to something sane. Recomputed on resize by the caller. */
+function budgetedDpr(w: number, h: number) {
+  const cap = Math.min(window.devicePixelRatio || 1, 2);
+  if (w <= 0 || h <= 0) return cap;
+  const fit = Math.sqrt(PIXEL_BUDGET / (w * h));
+  return Math.max(1, Math.min(cap, +fit.toFixed(2)));
+}
+
 /* `?aniso=N` forces the anisotropic filter level on the keycap legend
    textures. Debug aid: the board is seen at a steep oblique angle, which is
    where this setting decides how sharp the logos read. */
@@ -918,7 +945,21 @@ function HoverCard({ label, offset }: { label: string | null; offset: { x: numbe
    hard-coded: at a narrow viewport the old fixed position clipped both ends.
    --------------------------------------------------------------------------- */
 
-function FitCamera({ width, depth }: { width: number; depth: number }) {
+function FitCamera({
+  width,
+  depth,
+  daylight = false,
+  pose,
+  fill,
+}: {
+  width: number;
+  depth: number;
+  daylight?: boolean;
+  /** overrides HERO_Q while the tuning panel is driving */
+  pose?: HeroPose;
+  /** overrides the daylight FILL while the tuning panel is driving */
+  fill?: number;
+}) {
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const size = useThree((s) => s.size);
 
@@ -932,25 +973,38 @@ function FitCamera({ width, depth }: { width: number; depth: number }) {
     const hw = width / 2 + 0.62;
     const hd = depth / 2 + 0.62;
 
+    /* Where the eye goes. The section keeps its slight rake - it is a lamp
+       finding an object on a table. The hero is square-on and a touch below
+       centre, the way a product is held up to be looked at. */
+    const place = (cam: THREE.PerspectiveCamera, d: number) => {
+      if (daylight) cam.position.set(0, d * 0.05, d);
+      else cam.position.set(d * 0.02, -d * 0.04, d);
+      cam.lookAt(0, 0, 0);
+    };
+
     const corners: THREE.Vector3[] = [];
     for (const sx of [-1, 1]) {
       for (const sz of [-1, 1]) {
         for (const sy of [-0.9, 0.68]) {
-          const corner = new THREE.Vector3(sx * hw, sy, sz * hd).applyQuaternion(FINAL_Q);
-          corner.y += 0.55; // the board's resting lift
+          const q = daylight ? (pose ? heroQuat(_poseQ, pose) : HERO_Q) : FINAL_Q;
+          const corner = new THREE.Vector3(sx * hw, sy, sz * hd).applyQuaternion(q);
+          if (!daylight) corner.y += 0.55; // the board's resting lift
           corners.push(corner);
         }
       }
     }
 
-    const FILL = 0.93; // fraction of the frame the board should occupy
+    /* Fraction of the frame the board fills. Looser in the hero: the board
+       is one element in a composition rather than the whole picture, and a
+       0.93 fill leaves no air between the case corners and the type it is
+       supposed to be sitting in front of. */
+    const FILL = daylight ? (fill ?? 0.99) : 0.93;
     const probe = new THREE.Vector3();
     let dist = 8;
 
     for (let i = 0; i < 8; i++) {
       camera.aspect = size.width / Math.max(1, size.height);
-      camera.position.set(dist * 0.02, -dist * 0.04, dist);
-      camera.lookAt(0, 0, 0);
+      place(camera, dist);
       camera.updateMatrixWorld(true);
       camera.updateProjectionMatrix();
 
@@ -963,10 +1017,10 @@ function FitCamera({ width, depth }: { width: number; depth: number }) {
       dist *= worst / FILL;
     }
 
-    camera.position.set(dist * 0.02, -dist * 0.04, dist);
-    camera.lookAt(0, 0, 0);
+    place(camera, dist);
     camera.updateProjectionMatrix();
-  }, [camera, size.width, size.height, width, depth]);
+  }, [camera, size.width, size.height, width, depth, daylight, fill,
+      pose?.tip, pose?.roll, pose?.yaw, pose?.lean]);
 
   return null;
 }
@@ -982,6 +1036,8 @@ function Board({
   armed = true,
   instant = false,
   daylight = false,
+  pose,
+  fill,
 }: {
   onHover: (label: string | null) => void;
   /** True once this is the section on screen. Going true ARMS the sequence;
@@ -1005,6 +1061,10 @@ function Board({
    *  blackout, no lamp strike, no stand-up, no floor. It is simply lit and
    *  posed from the first frame, in daylight, and stays interactive. */
   daylight?: boolean;
+  /** Live pose from the tuning panel; falls back to the baked HERO_Q. */
+  pose?: HeroPose;
+  /** Live camera fill from the tuning panel. */
+  fill?: number;
 }) {
   const instantRef = useRef(instant);
   instantRef.current = instant;
@@ -1063,7 +1123,7 @@ function Board({
       STAGE.lamp = 1;
       STAGE.dark = false;
       STAGE.ready = true;
-      g.quaternion.copy(HERO_Q);
+      g.quaternion.copy(pose ? heroQuat(_poseQ, pose) : HERO_Q);
       g.position.copy(HERO_POS);
       return;
     }
@@ -1077,37 +1137,25 @@ function Board({
         litFired.current = true;
         onLight?.(true);
       } else {
-        // armed, but the room stays dark for a while yet
+        // armed: the clock starts and the board stands up out of it
         startAt.current = now;
       }
     }
     const t = startAt.current === null ? -1 : startAt.current === -99 ? 99 : now - startAt.current;
 
-    /* -- the strike --
-       Nothing at all for BLACKOUT seconds: no board, no floor, no copy, no
-       cone. Everything in the scene is a lit material with no emissive, and
-       the legends multiply by STAGE.lamp, so at lamp 0 the frame is genuinely
-       black rather than dark - nothing to glow. Then the lamp hits hard and
-       fast, which is what makes it read as a switch being thrown rather than
-       a fade-up. */
-    const s = t - BLACKOUT;
-    let lamp = 0;
-    if (s >= 0) {
-      const r = THREE.MathUtils.clamp(s / STRIKE, 0, 1);
-      lamp = r * r;
-      if (s < 0.26) {
-        // two brief dips, like the ballast catching
-        if (s > 0.05 && s < 0.09) lamp *= 0.25;
-        if (s > 0.15 && s < 0.18) lamp *= 0.45;
-      }
-      if (!litFired.current) {
-        litFired.current = true;
-        onLight?.(true);
-        // the strike used to click (playStageLight); Brian wants the lamp silent
-      }
+    /* The room is simply LIT. The blackout and the lamp strike are gone
+       (Brian, 2026-08-28): arriving in a dark room and waiting for a light to
+       catch was a beat too many in front of the thing you came to see. The
+       INTRO stays - the board still lies flat for half a second and stands up
+       - it just does it with the lights already on. */
+    const s = t;
+    const lamp = 1;
+    if (!litFired.current) {
+      litFired.current = true;
+      onLight?.(true);
     }
-    STAGE.dark = lamp < 0.04;
-    STAGE.lamp = lamp;
+    STAGE.dark = false;
+    STAGE.lamp = 1;
     /* The old 880 was set when the legends were dark ink on pale caps and
        needed all the help they could get. It put roughly 15 units of
        irradiance on the board - but a saturated cap clips once its brightest
@@ -1328,7 +1376,7 @@ function Board({
 
   return (
     <>
-      <FitCamera width={width} depth={depth} />
+      <FitCamera width={width} depth={depth} daylight={daylight} pose={pose} fill={fill} />
 
       <HoverCard label={activeCap && !activeCap.blank ? activeCap.label : null} offset={cardAt} />
 
@@ -1431,6 +1479,8 @@ export default function Keyboard3D({
   active = true,
   instant = false,
   daylight = false,
+  pose,
+  fill,
   onLight,
 }: {
   paused?: boolean;
@@ -1439,12 +1489,34 @@ export default function Keyboard3D({
   instant?: boolean;
   /** Hero mode: daylight on a warm page, no studio theatre. See Board. */
   daylight?: boolean;
+  /** Live pose + camera fill, driven by the hero tuning panel at ?tune=1. */
+  pose?: HeroPose;
+  fill?: number;
   onLight?: (on: boolean) => void;
 }) {
   const [label, setLabel] = useState<string | null>(null);
 
+  /* Keep the render scale inside PIXEL_BUDGET for whatever size the canvas
+     actually is, and follow window resizes. */
+  const hostBox = useRef<HTMLDivElement>(null);
+  const [pixelBudgetDpr, setPixelBudgetDpr] = useState(1);
+  useEffect(() => {
+    const fit = () => {
+      const el = hostBox.current;
+      const w = el?.clientWidth || window.innerWidth;
+      const h = el?.clientHeight || window.innerHeight;
+      setPixelBudgetDpr(budgetedDpr(w, h));
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, []);
+
   return (
-    <div className={`kb ${daylight ? "kb--daylight" : ""}`}>
+    <div
+      className={`kb ${daylight ? "kb--daylight" : ""}`}
+      ref={hostBox}
+    >
       <Canvas
         className="kb__canvas"
         shadows
@@ -1454,25 +1526,18 @@ export default function Keyboard3D({
            keycaps and their logos read soft. The cap is a RANGE, so weak
            GPUs still fall back down it; there is no cost on machines that
            cannot afford it. */
-        /* Render at the display's own pixel density. 1.75 meant a Retina
-           panel was fed 87.5% of the pixels it can show and upscaled the
-           rest, which is what made the keycap logos read soft.
+        /* A PIXEL BUDGET, not a device-pixel multiplier.
 
-           Measured at 1800x1013 DPR 2, logo edge energy (higher = crisper):
-               1.75  16.36     <- was
-               2.00  20.05     <- now, +22.5%
-               2.50  21.00
-               3.00  23.19     (+41.7%, but 16.4 MP of buffer)
+           `dpr={[1, 2]}` asks for the display's full density, which on a
+           Retina panel at a large window is 7.3 MP a frame - with shadows and
+           MSAA on 234 draw calls and ~389k triangles. That is what makes a
+           laptop hot, and it scales with WINDOW SIZE, so the biggest screens
+           pay the most. Budgeting total pixels instead keeps the cost roughly
+           constant everywhere: small windows still get full density, large
+           ones give back resolution rather than frame rate.
 
-           Stopping at the display's own density: past that is supersampling,
-           which keeps gaining but costs battery and heat on a laptop for a
-           board that is already at native resolution. `?dpr=` overrides it
-           if that is ever worth revisiting.
-
-           NOT the bottleneck, measured and ruled out: the legend textures
-           (256 vs 512 vs 1024 px changed nothing - the marks are SVG paths,
-           already oversampled), and anisotropic filtering (8 vs 1: -0.1%). */
-        dpr={DPR_OVERRIDE ?? [1, 2]}
+           `?dpr=` still overrides for testing. */
+        dpr={DPR_OVERRIDE ?? pixelBudgetDpr}
         frameloop={paused ? "never" : "always"}
         /* The hero looks at the board almost square-on from further back: it
            is a product being presented to the reader, not an object found on
@@ -1501,6 +1566,8 @@ export default function Keyboard3D({
           armed={active && !paused}
           instant={instant}
           daylight={daylight}
+          pose={pose}
+          fill={fill}
         />
       </Canvas>
 
