@@ -908,3 +908,41 @@ The DPR 1.75 -> 2 and anisotropy 8 -> max changes from earlier today are OUT.
 Neither could be justified: an A/B of `?aniso=1` vs `?aniso=8` measured
 **-0.1%**, and the control already rendered at 1.75 so no value >= 1.75 could
 be blurrier. `?dpr=` and `?aniso=` remain as debug knobs, inert unless used.
+
+
+## 19 · Played at 2x on the element (2026-10-20)
+
+Brian, back after a break: *"the scroll video transition from the keyboard
+to RAG needs to be like 1.5-2x faster."*
+
+**The master is untouched. `TransitionPlayer` sets `video.playbackRate = 2`
+(`PLAYBACK_RATE`), so the 4.52 s clip plays in 2.26 s, both directions.**
+
+Why 2 and not something in between: the same arithmetic as §11. The master
+is 60 fps with every frame unique (§14), so the element at 2x presents 120
+unique fps - a 60 Hz panel drops exactly every other frame and a 120 Hz
+panel shows every one; either way the cadence is even. 1.5x would be 90 fps
+on 60 Hz, a hold-1/hold-2 pattern, which is the judder §11 measured.
+
+Why the element and not a rebuild: the footage keeps all of its frames, the
+speed is one number to change, and nothing about the seam constants moves.
+A rebuild at `A_SPEED=B_SPEED=5` would be the equivalent file (ffmpeg's
+`fps=60` would drop the same alternate frames) and is still available if a
+single-speed asset is ever wanted.
+
+What had to follow the rate: the seam ramps (`SEAM_RAMP_S`, 1.8 s) are CSS
+transitions in wall time but are armed in clip time (`currentTime`). Left
+alone, the forward ramp would still be unwinding the keyboard correction
+while clip B was already growing the monitor. Both ramp durations are now
+`SEAM_RAMP_S / rate` wall seconds, so each covers the same 1.8 s of footage
+it did before. The give-back therefore runs at ~6 px/s rather than ~3 px/s;
+the board behind it is also moving twice as fast, so the ratio of
+correction to motion is what it was. Not re-measured against screenshots -
+if the head seam reads as a drift at 2x, that is the number to look at.
+
+Everything else is already wall-time or clip-time correctly: the 12 s
+play failsafe, `hide()`'s 300/420 ms, App's 220 ms `is-departing` lead-in
+and 260/700 ms post-landing timers are all independent of the rate, and the
+`hideBeforeEndS` check compares clip seconds to clip seconds.
+
+No cache bump: the file did not change.

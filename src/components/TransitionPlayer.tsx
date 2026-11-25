@@ -21,7 +21,13 @@ export type TransitionHandle = {
    *  hideBeforeEndS before the static tail, under the board's stand-up. */
   play: (
     src: string,
-    opts?: { hideBeforeEndS?: number; instantReveal?: boolean; seamAtEnd?: boolean },
+    opts?: {
+      hideBeforeEndS?: number;
+      instantReveal?: boolean;
+      seamAtEnd?: boolean;
+      /** element playback rate; defaults to PLAYBACK_RATE */
+      rate?: number;
+    },
   ) => Promise<void>;
   /** Fade the held last frame away. */
   hide: () => void;
@@ -35,6 +41,21 @@ export type TransitionHandle = {
    clip plus its fade; exists only so a missed hide() cannot leave the nav
    locked. */
 const CLIP_BUSY_FAILSAFE = 15000;
+
+/* ---- playback rate --------------------------------------------------------
+   The master is cut at 2.5x (docs/transition-kb-machine.md s14): 4.52 s at
+   60 fps with every frame unique. Brian wants it quicker still (2026-10-20:
+   "like 1.5-2x faster"), so the element plays it at 2x - 2.26 s. That is
+   the one speed in his range that keeps the cadence even: 120 unique fps on
+   a 60 Hz panel drops exactly every other frame, and a 120 Hz panel shows
+   every one. 1.5x would be 90 fps on 60 Hz, a hold-1/hold-2 pattern - the
+   judder s11 was about.
+
+   Done on the element rather than in the build so the footage keeps all of
+   its frames and the speed is one number. The seam ramps below run in wall
+   time but are ARMED in clip time, so their wall durations are divided by
+   the rate to keep covering the same footage (s19). */
+const PLAYBACK_RATE = 2;
 
 const REVEAL_AT_S = 0.05;
 
@@ -147,6 +168,9 @@ const TransitionPlayer = forwardRef<TransitionHandle>(function TransitionPlayer(
       const hideBeforeEndS = opts?.hideBeforeEndS ?? 0;
       const instantReveal = opts?.instantReveal ?? false;
       const seamAtEnd = opts?.seamAtEnd ?? false;
+      const rate = opts?.rate ?? PLAYBACK_RATE;
+      /* wall seconds the ramp takes to cover SEAM_RAMP_S of footage */
+      const rampS = SEAM_RAMP_S / rate;
       let seamArmed = false;
       /* Held for the whole visible transition: the nav blocks scroll input
          while this is true, so a second gesture cannot start the next move
@@ -171,6 +195,9 @@ const TransitionPlayer = forwardRef<TransitionHandle>(function TransitionPlayer(
         v.addEventListener("ended", finish);
         v.addEventListener("error", finish);
         v.currentTime = 0;
+        /* after load(): the load algorithm resets playbackRate to the
+           element default, so setting it earlier would not survive */
+        v.playbackRate = rate;
         v.play().catch(finish);
 
         if (instantReveal) {
@@ -195,7 +222,7 @@ const TransitionPlayer = forwardRef<TransitionHandle>(function TransitionPlayer(
             const o = coverOrigin(v);
             v.style.transformOrigin = `${o.x}px ${o.y}px`;
             v.style.transition =
-              `transform ${SEAM_RAMP_S}s ${SEAM_EASE_IN}, filter ${SEAM_RAMP_S}s ${SEAM_EASE_IN}`;
+              `transform ${rampS}s ${SEAM_EASE_IN}, filter ${rampS}s ${SEAM_EASE_IN}`;
             v.style.transform = `translateY(${SEAM_DY_PCT}%) scale(${SEAM_SCALE_X}, ${SEAM_SCALE_Y})`;
             v.style.filter = `brightness(${SEAM_BRIGHTNESS})`;
           }
@@ -228,7 +255,7 @@ const TransitionPlayer = forwardRef<TransitionHandle>(function TransitionPlayer(
             requestAnimationFrame(() => {
               requestAnimationFrame(() => {
                 v.style.transition =
-                  `transform ${SEAM_RAMP_S}s ${SEAM_EASE}, filter ${SEAM_RAMP_S}s ${SEAM_EASE}`;
+                  `transform ${rampS}s ${SEAM_EASE}, filter ${rampS}s ${SEAM_EASE}`;
                 v.style.transform = "none";
                 v.style.filter = "none";
               });
