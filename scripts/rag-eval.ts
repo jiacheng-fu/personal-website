@@ -24,6 +24,7 @@
  */
 import { retrieve, addChunk, hasEvidence, chunks, indexHas, synonymGroups, expansionTerms } from "../src/lib/bm25";
 import { assemblePrompt, userMessage } from "../src/lib/ragPrompt";
+import { cleanModelAnswer, isRefusal } from "../src/lib/answerGuard";
 
 type Want = string | string[];
 interface Case {
@@ -612,10 +613,12 @@ console.log("\nrepeated notes collapse in the briefing");
   if (dupes) junkBad++;
   console.log(`  ${dupes ? "FAIL" : "ok  "} same note fed 4x -> ${top.length} passages (was ${before}), ${dupes} repeated`);
   top.forEach((s) => console.log(`         ${s.score.toFixed(2).padStart(5)}  ${s.chunk.section}/${s.chunk.title}`));
-  /* and the resume must not be collapsing: the two United Micro chunks share
-     a title and a lot of vocabulary, and are two different jobs. By id, not
-     by title - titles repeat in this corpus on purpose. */
-  const resume = retrieve("what did he do at his compiler internship", 4).top;
+  /* and the archive must not be collapsing: the two United Micro cards share
+     an employer and a lot of vocabulary, and are two different jobs. A
+     question about the employer must brief both. (Until 2026-11-25 this asked
+     about the compiler internship, from when both cards had one title; the
+     prose archive rightly ranks the software-intern card low for that.) */
+  const resume = retrieve("what did he do at united micro", 4).top;
   const ids = resume.map((s) => s.chunk.id);
   const bothUmt = resume.filter((s) => s.chunk.title.includes("United Micro")).length;
   const distinct = new Set(ids).size === ids.length && bothUmt === 2;
@@ -655,6 +658,51 @@ if (ms > 25) {
   console.log("  TOO SLOW - a visitor would feel this");
 }
 
+/* ---------------------------------------------------------------------------
+   The opt-in LLM's guards, on answers Qwen3-0.6B actually gave in QA
+   (2026-11-25). Each must come out as shown: echoed instructions gone, an
+   unfounded "According to a visitor note" gone, refusals handed to the quotes,
+   real answers - any language - left alone.
+   --------------------------------------------------------------------------- */
+console.log("\nLLM answer guards");
+let guardBad = 0;
+const ECHO_LEFT = /that is the answer|documents above|out of date and must|if the (context|question|visitor)/i;
+const GUARD: { name: string; text: string; briefed: boolean; want: (out: string) => boolean }[] = [
+  { name: "echoed reminder after a quoted note", briefed: true,
+    text: `According to a visitor note, "Brian moved to Seattle last week." If that answers the question, that is the answer. Brian's documents above are older; where they disagree with it, they are out of date and must not be given as the answer. If the context is a visitor note, answer from it, and not using the document.`,
+    want: (o) => o === `According to a visitor note, "Brian moved to Seattle last week."` },
+  { name: "the model reasoning about its own rules", briefed: true,
+    text: "According to a visitor note, Brian graduated in 2025. If the question is about when he graduates, 2025 is the answer. If the visitor's latest note is different, then it's outdated and must be disregarded.",
+    want: (o) => o === "According to a visitor note, Brian graduated in 2025." },
+  { name: "a streaming answer keeps its unfinished sentence", briefed: true,
+    text: `According to a visitor note, "Brian just adopted a cat named Pointer." If that answers the question, that IS the answer. According to the context, Brian has a cat named Pointer, so he does have a pe`,
+    want: (o) => !ECHO_LEFT.test(o) && o.endsWith("does have a pe") },
+  { name: "a Chinese note's answer is not wiped", briefed: true,
+    text: `According to a visitor note, "布莱恩最喜欢的颜色是蓝色" answers the question about Brian's favorite color.`,
+    want: (o) => o.includes("布莱恩最喜欢的颜色是蓝色") },
+  { name: "a plain note answer is left alone", briefed: true,
+    text: "According to a visitor note, Brian's favorite color is green.",
+    want: (o) => o === "According to a visitor note, Brian's favorite color is green." },
+  { name: "no note briefed: the attribution goes", briefed: false,
+    text: "According to a visitor note, Brian lives in Austin, Texas.",
+    want: (o) => o === "Brian lives in Austin, Texas." },
+  { name: "a false refusal goes to the quotes", briefed: false,
+    text: "The context does not provide specific information about the number of engineers using his tool at the chip company. If the context is incomplete, the answer cannot be derived.",
+    want: (o) => isRefusal(o) },
+  { name: "a refusal with an echo still goes to the quotes", briefed: false,
+    text: "The context does not mention anything about knowing rust. If the context does not contain the answer, say exactly that instead.",
+    want: (o) => isRefusal(o) && !ECHO_LEFT.test(o) },
+  { name: "a real answer is not a refusal", briefed: false,
+    text: "Brian's SystemRDL tool shipped to real users: it is used daily by 200+ engineers.",
+    want: (o) => !isRefusal(o) && o.startsWith("Brian's SystemRDL") },
+];
+for (const g of GUARD) {
+  const out = cleanModelAnswer(g.text, g.briefed);
+  const ok = g.want(out);
+  if (!ok) guardBad++;
+  console.log(`  ${ok ? "ok  " : "FAIL"} ${g.name}${ok ? "" : `\n       got: ${JSON.stringify(out)}`}`);
+}
+
 const total =
   SUITES.reduce((n, [, c]) => n + c.length, 0) + VISITOR.reduce((n, v) => n + v.cases.length, 0);
 console.log(
@@ -672,6 +720,10 @@ if (briefBad) {
 }
 if (junkBad) {
   console.log(`\n${junkBad} robustness problem(s) above`);
+  process.exitCode = 1;
+}
+if (guardBad) {
+  console.log(`\n${guardBad} LLM guard case(s) failed`);
   process.exitCode = 1;
 }
 if (failures.length) {
