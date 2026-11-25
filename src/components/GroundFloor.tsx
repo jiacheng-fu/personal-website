@@ -115,8 +115,6 @@ export default function GroundFloor({ active, onRideUp }: { active: boolean; onR
 
   return (
     <div className={`section shell nb ${active ? "is-in" : ""}`}>
-      <p className="section__label">Notice board</p>
-
       <div className="nb__stage">
         <div className="nb__board">
           {/* a few spare pins, as every board has */}
@@ -124,8 +122,13 @@ export default function GroundFloor({ active, onRideUp }: { active: boolean; onR
           <i className="nb__pin nb__pin--green nb__pin--loose" style={{ left: "77.4%", top: "92.2%" }} aria-hidden />
           <i className="nb__pin nb__pin--blue nb__pin--loose" style={{ left: "46.2%", top: "95.6%" }} aria-hidden />
 
+          {/* the board's own label, punched out on label-maker tape */}
+          <Item x={26} y={30} w={300} r={-2.5} z={5} className="nb__dymo">
+            <p className="section__label">Notice board</p>
+          </Item>
+
           {/* filmed on location */}
-          <Item x={40} y={92} w={285} r={-6} className="nb__polaroid">
+          <Item x={40} y={112} w={285} r={-6} className="nb__polaroid">
             <PinHead c="red" />
             <img src="/board/polaroid.webp" alt="Brian under a glass sculpture in a glasshouse in Seattle" loading="lazy" decoding="async" />
             <p>
