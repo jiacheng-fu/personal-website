@@ -1482,7 +1482,7 @@ html {
   gap: 10px;
 }
 /* The window is a fixed size, so the copy has to fit it rather than the other
-   way round - CarScout's blurb is three times the length of the others and
+   way round - Axle's blurb is three times the length of the others and
    was spilling up over the reel. */
 .plate__caption p {
   margin: 0;

@@ -10,7 +10,7 @@ Sections, in order:
 |---|---------|-------|----------------|
 | 1 | Hero | AI video (planned) | downtown street, daylight |
 | 2 | Keyboard | black studio | **pure black** for 2.4s |
-| 3 | Projects (CarScout) | light | off-white page |
+| 3 | Projects (Axle) | light | off-white page |
 | 4 | TBD (currently Contact) | light | off-white page |
 
 ---
@@ -96,7 +96,7 @@ start frame  the settled keyboard, exported from the live scene
 ## C. Projects → Section 4  *(paper)*
 
 ```
-start frame  the CarScout card, exported from the live page
+start frame  the Axle card, exported from the live page
 0:00         the card peels off the page — it was printed, not rendered
 0:01         it folds itself into a paper plane, mid-air
 0:02         thrown; flies away from camera down a white void

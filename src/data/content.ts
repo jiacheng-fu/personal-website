@@ -46,8 +46,8 @@ export const skills = [
 /**
  * Everything else, newest work first.
  *
- * Only real repos, and the ROLE is stated where it was not solo - Wild West
- * was a team hackathon build and Brian wrote the frontend, so it says so.
+ * Only real repos. Team builds are called team builds (Wild West was a
+ * HowdyHack team project; Brian asked for it not to be narrowed to one role).
  * Dates are when the work happened, not when the repo was pushed to GitHub:
  * Project Horizon has been going since 2023 but the repo was created in 2026.
  */
@@ -58,7 +58,7 @@ export const skills = [
  * there being no footage yet, and on-theme, rather than a broken black
  * rectangle. Drop an mp4 in public/reels and set `clip` to light it up.
  *
- * Only real material: CarScout is a capture of the live site, Wild West is
+ * Only real material: Axle is a capture of its current frontend, Wild West is
  * the game's own background art from its repo. Horizon and CarStatus need
  * footage recorded - neither can be captured from here (one is a Unity
  * build, the other a CLI against a live car - CarStatus has since been
@@ -106,8 +106,8 @@ export const projects: Project[] = [
     years: "2024",
     repo: "https://github.com/jiacheng-fu/wild-west-party-game",
     blurb:
-      "Live multiplayer party game built in 24 hours at HowdyHack. Team project — I built the frontend: inter-scene mechanics, transitions, and UI across distinct client states.",
-    stack: ["TypeScript", "React"],
+      "A live-multiplayer western party game, built as a team in 24 hours at HowdyHack 2024. Players join a lobby from their phones for drawing and prompt rounds, with AI-generated art.",
+    stack: ["Next.js", "TypeScript", "Socket.IO", "Python", "OpenAI"],
   },
   {
     title: "DeskStats",
@@ -143,10 +143,10 @@ export const projects: Project[] = [
 
 /** One artifact, chosen because you can click it and it responds. */
 export const flagship = {
-  reel: { still: "/shots/carscout.jpg" },
-  title: "CarScout",
+  reel: { still: "/shots/axle.jpg" },
+  title: "Axle",
   live: "https://d1j3m9qdbgs5ik.cloudfront.net",
-  repo: "https://github.com/jiacheng-fu/CarScout",
+  repo: "https://github.com/jiacheng-fu/axle",
   blurb:
     "Describe the car you want in plain English and get back ranked real listings. An LLM pipeline turns free-form text into validated JSON, and a 10-level constraint-relaxation algorithm makes sure you get useful matches instead of an empty page when nothing satisfies every filter. It runs serverless on Lambda with a DynamoDB cache that keeps the whole thing inside a 1,000-call/month API budget.",
   stack: ["React", "FastAPI", "AWS Lambda", "DynamoDB", "PostgreSQL"],
