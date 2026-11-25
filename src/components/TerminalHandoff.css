@@ -236,6 +236,13 @@
   opacity: 0;
   transition: opacity 0.16s ease;
 }
+/* The prompt is swapped, not faded: the overlay draws its caret on exactly
+   this spot, so an instant swap cannot be seen - while a 0.16 s fade left
+   the live "] TYPE A QUESTION..." under the command being typed for ~10
+   frames (caught frame by frame, 2026-11-25). */
+.rag.is-continuing .a2-prompt {
+  transition: none;
+}
 
 /* Enter: the session slides up by the height of the output about to print.
    The tube's own `overflow: hidden` does the clipping, so the top of the

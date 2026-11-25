@@ -330,6 +330,37 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
       );
     };
 
+    /* Anything else that scrolls the page. Tab moves focus into the next
+       section's links and the browser scrolls them into view; find-in-page
+       does the same; some browsers scroll on Ctrl+wheel instead of zooming.
+       The page was left between sections with the dots still on the old one,
+       and the sections it passed never arrived - no boot, no index, a dark
+       page (Tab from the hero: scrollY 2090, dot still "top"). Once the page
+       has stopped, the nav takes over: back onto its own section at once, so
+       the move starts from where every scene expects to, then a normal move
+       to whichever section the page had got nearest to. */
+    let drift = 0;
+    const follow = () => {
+      /* mid-move: look again once it is over, or focus tabbed onward during
+         the move is never followed (the page ended on contact, dot on work) */
+      if (busy.current || isClipBusy() || isNavLocked()) {
+        drift = window.setTimeout(follow, 300);
+        return;
+      }
+      const y = window.scrollY;
+      const cur = indexRef.current;
+      if (Math.abs(y - sectionTop(cur)) < 3) return;
+      let near = 0;
+      for (let i = 1; i < count; i++) if (Math.abs(sectionTop(i) - y) < Math.abs(sectionTop(near) - y)) near = i;
+      window.scrollTo(0, sectionTop(cur));
+      goTo(near, near !== cur);
+    };
+    const onScroll = () => {
+      window.clearTimeout(drift);
+      drift = window.setTimeout(follow, 160);
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("wheel", onWheel, { passive: false });
     window.addEventListener("keydown", onKey);
     window.addEventListener("touchstart", onTouchStart, { passive: true });
@@ -340,6 +371,8 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
     document.addEventListener("fullscreenchange", onResize);
     window.visualViewport?.addEventListener("resize", onResize);
     return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.clearTimeout(drift);
       window.removeEventListener("wheel", onWheel);
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("touchstart", onTouchStart);
