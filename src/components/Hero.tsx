@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { profile } from "../data/content";
 import { PHOTO, createEruption, type Eruption, type Platform } from "../lib/eruption";
 import HeroDoodles from "./HeroDoodles";
+import { morphFor } from "./HeroMorphs";
 import "./Hero.css";
 
 /* ---------------------------------------------------------------------------
@@ -53,6 +54,11 @@ const SUB_GAP = 0.075;
 const SUB_ALIGN: "center" | "left" = "left";
 /** the role rises a beat after the name */
 const SUB_LAG = 0.25;
+/** Inter Tight 200's stem, as a fraction of its size: the stroke the hover
+ *  drawings (HeroMorphs.tsx) are drawn with, so they match the letters */
+const STEM = 0.034;
+/** the height of a hover drawing's box, in its own units (one cap height) */
+const MORPH_BOX = 140;
 /** the name has the stage to itself for this long before the eruption */
 const ERUPT_AFTER_MS = 900;
 
@@ -261,22 +267,38 @@ export default function Hero({ active }: { active: boolean }) {
           </text>
           {layout && (
             <g clipPath="url(#hx-slot)">
-              {layout.letters.map((l, i) => (
-                /* each letter lifts a touch on hover; the rect is its hit area,
-                   since a weight-200 stroke is too thin to find */
-                <g key={`${i}${l.ch}`} className="hx__glyph" data-cursor="hover">
-                  <rect className="hx__glyphHit" x={l.x} y={layout.base - cap} width={l.x1 - l.x} height={cap} />
-                  <text
-                    className="hx__letter"
-                    x={l.x}
-                    y={layout.base}
-                    fontSize={layout.fs}
-                    style={{ "--d": `${l.delay.toFixed(3)}s`, "--rise": `${(cap * 1.08).toFixed(1)}px` } as CSSProperties}
-                  >
-                    {l.ch}
-                  </text>
-                </g>
-              ))}
+              {layout.letters.map((l, i) => {
+                /* on hover each letter turns into a thing (HeroMorphs.tsx),
+                   drawn in its own box scaled onto the letter; the rect is
+                   the hit area, since a weight-200 stroke is too thin to find */
+                const Morph = morphFor(l.ch);
+                const k = cap / MORPH_BOX;
+                return (
+                  <g key={`${i}${l.ch}`} className="hx__glyph hx__glyph--name" data-cursor="hover">
+                    <rect className="hx__glyphHit" x={l.x} y={layout.base - cap} width={l.x1 - l.x} height={cap} />
+                    <text
+                      className="hx__letter"
+                      x={l.x}
+                      y={layout.base}
+                      fontSize={layout.fs}
+                      style={{ "--d": `${l.delay.toFixed(3)}s`, "--rise": `${(cap * 1.08).toFixed(1)}px` } as CSSProperties}
+                    >
+                      {l.ch}
+                    </text>
+                    {Morph && (
+                      <g
+                        className="hxm"
+                        transform={`translate(${((l.x + l.x1) / 2).toFixed(1)} ${layout.base.toFixed(1)}) scale(${k.toFixed(4)})`}
+                        strokeWidth={((layout.fs * STEM) / k).toFixed(2)}
+                      >
+                        <g className="hxm__pop">
+                          <Morph />
+                        </g>
+                      </g>
+                    )}
+                  </g>
+                );
+              })}
             </g>
           )}
           {layout?.sub && (

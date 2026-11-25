@@ -189,6 +189,302 @@
 .hx__glyph:hover .hx__letter {
   font-weight: 300;
 }
+
+/* ---- the name's letters turn into things (HeroMorphs.tsx) ----
+   On hover a letter of BRIAN FU squashes, pops, and is the thing; off it,
+   the thing goes and the letter is back. Everything inside loops only while
+   the pointer is there. The role underneath keeps the plain lift above. */
+.hx__glyph--name:hover {
+  transform: none;
+}
+.hx__glyph--name .hx__letter {
+  transition: opacity 0.2s ease 0.06s;
+}
+.hx__glyph--name:hover .hx__letter {
+  opacity: 0;
+  font-weight: 200;
+  transition-delay: 0s;
+}
+.hxm {
+  fill: none;
+  stroke: #fff;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.hxm__pop {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  transform: scale(0.5, 0.2);
+  transition: opacity 0.14s ease, transform 0.2s ease;
+}
+.hx__glyph--name:hover .hxm__pop {
+  opacity: 1;
+  transform: none;
+  animation: hxm-pop 0.55s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+}
+@keyframes hxm-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.55, 0.12);
+  }
+  45% {
+    opacity: 1;
+    transform: scale(1.12, 1.07);
+  }
+  72% {
+    transform: scale(0.96, 1.02);
+  }
+  100% {
+    transform: none;
+  }
+}
+/* every moving part pivots on its own box */
+.hxm-leg,
+.hxm-kick__leg,
+.hxm-kick__coin,
+.hxm-mountain__snow,
+.hxm-flag__flag,
+.hxm-flag__flag path,
+.hxm-magnet,
+.hxm-bolt {
+  transform-box: fill-box;
+}
+
+/* B - a bug: legs stepping, scurrying on the spot */
+.hxm-leg {
+  transform-origin: 0% 50%;
+}
+.hx__glyph--name:hover .hxm-bug {
+  animation: hxm-scurry 0.42s ease-in-out 0.45s infinite alternate;
+}
+.hx__glyph--name:hover .hxm-leg--a {
+  animation: hxm-step 0.21s ease-in-out infinite alternate;
+}
+.hx__glyph--name:hover .hxm-leg--b {
+  animation: hxm-step 0.21s ease-in-out -0.21s infinite alternate;
+}
+@keyframes hxm-scurry {
+  to {
+    transform: translateX(7px);
+  }
+}
+@keyframes hxm-step {
+  from {
+    transform: rotate(-20deg);
+  }
+  to {
+    transform: rotate(16deg);
+  }
+}
+
+/* R - it kicks, and a coin goes flying */
+.hxm-kick__leg {
+  transform-origin: 0% 0%;
+}
+.hxm-kick__whoosh {
+  opacity: 0;
+}
+.hx__glyph--name:hover .hxm-kick__leg {
+  animation: hxm-kick 1.5s cubic-bezier(0.2, 0.9, 0.3, 1) 0.3s infinite;
+}
+.hx__glyph--name:hover .hxm-kick__whoosh {
+  animation: hxm-whoosh 1.5s ease 0.3s infinite;
+}
+.hx__glyph--name:hover .hxm-kick__coin {
+  animation: hxm-coin 1.5s linear 0.3s infinite;
+}
+/* up fast, hold a beat, back down - and again */
+@keyframes hxm-kick {
+  0%,
+  12% {
+    transform: none;
+  }
+  26% {
+    transform: rotate(-82deg);
+  }
+  44% {
+    transform: rotate(-70deg);
+  }
+  66%,
+  100% {
+    transform: none;
+  }
+}
+@keyframes hxm-whoosh {
+  0%,
+  20% {
+    opacity: 0;
+  }
+  28% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+/* a coin at the foot, kicked away, and a new one by the next kick */
+@keyframes hxm-coin {
+  0%,
+  22% {
+    opacity: 1;
+    transform: none;
+  }
+  60% {
+    opacity: 0;
+    transform: translate(96px, -170px) rotate(540deg);
+  }
+  61%,
+  88% {
+    opacity: 0;
+    transform: none;
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* I - the Space Needle: a lift rides the core, the top level turns, the
+   beacon on the spire blinks */
+.hxm-needle__deck {
+  stroke-dasharray: 4 7;
+}
+.hx__glyph--name:hover .hxm-needle__lift {
+  animation: hxm-lift 2.4s ease-in-out 0.4s infinite alternate;
+}
+.hx__glyph--name:hover .hxm-needle__deck {
+  animation: hxm-turn 1.6s linear infinite;
+}
+.hx__glyph--name:hover .hxm-needle__beacon {
+  animation: hxm-blink 1.1s steps(1, end) infinite;
+}
+@keyframes hxm-lift {
+  to {
+    transform: translateY(-92px);
+  }
+}
+@keyframes hxm-turn {
+  to {
+    stroke-dashoffset: -22;
+  }
+}
+@keyframes hxm-blink {
+  50% {
+    opacity: 0.15;
+  }
+}
+
+/* A - Mount Rainier: the snow comes down the peak, a cloud drifts by */
+.hxm-mountain__snow {
+  transform-origin: 50% 0%;
+}
+.hx__glyph--name:hover .hxm-mountain__snow {
+  animation: hxm-snow 0.5s cubic-bezier(0.2, 0.9, 0.3, 1) 0.3s both;
+}
+.hx__glyph--name:hover .hxm-mountain__cloud {
+  animation: hxm-drift 3.2s ease-in-out 0.3s infinite alternate;
+}
+@keyframes hxm-snow {
+  from {
+    transform: scaleY(0);
+  }
+}
+@keyframes hxm-drift {
+  to {
+    transform: translateX(38px);
+  }
+}
+
+/* N - a lightning bolt: it flashes and jolts */
+.hxm-bolt {
+  transform-origin: 50% 50%;
+}
+.hx__glyph--name:hover .hxm-bolt {
+  animation: hxm-jolt 0.14s steps(2, end) infinite;
+}
+.hx__glyph--name:hover .hxm-bolt__shape {
+  animation: hxm-zap 0.9s steps(1, end) infinite;
+}
+@keyframes hxm-jolt {
+  50% {
+    transform: translate(2px, -1px) rotate(1.5deg);
+  }
+}
+@keyframes hxm-zap {
+  0%,
+  60% {
+    fill: #ffd93b;
+    filter: drop-shadow(0 0 6px rgba(255, 217, 59, 0.95));
+  }
+  30%,
+  80% {
+    fill: #fff;
+    filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.95));
+  }
+}
+
+/* F - the goal flag slides down its pole, waving all the way */
+.hxm-flag__flag path {
+  transform-origin: 0% 50%;
+}
+.hx__glyph--name:hover .hxm-flag__flag {
+  animation: hxm-slide 1.05s cubic-bezier(0.45, 0, 0.55, 1) 0.35s both;
+}
+.hx__glyph--name:hover .hxm-flag__flag path {
+  animation: hxm-wave 0.42s ease-in-out infinite alternate;
+}
+@keyframes hxm-slide {
+  80% {
+    transform: translateY(98px);
+  }
+  90% {
+    transform: translateY(92px);
+  }
+  100% {
+    transform: translateY(96px);
+  }
+}
+@keyframes hxm-wave {
+  to {
+    transform: scaleX(0.82) skewY(5deg);
+  }
+}
+
+/* U - a magnet: it wobbles, the field hums, the poles spark */
+.hxm-magnet {
+  transform-origin: 50% 100%;
+}
+.hxm-magnet__field {
+  stroke-dasharray: 6 8;
+  opacity: 0.85;
+}
+.hx__glyph--name:hover .hxm-magnet {
+  animation: hxm-wobble 0.9s ease-in-out 0.4s infinite alternate;
+}
+.hx__glyph--name:hover .hxm-magnet__field {
+  animation: hxm-turn 0.8s linear infinite;
+}
+.hx__glyph--name:hover .hxm-magnet__spark {
+  animation: hxm-blink 0.35s steps(1, end) infinite;
+}
+@keyframes hxm-wobble {
+  from {
+    transform: rotate(-5deg);
+  }
+  to {
+    transform: rotate(5deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* the swap still happens; nothing moves */
+  .hx__glyph--name:hover .hxm__pop,
+  .hx__glyph--name:hover .hxm__pop * {
+    animation: none !important;
+  }
+}
 .hx__doodle {
   pointer-events: auto;
   transform-box: fill-box;
