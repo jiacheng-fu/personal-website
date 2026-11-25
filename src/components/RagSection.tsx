@@ -739,6 +739,9 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
     <div
       className={`a2-crt ${active ? "is-powered" : ""} ${bootPhase === "off" ? "a2-crt--off" : ""} ${bootPhase === "on" || bootPhase === "loading" ? "a2-crt--bloom" : ""}`}
       data-cursor="hover"
+      /* the wheel on the screen scrolls the answer, never the page
+         (useSectionNav zoneOf) */
+      data-scroll-zone
       onClick={() => inputRef.current?.focus()}
     >
       {/* boot screen */}
@@ -847,6 +850,7 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
             <motion.div
               className="a2-speech"
               data-scrollable
+              data-scroll-main
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.4 }}
@@ -1035,6 +1039,12 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
           </p>
         </div>
       )}
+      {/* shown by useSectionNav (data-edge) when the wheel on the screen has
+          nothing left to scroll: the page turns from outside it */}
+      <p className="a2-edge" aria-hidden>
+        <span className="a2-edge__down">▼ SCROLL OUTSIDE THE SCREEN TO MOVE ON</span>
+        <span className="a2-edge__up">▲ SCROLL OUTSIDE THE SCREEN TO GO BACK</span>
+      </p>
       <div className="a2-crt__scanlines" aria-hidden />
       <div className="a2-crt__vignette" aria-hidden />
     </div>

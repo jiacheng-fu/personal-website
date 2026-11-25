@@ -2053,6 +2053,36 @@ html {
   color: var(--ph);
 }
 
+/* the wheel on the screen with nothing left to scroll: the page turns from
+   outside the screen (useSectionNav sets data-edge) */
+.a2-edge {
+  position: absolute;
+  left: 50%;
+  bottom: 2.7rem;
+  z-index: 2;
+  transform: translateX(-50%);
+  padding: 0.1em 0.6em;
+  background: var(--crt);
+  border: 1px solid var(--ph-faint);
+  font-size: 0.85em;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.25s;
+  pointer-events: none;
+}
+.a2-crt[data-edge] .a2-edge {
+  opacity: 1;
+}
+.a2-edge__down,
+.a2-edge__up {
+  display: none;
+}
+.a2-crt[data-edge="down"] .a2-edge__down,
+.a2-crt[data-edge="up"] .a2-edge__up {
+  display: inline;
+}
+
 /* the opt-in, over the glass */
 .a2-optin {
   position: absolute;

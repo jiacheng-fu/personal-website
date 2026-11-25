@@ -86,6 +86,32 @@ function roomIn(el: HTMLElement, dy: number) {
   return dy > 0 ? el.scrollHeight - el.clientHeight - el.scrollTop : el.scrollTop;
 }
 
+/* The machine's screen (Brian, 2026-11-25): "when your mouse is within the
+   monitor, youre only scrolling the text within the RAG and you cannot trigger
+   the next page/animation/transition. You can only trigger that when your
+   mouse is outside and youre scrolling." Reading a long answer used to turn
+   the page: at the end of the text the next flick ("is there more?") started
+   the handoff to the projects, and over the glass but off the text box any
+   wheel did. A [data-scroll-zone] is that screen: the wheel anywhere on it
+   scrolls what is under it, or else its [data-scroll-main] text, and never the
+   page. With nothing left to scroll it says where to scroll instead
+   (data-edge on the zone, drawn by the section). */
+function zoneOf(t: EventTarget | null) {
+  return ((t as HTMLElement | null)?.closest?.("[data-scroll-zone]") as HTMLElement | null) ?? null;
+}
+/** Everything under the pointer that can scroll, innermost first: the
+ *  [data-scrollable] boxes, then its zone's main text. */
+function scrollersAt(t: EventTarget | null): HTMLElement[] {
+  const out: HTMLElement[] = [];
+  for (let el = boxOf(t); el; el = boxOf(el.parentElement)) out.push(el);
+  const main = zoneOf(t)?.querySelector<HTMLElement>("[data-scroll-main]");
+  if (main && !out.includes(main)) out.push(main);
+  return out;
+}
+/** a wheel's deltaY in pixels, whatever unit the browser sent */
+const wheelPx = (e: WheelEvent) => e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? window.innerHeight : 1);
+const EDGE_HINT_MS = 1600;
+
 export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
   const [index, setIndex] = useState(0);
   const busy = useRef(false);
@@ -218,6 +244,12 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
   useEffect(() => {
     if (!enabled) return;
     const flick = { lastT: -1e9, lastAbs: 0, spent: false };
+    let edgeTimer = 0;
+    const hintEdge = (zone: HTMLElement, dy: number) => {
+      zone.dataset.edge = dy > 0 ? "down" : "up";
+      window.clearTimeout(edgeTimer);
+      edgeTimer = window.setTimeout(() => delete zone.dataset.edge, EDGE_HINT_MS);
+    };
     const onWheel = (e: WheelEvent) => {
       /* Ctrl + wheel is a zoom, and a trackpad pinch arrives as exactly that:
          it was flipping sections and blocking the browser's zoom. */
@@ -230,6 +262,19 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
       }
       flick.lastT = e.timeStamp;
       flick.lastAbs = abs;
+      /* On the machine's screen the wheel is the text's, never the page's (see
+         zoneOf). The gesture is spent too, so a flick's tail that drifts off
+         the screen with the pointer does not turn the page either. */
+      const zone = zoneOf(e.target);
+      if (zone) {
+        flick.spent = true;
+        const roomy = scrollersAt(e.target).find((el) => roomIn(el, e.deltaY) > 1);
+        if (roomy && roomy === box) return; // the box under the pointer scrolls itself
+        e.preventDefault();
+        if (roomy) roomy.scrollTop += wheelPx(e);
+        else hintEdge(zone, e.deltaY);
+        return;
+      }
       /* A scrollable box keeps the wheel only while it can move that way
          (see roomIn); the rest of that gesture is its too, so the tail of a
          flick that scrolled the note to its end does not then turn the page. */
@@ -280,6 +325,14 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
       const next = key && e.key === " " && e.shiftKey ? -key : key; // Shift+Space goes back, as in any page
       if (next) {
         e.preventDefault();
+        /* a long answer on the machine's screen reads on before the page turns */
+        const main = document
+          .querySelectorAll<HTMLElement>(".panel")
+          [indexRef.current]?.querySelector<HTMLElement>("[data-scroll-zone] [data-scroll-main]");
+        if (main && roomIn(main, next) > 1) {
+          main.scrollBy({ top: next * (e.key.startsWith("Arrow") ? 48 : main.clientHeight * 0.85), behavior: "smooth" });
+          return;
+        }
         if (!busy.current) goTo(indexRef.current + next);
       } else if (e.key === "Home") {
         e.preventDefault();
@@ -374,6 +427,7 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
       window.removeEventListener("scroll", onScroll);
       window.clearTimeout(drift);
       window.removeEventListener("wheel", onWheel);
+      window.clearTimeout(edgeTimer);
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("touchstart", onTouchStart);
       window.removeEventListener("touchmove", onTouchMove);
