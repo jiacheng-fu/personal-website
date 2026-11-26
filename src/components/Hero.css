@@ -82,6 +82,17 @@
 .hx__head {
   z-index: 3;
 }
+/* Each of these on a layer of its own, painted once. Without it WebKit
+   repainted the name (its 18px drop-shadow over the whole frame, at 3x on
+   an iPhone) and the doodles every time a logo was thrown or crossed into
+   the front layer: 15-30fps through the eruption in WebKit at phone size,
+   60fps with these (2026-11-26, Brian: "doesnt seem to be 60fps"). Nothing
+   on them moves, so nothing looks different. */
+.hx__name,
+.hx__doodles,
+.hx__head {
+  will-change: transform;
+}
 
 /* ---- logos in front, and the doodles ---- */
 .hx__front {

@@ -178,6 +178,12 @@ export function createEruption(layer: HTMLElement, play?: Play): Eruption {
   let acc = 0;
   let last = 0;
   let raf = 0;
+  /* screen px per photo px, kept by a ResizeObserver: read off the layer
+     inside the frame, it forced a layout right after every throw had just
+     appended a logo */
+  let scale = layer.clientWidth / PHOTO.w;
+  const sizer = new ResizeObserver(() => (scale = layer.clientWidth / PHOTO.w));
+  sizer.observe(layer);
 
   const throwOne = (volley: boolean) => {
     if (live.length >= ERUPTION.maxLive) return;
@@ -234,7 +240,7 @@ export function createEruption(layer: HTMLElement, play?: Play): Eruption {
       }
     } else acc = 0;
 
-    const s = layer.clientWidth / PHOTO.w;
+    const s = scale;
     if (play) {
       stepPlay(t, dt, s);
       raf = t < until || live.length > 0 || timers.length > 0 ? requestAnimationFrame(frame) : 0;
@@ -431,6 +437,7 @@ export function createEruption(layer: HTMLElement, play?: Play): Eruption {
       live.splice(0).forEach((p) => p.el.remove());
       flying.clear();
       window.removeEventListener("pointermove", onMove);
+      sizer.disconnect();
     },
   };
 }
