@@ -1634,6 +1634,17 @@ export default function Keyboard3D({
     >
       <Canvas
         className="kb__canvas"
+        /* Measure the LAYOUT box, not the on-screen one. The wrapper fades in
+           with a scale(0.98) (App.css kb-in), and react-three-fiber sizes the
+           canvas from getBoundingClientRect, transforms included, without
+           ever re-measuring once the animation ends: wherever it measured
+           mid-fade, the board rendered ~1.7% small and anchored top-left for
+           good - on a 1440p or 4K screen every time (2517 of 2560px,
+           3776 of 3840; 1080p measured after the fade and was fine). The same
+           fault behind the plates' 1.6% shrink (docs/transition-kb-machine.md
+           s16). offsetSize reads offsetWidth/Height, which transforms do not
+           touch. 2026-11-26. */
+        resize={{ offsetSize: true }}
         shadows={!LOW_TIER}
         /* Was capped at 1.75. On a Retina panel that renders ~14% fewer
            pixels per axis than the display can show (measured: a 3241x1823
