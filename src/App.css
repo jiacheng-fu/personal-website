@@ -890,8 +890,11 @@
    the board on a 16:9 surface that covers the viewport - instead of the
    viewport's own aspect - makes the camera's framing identical to the clip's
    at any window size, so the cut into the clip is pixel-exact. Desktop
-   only; phones keep the fitted board (no clip there anyway). */
-@media (min-width: 720px) {
+   only; phones keep the fitted board (no clip there anyway) - and so does
+   any window taller than it is wide: the clip never plays there, and a 16:9
+   surface covering a portrait tablet set the board ~2.5 screens wide, cut
+   off at both sides (an iPad held upright, 2026-11-26). */
+@media (min-width: 720px) and (min-aspect-ratio: 1/1) {
   .panel--void .kb {
     inset: auto;
     left: 50%;
@@ -930,9 +933,10 @@
   text-align: right;
 }
 
-/* A phone: the caption (hidden under 720px when the board shared a squat
-   16:9 box) goes under the section label, where a tapped key is named. */
-@media (max-width: 720px) {
+/* A phone, or anything held upright: the caption (hidden under 720px when
+   the board shared a squat 16:9 box) goes under the section label, where a
+   tapped key is named. */
+@media (max-width: 720px), (max-aspect-ratio: 1/1) {
   .panel--void .kb__caption {
     display: block;
     right: auto;
@@ -2308,6 +2312,21 @@ html {
   padding: 0.6rem 0.7rem;
   font-size: clamp(15px, 4.2vw, 19px);
 }
+/* a phone on its side: the glass is short, so the type follows the height
+   and the caption goes - at 390px tall the menu had scrolled out of sight
+   under the title */
+@media (max-height: 520px) {
+  .rag:has(.a2m--compact) .rag__foot {
+    display: none;
+  }
+  .rag:has(.a2m--compact) {
+    padding-top: 3rem;
+  }
+  .a2m--compact .a2-crt {
+    font-size: clamp(13px, 3.6vh, 17px);
+    padding: 0.4rem 0.7rem;
+  }
+}
 /* never under 16px: iOS zooms the page into a smaller field on focus */
 .a2m--compact .a2-prompt input {
   font-size: max(16px, 1em);
@@ -2353,6 +2372,16 @@ html {
   width: 9px;
   height: 9px;
   overflow: visible;
+}
+
+/* a link key on a phone: the first tap names it, the second opens it */
+.kb__again {
+  display: block;
+  margin-top: 0.45rem;
+  font-style: normal;
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  color: var(--accent);
 }
 
 /* ---- keycap caption: name on one line, a plain-words note under it ---- */

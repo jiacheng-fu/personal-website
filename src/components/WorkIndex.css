@@ -264,6 +264,15 @@
   position: relative;
   z-index: 1;
 }
+.wx__card.is-entering {
+  animation: wx-card-in 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes wx-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
 
 .wx__yr--card {
   margin-bottom: max(0.75rem, calc(var(--u) * 0.9));

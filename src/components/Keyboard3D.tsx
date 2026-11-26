@@ -194,6 +194,17 @@ const STAGE = { lamp: 1, dark: false, ready: false };
 /** Timestamp of the last spacebar hit; every key ripples off it. */
 const WAVE = { at: 0 };
 
+/* On a phone there is no hover, so a tap is how a key gets named - and on the
+   GitHub, LinkedIn, Email and Source keys that same tap opened the link: you
+   could not find out what a key was without being sent off the site (the
+   projects page had the same fault; Brian, 2026-11-26). On touch a link key
+   takes two taps: the first names it (and says to tap again), the second
+   opens it. Any other key tapped in between disarms it. */
+const ARMED = { label: null as string | null };
+const touchOnly = () => typeof window !== "undefined" && !window.matchMedia("(hover: hover)").matches;
+/** the keys whose tap leaves the page */
+const LEAVES: Record<string, true> = { GitHub: true, LinkedIn: true, Email: true, Source: true };
+
 /** Someone who asked for less motion gets none of the parallax. */
   typeof window !== "undefined" &&
   window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -602,6 +613,7 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
   const enter = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
       e.stopPropagation();
+      if (ARMED.label !== cap.label) ARMED.label = null;
       onEnter(cap.label);
     },
     [cap.label, onEnter]
@@ -617,9 +629,16 @@ const Key = memo(function Key({ cap, geometry, texture, active, onEnter, onLeave
     (e: ThreeEvent<MouseEvent>) => {
       if (!cap.action) return;
       e.stopPropagation();
+      if (touchOnly() && LEAVES[cap.label]) {
+        if (ARMED.label !== cap.label) {
+          ARMED.label = cap.label; // first tap: named, not opened
+          return;
+        }
+        ARMED.label = null;
+      }
       onAction(cap.action);
     },
-    [cap.action, onAction]
+    [cap.action, cap.label, onAction]
   );
 
   // Sit the legend just clear of the un-dished rim. Floating it above the whole
@@ -1648,6 +1667,7 @@ export default function Keyboard3D({
           <>
             <b>{label}</b>
             <span>{CAP_NOTES[label]}</span>
+            {LEAVES[label] && touchOnly() && <em className="kb__again">Tap it again to open</em>}
           </>
         ) : (
           /* a phone has no hover: a tap names the key */

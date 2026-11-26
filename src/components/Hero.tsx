@@ -54,7 +54,8 @@ const NAV_CLEAR_PX = 46;
  *  it is centred between the location rail and the photo's faded top edge,
  *  and these are the rail's bottom (CSS px) and how far into the photo the
  *  band may reach (photo px; the fade covers the top 20%). */
-const TALL_RAIL_CLEAR_PX = 104;
+const TALL_RAIL_CLEAR_PX = 104; // fallback; measured off the rail itself (+ RAIL_GAP_PX)
+const RAIL_GAP_PX = 18;
 const TALL_INTO_PHOTO = 120;
 
 /** Inter Tight's cap height, as a fraction of its size */
@@ -88,7 +89,12 @@ type Line = {
   base: number;
   letters: { ch: string; x: number; x1: number; delay: number }[];
 };
-type Layout = Line & { sub: Line | null; tall: boolean };
+/** vTop: where the name's SVG starts, in photo px (0, or above the photo in a
+ *  tall window); s: screen px per photo px when it was measured */
+type Layout = Line & { sub: Line | null; tall: boolean; vTop: number; s: number };
+
+/** how long a tapped letter stays turned into its drawing (touch has no hover) */
+const MORPH_HOLD_MS = 2200;
 
 /* Where a logo can sit on each letter, as fractions of the letter's advance
    box: the full top bar of B R F, the single stems of I, the two stems of N
@@ -143,7 +149,23 @@ export default function Hero({ active }: { active: boolean }) {
       const visH = sec.clientHeight / s;
       const visTop = PHOTO.h - visH;
       const target = Math.min(PHOTO.w * NAME_WIDTH, (sec.clientWidth * NAME_FIT) / s);
-      const fs = Math.min((100 * target) / w100, (NAME_MAX_CAP * visH) / CAP);
+      /* the photo held narrower than cover-fit (Hero.css, a tall window) */
+      const tall = f.clientWidth < (sec.clientHeight * PHOTO.w) / PHOTO.h - 1;
+      /* below wherever the location rail actually ends: it sits lower on a
+         tablet (9.5vh) than on a phone, and a fixed 104px let BRIAN FU run
+         into it on an iPad mini held upright */
+      const rail = sec.querySelector(".hx__rail--top span")?.getBoundingClientRect();
+      const railBottom = rail && rail.height ? rail.bottom - sec.getBoundingClientRect().top + RAIL_GAP_PX : TALL_RAIL_CLEAR_PX;
+      const skyTop = visTop + railBottom / s;
+      /* Cover-fit, the name hangs off the crown (NAME_DROP), so its top is
+         1 - NAME_DROP caps above it - and that must clear the rail. Never
+         binds on a desktop; on a phone held sideways (390px tall) the name
+         was set at 0.3 of the height and ran over the nav and the rail. */
+      const fitsUnderRail = ((PHOTO.crownY - skyTop) / (1 - NAME_DROP) / CAP);
+      const fs = Math.max(
+        1,
+        Math.min((100 * target) / w100, (NAME_MAX_CAP * visH) / CAP, tall ? Infinity : fitsUnderRail),
+      );
       p.setAttribute("font-size", String(fs));
       const letters: Line["letters"] = [];
       for (let i = 0; i < name.length; i++) {
@@ -155,11 +177,8 @@ export default function Hero({ active }: { active: boolean }) {
         letters.push({ ch: name[i], x, x1, delay: 0.2 + d * 1.1 });
       }
       const clear = Math.max(NAME_TOP_CLEAR * visH, NAV_CLEAR_PX / s);
-      /* the photo held narrower than cover-fit (Hero.css, a tall window) */
-      const tall = f.clientWidth < (sec.clientHeight * PHOTO.w) / PHOTO.h - 1;
       const subFs = Math.max(fs * SUB_SIZE, SUB_MIN_PX / s);
       const blockH = fs * CAP + fs * SUB_GAP + subFs * CAP;
-      const skyTop = visTop + TALL_RAIL_CLEAR_PX / s;
       const base = tall
         ? Math.max(skyTop, (skyTop + TALL_INTO_PHOTO) / 2 - blockH / 2) + fs * CAP
         : Math.max(PHOTO.crownY + fs * CAP * NAME_DROP, visTop + clear + fs * CAP);
@@ -190,7 +209,16 @@ export default function Hero({ active }: { active: boolean }) {
         }
         sub = { fs: sfs, base: sbase, letters: sl };
       }
-      setLayout({ fs, base, letters, sub, tall });
+      /* In a tall window the name is set in the painted sky ABOVE the photo,
+         at negative photo y. It used to be drawn there by overflow from an
+         SVG the size of the photo - outside its own box, through its
+         drop-shadow filter - and iOS, which paints in tiles, kept dropping
+         and redrawing it: BRIAN FU blinked on and off on an iPhone, Reduce
+         Motion or not, worst under a finger (Brian, 2026-11-26; desktop
+         WebKit paints differently and never showed it). The SVG now starts
+         at the top of the section, so everything it draws is inside it. */
+      const vTop = tall ? Math.min(0, Math.floor(visTop)) : 0;
+      setLayout({ fs, base, letters, sub, tall, vTop, s });
     };
     /* ...and once more a couple of frames after every font is in: WebKit
        resolves fonts.load() before the SVG probe is laid out again in the
@@ -239,10 +267,32 @@ export default function Hero({ active }: { active: boolean }) {
     return () => window.clearTimeout(t);
   }, [active]);
 
+  /* Touch has no hover, so a tap on a letter of the name is what turns it
+     into its drawing (HeroMorphs.tsx) - for a moment, then it is a letter
+     again. The letters ignore the pointer on touch (Hero.css: a stuck
+     :hover), so the tap is matched to a letter here, by position. */
+  const morphTimer = useRef(0);
+  const morphAt = (x: number, y: number) => {
+    const glyphs = section.current?.querySelectorAll<SVGGElement>(".hx__glyph--name") ?? [];
+    let hit: SVGGElement | null = null;
+    glyphs.forEach((g) => {
+      const r = g.querySelector(".hx__glyphHit")?.getBoundingClientRect();
+      if (r && x >= r.left - 6 && x <= r.right + 6 && y >= r.top - 10 && y <= r.bottom + 10) hit = g;
+    });
+    glyphs.forEach((g) => g !== hit && g.classList.remove("is-morphed"));
+    if (!hit) return;
+    (hit as SVGGElement).classList.add("is-morphed");
+    window.clearTimeout(morphTimer.current);
+    const g: SVGGElement = hit;
+    morphTimer.current = window.setTimeout(() => g.classList.remove("is-morphed"), MORPH_HOLD_MS);
+  };
+  useEffect(() => () => window.clearTimeout(morphTimer.current), []);
+
   /* A click anywhere on the hero keeps it erupting - except on a link. */
   const onPointerDown = (ev: React.PointerEvent) => {
-    if (!active || still()) return;
     if ((ev.target as HTMLElement).closest("a, button")) return;
+    if (ev.pointerType !== "mouse") morphAt(ev.clientX, ev.clientY);
+    if (!active || still()) return;
     engine.current?.extend();
   };
 
@@ -280,9 +330,14 @@ export default function Hero({ active }: { active: boolean }) {
 
         <svg
           className="hx__layer hx__name"
-          viewBox={`0 0 ${PHOTO.w} ${PHOTO.h}`}
+          viewBox={`0 ${layout?.vTop ?? 0} ${PHOTO.w} ${PHOTO.h - (layout?.vTop ?? 0)}`}
           preserveAspectRatio="none"
           aria-hidden="true"
+          style={
+            layout?.vTop
+              ? { top: `${(layout.vTop * layout.s).toFixed(2)}px`, height: `calc(100% + ${(-layout.vTop * layout.s).toFixed(2)}px)` }
+              : undefined
+          }
         >
           <defs>
             {/* the slot each letter rises out of: nothing below the baseline */}

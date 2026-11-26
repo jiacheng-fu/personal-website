@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import "./FeedShred.css";
+import { JS_ANIM } from "../lib/motionJs";
 
 /* ---------------------------------------------------------------------------
    Feeding the machine, through a shredder
@@ -183,6 +184,7 @@ export default function FeedShred({
 
           return (
             <motion.div
+              {...JS_ANIM}
               key={i}
               className="shred__strip"
               style={{

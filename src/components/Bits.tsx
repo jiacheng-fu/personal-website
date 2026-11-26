@@ -1,5 +1,6 @@
 import { useRef, type ReactNode } from "react";
 import { motion, useReducedMotion, useSpring } from "motion/react";
+import { JS_ANIM } from "../lib/motionJs";
 
 /* ---------------------------------------------------------------------------
    Micro-animation kit, React Bits-style
@@ -40,6 +41,7 @@ export function SplitText({
           style={{ display: "inline-block", overflow: "hidden", verticalAlign: "top" }}
         >
           <motion.span
+            {...JS_ANIM}
             style={{ display: "inline-block", paddingRight: "0.24em", willChange: "transform, filter" }}
             initial={{ y: "112%", opacity: 0, filter: "blur(7px)" }}
             {...(play === undefined
@@ -84,6 +86,7 @@ export function Magnetic({
 
   return (
     <motion.span
+      {...JS_ANIM}
       ref={ref}
       style={{ display: "inline-block", x, y }}
       onPointerMove={(e) => {

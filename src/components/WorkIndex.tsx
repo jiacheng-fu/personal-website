@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { projects, profile } from "../data/content";
 import "./WorkIndex.css";
+import { JS_ANIM } from "../lib/motionJs";
 
 /* ---------------------------------------------------------------------------
    Selected work, as an index
@@ -54,6 +55,7 @@ export default function WorkIndex({
   return (
     <div className={`section shell wx ${handed ? "is-handed" : ""} ${lifting ? "is-lifting" : ""}`}>
       <motion.p
+        {...JS_ANIM}
         className="wx__label"
         initial={{ opacity: 0, y: 12 }}
         animate={on ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
@@ -66,6 +68,7 @@ export default function WorkIndex({
         <ol className="wx__list">
           {projects.map((p, n) => (
             <motion.li
+              {...JS_ANIM}
               key={p.title}
               initial={handed ? false : { opacity: 0, y: 26 }}
               animate={on ? { opacity: 1, y: 0 } : { opacity: 0, y: 26 }}
@@ -135,15 +138,14 @@ export default function WorkIndex({
             <span className="wx__ghost" aria-hidden="true">{pad(i)}</span>
           )}
 
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div
-              key={shown.title}
-              className="wx__card"
-              initial={reduce ? false : { opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={reduce ? undefined : { opacity: 0, y: -10 }}
-              transition={{ duration: 0.32, ease }}
-            >
+          {/* A CSS entrance, keyed so each project's card plays it once.
+              It was Motion's AnimatePresence (fade the old card out, then the
+              new one in), whose last frame in WebKit - every iPhone browser -
+              snapped back: the old copy flashed up again before it went, and
+              the new one vanished for a frame as it landed. Brian saw it as
+              the text "showing up, disappearing, then appearing again"
+              (2026-11-26). */}
+            <div key={shown.title} className={`wx__card ${reduce ? "" : "is-entering"}`}>
               <p className="wx__yr wx__yr--card">{shown.years}</p>
               <p className="wx__blurb">{shown.blurb}</p>
               <ul className="wx__stack">
@@ -161,12 +163,12 @@ export default function WorkIndex({
                 View repository
                 <span aria-hidden="true">&#8599;</span>
               </a>
-            </motion.div>
-          </AnimatePresence>
+            </div>
         </div>
       </div>
 
       <motion.p
+        {...JS_ANIM}
         className="wx__aside"
         initial={{ opacity: 0 }}
         animate={on ? { opacity: 1 } : { opacity: 0 }}

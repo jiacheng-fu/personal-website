@@ -18,6 +18,7 @@ import TerminalHandoff, { type HandoffHandle } from "./components/TerminalHandof
 import SceneCuts, { type CutsHandle } from "./components/SceneCuts";
 import { whenBoardStanding } from "./lib/boardState";
 import { profile, skills } from "./data/content";
+import { JS_ANIM } from "./lib/motionJs";
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
@@ -544,6 +545,7 @@ export default function App() {
 
       <div className="app">
         <motion.nav
+          {...JS_ANIM}
           className="nav"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}

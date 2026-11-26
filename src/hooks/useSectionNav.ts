@@ -119,6 +119,16 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate, inst
   const busy = useRef(false);
   const instantRef = useRef(instant);
   instantRef.current = instant;
+  /* development only: lets a test wait until no move or scene is running
+     (scratch soak tests drive random gestures and check the page sits on a
+     section once it is idle) */
+  if (import.meta.env.DEV && typeof window !== "undefined")
+    (window as unknown as { __navState: () => object }).__navState = () => ({
+      busy: busy.current,
+      locked: isNavLocked(),
+      clip: isClipBusy(),
+      index: indexRef.current,
+    });
   const indexRef = useRef(0);
   indexRef.current = index;
 

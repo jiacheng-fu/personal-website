@@ -20,6 +20,7 @@ import { cleanModelAnswer, isRefusal, markNoteSentences, noteJudge, type NoteJud
 
 import Apple2Front from "./Apple2Front";
 import FeedShred from "./FeedShred";
+import { JS_ANIM } from "../lib/motionJs";
 
 /* ---------------------------------------------------------------------------
    The RAG section, performed on a front-view Apple ][-style illustration.
@@ -231,6 +232,7 @@ function FeedSheet({ onFeed }: { onFeed: (text: string) => void }) {
   };
   return (
     <motion.form
+      {...JS_ANIM}
       className={`feed ${flying ? "is-shredding" : ""}`}
       onSubmit={(e) => {
         e.preventDefault();
@@ -799,6 +801,7 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
           <AnimatePresence mode="wait">
             {line && (
               <motion.p
+                {...JS_ANIM}
                 key={act + (answer?.mode ?? "")}
                 className="a2-perf__direction"
                 initial={{ opacity: 0 }}
@@ -829,6 +832,7 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
                 const judged = act === "fuse";
                 return (
                   <motion.div
+                    {...JS_ANIM}
                     key={s.chunk.id}
                     layout
                     className={`a2-frag ${judged ? (picked ? "is-picked" : "is-dead") : ""} ${s.chunk.section === "Visitor" ? "is-visitor" : ""}`}
@@ -857,6 +861,7 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
 
           {act === "speak" && (
             <motion.div
+              {...JS_ANIM}
               className="a2-speech"
               data-scrollable
               data-scroll-main
