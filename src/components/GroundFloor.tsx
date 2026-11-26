@@ -39,6 +39,7 @@ function Item({
   y,
   w,
   r,
+  p,
   z,
   className = "",
   children,
@@ -50,6 +51,9 @@ function Item({
   y: number;
   w: number;
   r: number;
+  /** where it goes on the portrait board (a phone held upright): x, y, tilt
+   *  in the same design units, on a 990-wide stage (GroundFloor.css) */
+  p?: [number, number, number];
   z?: number;
   className?: string;
   children: ReactNode;
@@ -64,6 +68,7 @@ function Item({
     "--y": y,
     "--w": w,
     "--r": `${r}deg`,
+    ...(p ? { "--px": p[0], "--py": p[1], "--pr": `${p[2]}deg` } : {}),
     zIndex: z,
     ...(zoom ? { "--zx": `${zoom.dx}px`, "--zy": `${zoom.dy}px`, "--zs": zoom.s } : {}),
   } as CSSProperties;
@@ -198,12 +203,12 @@ export default function GroundFloor({ active, onRideUp }: { active: boolean; onR
           <i className="nb__pin nb__pin--blue nb__pin--loose" style={{ left: "46.2%", top: "95.6%" }} aria-hidden />
 
           {/* the board's own label, punched out on label-maker tape */}
-          <Item x={26} y={30} w={300} r={-2.5} z={5} className="nb__dymo">
+          <Item x={26} y={30} w={300} r={-2.5} p={[30, 30, -2.5]} z={5} className="nb__dymo">
             <p className="section__label">Notice board</p>
           </Item>
 
           {/* filmed on location */}
-          <Item x={40} y={112} w={285} r={-6} className="nb__polaroid" zoom={held("glass")} onPick={pick("glass")} label="the glasshouse photo">
+          <Item x={40} y={112} w={285} r={-6} p={[40, 110, -5]} className="nb__polaroid" zoom={held("glass")} onPick={pick("glass")} label="the glasshouse photo">
             <PinHead c="red" />
             <img
               src="/board/polaroid.webp"
@@ -219,7 +224,7 @@ export default function GroundFloor({ active, onRideUp }: { active: boolean; onR
           </Item>
 
           {/* his name, the long way */}
-          <Item x={52} y={530} w={240} r={3} className="nb__hello">
+          <Item x={52} y={530} w={240} r={3} p={[55, 505, 3]} className="nb__hello">
             <p className="nb__helloHead">
               <b>Hello</b>
               <span>my name is</span>
@@ -231,7 +236,7 @@ export default function GroundFloor({ active, onRideUp }: { active: boolean; onR
           </Item>
 
           {/* the observation deck */}
-          <Item x={30} y={790} w={330} r={-3} className="nb__ticket">
+          <Item x={30} y={790} w={330} r={-3} p={[45, 1300, -3]} className="nb__ticket">
             <Tape x="50%" y="2%" r={-3} w={90} />
             <div className="nb__ticketMain">
               <span className="nb__ticketKicker">Admit one</span>
@@ -247,7 +252,7 @@ export default function GroundFloor({ active, onRideUp }: { active: boolean; onR
           </Item>
 
           {/* directed by, written by, stunt head */}
-          <Item x={372} y={46} w={390} r={2.5} className="nb__clap">
+          <Item x={372} y={46} w={390} r={2.5} p={[350, 50, 2.5]} className="nb__clap">
             <PinHead c="white" at={86} />
             <div className="nb__clapStick" aria-hidden />
             <div className="nb__clapBody">
@@ -269,20 +274,20 @@ export default function GroundFloor({ active, onRideUp }: { active: boolean; onR
           </Item>
 
           {/* bugs */}
-          <Item x={362} y={420} w={165} r={-7} className="nb__sticky nb__sticky--yellow">
+          <Item x={362} y={420} w={165} r={-7} p={[770, 365, 5]} className="nb__sticky nb__sticky--yellow">
             <p>
               <small>bugs:</small> also Brian
             </p>
           </Item>
 
           {/* a fortune */}
-          <Item x={828} y={500} w={225} r={5} className="nb__fortune">
+          <Item x={828} y={500} w={225} r={5} p={[575, 925, 5]} className="nb__fortune">
             <p>You will scroll back up.</p>
             <span>Lucky numbers: 46 · {TOP_FT}</span>
           </Item>
 
           {/* Xi'an, from the photo's own metadata: the Drum Tower, June 2024 */}
-          <Item x={560} y={402} w={232} r={4} className="nb__polaroid" zoom={held("xian")} onPick={pick("xian")} label="the Xi'an photo">
+          <Item x={560} y={402} w={232} r={4} p={[45, 725, 4]} className="nb__polaroid" zoom={held("xian")} onPick={pick("xian")} label="the Xi'an photo">
             <PinHead c="green" />
             <img
               src="/board/xian.webp"
@@ -296,14 +301,14 @@ export default function GroundFloor({ active, onRideUp }: { active: boolean; onR
           </Item>
 
           {/* a meme, and the machine's opt-in */}
-          <Item x={1295} y={60} w={200} r={6} className="nb__polaroid" zoom={held("glow")} onPick={pick("glow")} label="the glowing meme">
+          <Item x={1295} y={60} w={200} r={6} p={[790, 600, 6]} className="nb__polaroid" zoom={held("glow")} onPick={pick("glow")} label="the glowing meme">
             <Tape x="50%" y="1%" r={-4} w={80} />
             <img src="/board/glow.webp" alt="A blown-out, glowing meme photo" loading="lazy" decoding="async" />
             <p>your GPU, LLM on</p>
           </Item>
 
           {/* special thanks */}
-          <Item x={372} y={750} w={330} r={1.5} className="nb__notebook">
+          <Item x={372} y={750} w={330} r={1.5} p={[40, 1065, 1.5]} className="nb__notebook">
             <Tape x="18%" y="4%" r={-8} w={80} />
             <p>
               <small>special thanks:</small>
@@ -313,7 +318,7 @@ export default function GroundFloor({ active, onRideUp }: { active: boolean; onR
           </Item>
 
           {/* sound design */}
-          <Item x={722} y={786} w={160} r={-4} className="nb__sticky nb__sticky--pink">
+          <Item x={722} y={786} w={160} r={-4} p={[420, 1330, -4]} className="nb__sticky nb__sticky--pink">
             <p>
               <small>sound design:</small> none
               <br />
@@ -322,7 +327,7 @@ export default function GroundFloor({ active, onRideUp }: { active: boolean; onR
           </Item>
 
           {/* the machine, its understudy */}
-          <Item x={808} y={50} w={395} r={-2} className="nb__card nb__cast">
+          <Item x={808} y={50} w={395} r={-2} p={[345, 372, -2]} className="nb__card nb__cast">
             <PinHead c="blue" at={12} />
             <h3>Cast</h3>
             <p>
@@ -338,7 +343,7 @@ export default function GroundFloor({ active, onRideUp }: { active: boolean; onR
           </Item>
 
           {/* the keyboard */}
-          <Item x={826} y={252} w={200} r={5} className="nb__kraft">
+          <Item x={826} y={252} w={200} r={5} p={[330, 550, 5]} className="nb__kraft">
             <Tape x="50%" y="3%" r={4} w={100} />
             <span className="nb__keycap" aria-hidden>
               <span>46</span>
@@ -349,7 +354,7 @@ export default function GroundFloor({ active, onRideUp }: { active: boolean; onR
           </Item>
 
           {/* the to-do list */}
-          <Item x={884} y={596} w={272} r={-3} className="nb__todo">
+          <Item x={884} y={596} w={272} r={-3} p={[300, 805, -3]} className="nb__todo">
             <PinHead c="red" at={50} />
             <p className="nb__todoHead">to do:</p>
             <ul>
@@ -364,7 +369,7 @@ export default function GroundFloor({ active, onRideUp }: { active: boolean; onR
           </Item>
 
           {/* the flyer, with tabs to tear off */}
-          <Item x={1052} y={232} w={250} r={-2} className="nb__flyer">
+          <Item x={1052} y={232} w={250} r={-2} p={[560, 560, -2]} className="nb__flyer">
             <PinHead c="yellow" at={50} />
             <p className="nb__flyerKicker">Now accepting</p>
             <p className="nb__flyerHead">2027 internships</p>
@@ -385,14 +390,14 @@ export default function GroundFloor({ active, onRideUp }: { active: boolean; onR
           </Item>
 
           {/* complaints */}
-          <Item x={1530} y={640} w={160} r={7} z={3} className="nb__sticky nb__sticky--blue">
+          <Item x={1530} y={640} w={160} r={7} p={[790, 1115, 7]} z={3} className="nb__sticky nb__sticky--blue">
             <a href={`mailto:${profile.email}`} data-cursor="hover">
               <small>complaints:</small> email me ↗
             </a>
           </Item>
 
           {/* the way back up */}
-          <Item x={1500} y={110} w={245} r={-3} z={4} className="nb__panel">
+          <Item x={1500} y={110} w={245} r={-3} p={[735, 85, -3]} z={4} className="nb__panel">
             <PinHead c="red" />
             <div className="nb__led" aria-hidden>
               <span className={`nb__ledArrow ${riding ? "is-on" : ""}`}>▲</span>
@@ -422,7 +427,7 @@ export default function GroundFloor({ active, onRideUp }: { active: boolean; onR
           </Item>
 
           {/* the elevator's certificate, taped under its panel */}
-          <Item x={1508} y={390} w={232} r={2} z={3} className="nb__slip">
+          <Item x={1508} y={390} w={232} r={2} p={[750, 860, 2]} z={3} className="nb__slip">
             <Tape x="50%" y="0%" r={-2} w={70} />
             <h3>Certificate of operation</h3>
             <p>capacity: 1 recruiter</p>
@@ -435,7 +440,7 @@ export default function GroundFloor({ active, onRideUp }: { active: boolean; onR
           </Item>
 
           {/* the attributions the site owes */}
-          <Item x={1172} y={668} w={350} r={2.5} className="nb__card nb__thanks">
+          <Item x={1172} y={668} w={350} r={2.5} p={[410, 1115, 2.5]} className="nb__card nb__thanks">
             <Tape x="8%" y="6%" r={-35} w={80} />
             <Tape x="92%" y="6%" r={35} w={80} />
             <h3>Borrowed, with thanks</h3>
@@ -460,7 +465,7 @@ export default function GroundFloor({ active, onRideUp }: { active: boolean; onR
           </Item>
 
           {/* lost & found */}
-          <Item x={1420} y={812} w={160} r={-5} z={4} className="nb__sticky nb__sticky--green">
+          <Item x={1420} y={812} w={160} r={-5} p={[645, 1340, -5]} z={4} className="nb__sticky nb__sticky--green">
             <a href={profile.github} {...ext} data-cursor="hover">
               <small>lost &amp; found:</small> GitHub ↗
             </a>

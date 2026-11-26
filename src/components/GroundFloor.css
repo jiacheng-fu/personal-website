@@ -82,6 +82,34 @@
   transform: rotate(calc(var(--r) * 0.5)) translateY(calc(-5 * var(--u)));
 }
 
+/* ---- a tall window (a phone held upright): the portrait board ----
+   The 16:9 collage on a phone was a strip across the middle third of the
+   screen, every note at a third of its size (Brian, 2026-11-25: "needs to fill
+   up the whole screen"). Here the stage is 990 x 1530 design units, the same
+   pieces at the same design size - so ~1.8x bigger on a phone - pinned up in
+   their own arrangement (each Item's `p`). The spare pins are placed in % of
+   the wide board, so they go. */
+@media (max-aspect-ratio: 4/5) {
+  .nb__stage {
+    width: min(100%, calc((100dvh - 6.5rem) * 990 / 1530));
+    aspect-ratio: 990 / 1530;
+  }
+  .nb__board {
+    --u: calc(100cqw / 990);
+  }
+  .nb__item {
+    left: calc(var(--px, var(--x)) * var(--u));
+    top: calc(var(--py, var(--y)) * var(--u));
+    transform: rotate(var(--pr, var(--r)));
+  }
+  .nb__item:hover {
+    transform: rotate(calc(var(--pr, var(--r)) * 0.5)) translateY(calc(-5 * var(--u)));
+  }
+  .nb__pin--loose {
+    display: none;
+  }
+}
+
 /* ---- picking a Polaroid up: off its pin, to the middle, big; and back ---- */
 .nb__item--pick {
   transition: transform 0.55s cubic-bezier(0.3, 1.15, 0.4, 1), box-shadow 0.4s ease;
