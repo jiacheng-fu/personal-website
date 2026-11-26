@@ -118,7 +118,7 @@ export default function WorkIndex({
                   key={shown.reel.clip}
                   className="wx__media"
                   src={shown.reel.clip}
-                  poster={shown.reel.still}
+                  poster={shown.reel.poster ?? shown.reel.still}
                   autoPlay
                   muted
                   loop

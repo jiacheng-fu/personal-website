@@ -68,10 +68,15 @@ export const skills = [
  * click events) recorded on this machine with live readings; only the pointer
  * is drawn in, to show where each click lands. "Personal Website" is a
  * headless capture of the dev build. */
-/** `clip` is an mp4 and wins when present; `still` is the fallback frame, and
- *  also the poster the video shows before its first frame decodes. Neither is
- *  required - a project with no reel keeps the numeral instead. */
-export type Reel = { clip?: string; still?: string };
+/** `clip` is an mp4 and wins when present. `still` is the picture shown
+ *  instead of it (Reduce Motion, no video) - free to be the most telling
+ *  frame. `poster` is what the <video> shows until its first frame decodes,
+ *  so it must BE that first frame, or the preview flashes one picture and
+ *  then cuts to another (Brian, 2026-11-26, Wild West: "a millisecond of the
+ *  default screen before the main menu"); cut from the reel's frame 0 with
+ *  ffmpeg, falls back to still. None is required - a project with no reel
+ *  keeps the numeral instead. */
+export type Reel = { clip?: string; still?: string; poster?: string };
 export type Project = {
   title: string;
   reel: Reel;
@@ -84,7 +89,7 @@ export type Project = {
 export const projects: Project[] = [
   {
     title: "Axle",
-    reel: { clip: "/reels/axle.mp4", still: "/shots/axle.jpg" },
+    reel: { clip: "/reels/axle.mp4", still: "/shots/axle.jpg", poster: "/shots/axle-f0.jpg" },
     years: "2026 — now",
     repo: "https://github.com/jiacheng-fu/axle",
     blurb:
@@ -93,7 +98,7 @@ export const projects: Project[] = [
   },
   {
     title: "Project Horizon",
-    reel: { clip: "/reels/horizon.mp4", still: "/shots/horizon.jpg" },
+    reel: { clip: "/reels/horizon.mp4", still: "/shots/horizon.jpg", poster: "/shots/horizon-f0.jpg" },
     years: "2023 — now",
     repo: "https://github.com/jiacheng-fu/project-horizon",
     blurb:
@@ -102,7 +107,7 @@ export const projects: Project[] = [
   },
   {
     title: "Wild West Party Game",
-    reel: { clip: "/reels/wild-west.mp4", still: "/shots/wild-west.jpg" },
+    reel: { clip: "/reels/wild-west.mp4", still: "/shots/wild-west-menu.jpg", poster: "/shots/wild-west-menu.jpg" },
     years: "2024",
     repo: "https://github.com/jiacheng-fu/wild-west-party-game",
     blurb:
@@ -111,7 +116,7 @@ export const projects: Project[] = [
   },
   {
     title: "DeskStats",
-    reel: { clip: "/reels/deskstats.mp4", still: "/shots/deskstats.jpg" },
+    reel: { clip: "/reels/deskstats.mp4", still: "/shots/deskstats.jpg", poster: "/shots/deskstats-f0.jpg" },
     years: "2026",
     repo: "https://github.com/jiacheng-fu/DeskStats",
     blurb:
@@ -120,7 +125,7 @@ export const projects: Project[] = [
   },
   {
     title: "Personal Website",
-    reel: { clip: "/reels/personal-website.mp4", still: "/shots/personal-website.jpg" },
+    reel: { clip: "/reels/personal-website.mp4", still: "/shots/personal-website.jpg", poster: "/shots/personal-website-f0.jpg" },
     years: "2026 — now",
     repo: "https://github.com/jiacheng-fu/personal-website",
     blurb:
@@ -132,7 +137,7 @@ export const projects: Project[] = [
     /* Real data, simulated car: `npm start` in a real terminal (a clean zsh
        in the project, via ttyd) reading a Smartcar Simulator vehicle through
        the live v3 API - once, then again after the car is driven. */
-    reel: { clip: "/reels/carstatus.mp4", still: "/shots/carstatus.jpg" },
+    reel: { clip: "/reels/carstatus.mp4", still: "/shots/carstatus.jpg", poster: "/shots/carstatus-f0.jpg" },
     years: "2026",
     repo: "https://github.com/jiacheng-fu/CarStatus",
     blurb:
