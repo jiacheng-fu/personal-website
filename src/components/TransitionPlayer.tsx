@@ -114,25 +114,32 @@ const SEAM_DY_PCT = -1.54;
    drift on a board that is tumbling behind a wipe, and it finishes inside
    clip A (2.0 s at 2.5x). Linear: any easing puts a fast segment somewhere,
    and a fast segment is the thing being avoided. */
-/* ---- lighting -------------------------------------------------------------
-   Brian, once the position lined up: "the difference I see is a slight
-   lighting difference from the live into the video". Measured over the board
-   area of real screenshots, the clip is ~7% darker than the live WebGL frame
-   and its highlights are rolled off - Higgsfield's render is flatter than the
-   real lamp:
+/* ---- colour ---------------------------------------------------------------
+   A grade for each END of the clip, and the clip carries it from one to the
+   other as it plays: the keyboard end matched to the live board, the machine
+   end to the live machine. Fitted 2026-11-26 from real screenshots at
+   1600x900 (clip frames with no filter vs the live page, pixel-aligned),
+   as CSS filter functions so the grade can be transitioned (an SVG matrix
+   could not).
 
-       mean luminance      live 29.61   clip 27.69   (ratio 1.0694)
-       brightest bucket    live  1.21%  clip  0.40%  of pixels
+   It replaced brightness(1.07) at the keyboard end only. That was measured in
+   August against the whole frame, when the clip was ~7% darker; since then
+   the board itself had come out BRIGHTER than live (luminance 103 vs 102),
+   while the void around it stayed darker (4.2 vs 6.8, the page's spotlight
+   glow). The flat boost pushed the board to 110 - mean error 13.8 against no
+   correction's 9.1, the "color grading slightly off" at the seams (Brian).
 
-   brightness(1.07) puts both back:
+       keyboard, whole frame   error  board 9.39 (none 9.12, old 13.84)
+                                      void  1.73 (none 3.33, old  3.38)
+                               board luminance 100.2 vs live 101.5
+       machine case            error  3.76 (none 6.95); the clip's beige
+                               was cooler and lighter than the live one
 
-       mean luminance      live 29.61   clip 29.57   (ratio 1.0014)
-       brightest bucket    live  1.21%  clip  1.20%
-
-   Ramped off exactly like the geometry, and for the same reason: correcting
-   the whole clip would push the machine at the END too bright to match the
-   live section it lands on. */
-const SEAM_BRIGHTNESS = 1.07;
+   The rest of the keyboard's difference is not colour (the best possible
+   colour map takes it only from 9.1 to 8.6): it is the footage's softer
+   legends and highlights. */
+const GRADE_KB = "brightness(0.960) contrast(0.968) saturate(1.066)";
+const GRADE_MACHINE = "brightness(0.932) contrast(1.141) saturate(1.065)";
 
 const SEAM_RAMP_S = 1.8;
 const SEAM_EASE = "linear";
@@ -289,6 +296,16 @@ const TransitionPlayer = forwardRef<TransitionHandle>(function TransitionPlayer(
         v.playbackRate = rate;
         v.play().catch(finish);
 
+        /* the clip's wall-clock length: the grade travels across all of it */
+        const gradeS = Math.max(0.1, (v.duration || 4.5) / rate);
+        if (instantReveal) {
+          /* reverse: it opens on the machine, in the machine's grade */
+          v.style.transition = "none";
+          v.style.filter = GRADE_MACHINE;
+          void v.offsetWidth;
+          v.style.transition = `filter ${gradeS}s linear`;
+          v.style.filter = GRADE_KB;
+        }
         if (instantReveal) {
           /* Reverse: cover NOW with no fade, so the machine we are leaving is
              hidden in a single frame (App blacks its glass to match the clip's
@@ -309,10 +326,12 @@ const TransitionPlayer = forwardRef<TransitionHandle>(function TransitionPlayer(
                frame lands, so the frame we hold matches the live board. */
             seamArmed = true;
             v.style.transformOrigin = "0 0";
+            /* the filter's own transition (machine -> keyboard grade, set
+               at the start) is left running: it is listed with the same
+               duration, and its value is not touched */
             v.style.transition =
-              `transform ${rampS}s ${SEAM_EASE_IN}, filter ${rampS}s ${SEAM_EASE_IN}`;
+              `transform ${rampS}s ${SEAM_EASE_IN}, filter ${gradeS}s linear`;
             v.style.transform = seamTransform(v);
-            v.style.filter = `brightness(${SEAM_BRIGHTNESS})`;
           }
           if (hideBeforeEndS > 0) {
             /* Reverse: hide + land BEFORE the clip's static K tail, so the
@@ -331,7 +350,7 @@ const TransitionPlayer = forwardRef<TransitionHandle>(function TransitionPlayer(
             v.style.transformOrigin = "0 0";
             v.style.transition = "none";
             v.style.transform = seamTransform(v);
-            v.style.filter = `brightness(${SEAM_BRIGHTNESS})`;
+            v.style.filter = GRADE_KB;
             const prev = h.style.transition;
             h.style.transition = "none";
             h.classList.add("is-on");
@@ -341,10 +360,11 @@ const TransitionPlayer = forwardRef<TransitionHandle>(function TransitionPlayer(
                ramp is armed, or the browser collapses both into one step */
             requestAnimationFrame(() => {
               requestAnimationFrame(() => {
+                const left = Math.max(0.1, ((v.duration || 4.5) - v.currentTime) / rate);
                 v.style.transition =
-                  `transform ${rampS}s ${SEAM_EASE}, filter ${rampS}s ${SEAM_EASE}`;
+                  `transform ${rampS}s ${SEAM_EASE}, filter ${left}s linear`;
                 v.style.transform = "none";
-                v.style.filter = "none";
+                v.style.filter = GRADE_MACHINE;
               });
             });
           }

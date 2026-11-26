@@ -91,6 +91,36 @@ const align = (page, A, C, R, skip) =>
     [A.toString("base64"), C.toString("base64"), R, skip ?? null],
   );
 
+/** mean luminance of a screenshot over a rect (minus `skip`), 0..255 */
+const lumOf = (page, A, R, skip) =>
+  page.evaluate(
+    async ([A, R, S]) => {
+      const img = new Image();
+      img.src = "data:image/png;base64," + A;
+      await img.decode();
+      const cv = document.createElement("canvas");
+      cv.width = img.width;
+      cv.height = img.height;
+      const g = cv.getContext("2d");
+      g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, img.width, img.height).data;
+      let sum = 0;
+      let n = 0;
+      for (let y = Math.ceil(R.y); y < R.y + R.h; y += 2)
+        for (let x = Math.ceil(R.x); x < R.x + R.w; x += 2) {
+          if (S && x > S.x - 8 && x < S.x + S.w + 8 && y > S.y - 8 && y < S.y + S.h + 8) continue;
+          const i = (y * img.width + x) * 4;
+          sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+          n++;
+        }
+      return sum / n;
+    },
+    [A.toString("base64"), R, skip ?? null],
+  );
+/* the clip's colour at each end must stay within this of the live page's
+   (the old brightness patch drifted 9% out over three months unnoticed) */
+const LUM_TOLERANCE = 0.04;
+
 let failed = 0;
 try {
   for (const [w, h, bar] of CASES) {
@@ -169,9 +199,21 @@ try {
     );
     const ok = Math.abs(r.dx) <= TOLERANCE_PX && Math.abs(r.dy) <= TOLERANCE_PX;
     if (!ok) failed++;
+    const box = await page.evaluate(() => {
+      const rect = (sel) => {
+        const e = document.querySelector(sel).getBoundingClientRect();
+        return { x: e.left, y: e.top, w: e.width, h: e.height };
+      };
+      return { stage: rect(".a2m__stage"), glass: rect(".a2m__screen") };
+    });
+    const lumClip = await lumOf(page, clip, box.stage, box.glass);
+    const lumLive = await lumOf(page, live, box.stage, box.glass);
+    const okLum = Math.abs(lumClip / lumLive - 1) <= LUM_TOLERANCE;
+    if (!okLum) failed++;
     console.log(
       `${ok ? "ok  " : "FAIL"} ${w}x${h} ${bar ? "scrollbar " + scrollbar + "px" : "no scrollbar"}`.padEnd(34) +
-        `clip vs machine: dx ${r.dx}, dy ${r.dy}`,
+        `clip vs machine: dx ${r.dx}, dy ${r.dy}` +
+        `   ${okLum ? "" : "FAIL "}luminance ${lumClip.toFixed(1)} vs ${lumLive.toFixed(1)}`,
     );
 
     /* the way back: the reverse clip's held last frame vs the live board it
@@ -192,10 +234,19 @@ try {
     });
     await page.waitForTimeout(2500);
     const board = await page.screenshot({ type: "png" });
-    const back = await align(page, board, held, { x: w * 0.15, y: h * 0.12, w: w * 0.7, h: h * 0.76 });
+    const boardRect = { x: w * 0.15, y: h * 0.12, w: w * 0.7, h: h * 0.76 };
+    const back = await align(page, board, held, boardRect);
     const okBack = Math.abs(back.dx) <= TOLERANCE_PX && Math.abs(back.dy) <= TOLERANCE_PX;
     if (!okBack) failed++;
-    console.log(`${okBack ? "ok  " : "FAIL"}`.padEnd(34) + `   back: clip vs board: dx ${back.dx}, dy ${back.dy}`);
+    const lumHeld = await lumOf(page, held, boardRect);
+    const lumBoard = await lumOf(page, board, boardRect);
+    const okBackLum = Math.abs(lumHeld / lumBoard - 1) <= LUM_TOLERANCE;
+    if (!okBackLum) failed++;
+    console.log(
+      `${okBack && okBackLum ? "ok  " : "FAIL"}`.padEnd(34) +
+        `   back: clip vs board: dx ${back.dx}, dy ${back.dy}` +
+        `   ${okBackLum ? "" : "FAIL "}luminance ${lumHeld.toFixed(1)} vs ${lumBoard.toFixed(1)}`,
+    );
     await page.close();
   }
 } finally {
@@ -203,5 +254,5 @@ try {
   await server.close();
 }
 
-console.log(failed ? `\n${failed} case(s) shift by more than ${TOLERANCE_PX}px` : "\nseamless in every case");
+console.log(failed ? `\n${failed} check(s) failed: shift over ${TOLERANCE_PX}px or luminance over ${LUM_TOLERANCE * 100}%` : "\nseamless in every case");
 process.exit(failed ? 1 : 0);
