@@ -1,6 +1,6 @@
 import { forwardRef, useImperativeHandle, useRef } from "react";
 import { setClipBusy } from "../lib/transitions";
-import { boardPlacement } from "../lib/boardState";
+import { boardPlacement, boardStanding } from "../lib/boardState";
 
 /* ---------------------------------------------------------------------------
    Full-screen clip player for section transitions.
@@ -30,6 +30,13 @@ export type TransitionHandle = {
       seamAtEnd?: boolean;
       /** element playback rate; defaults to PLAYBACK_RATE */
       rate?: number;
+      /** the keyboard <-> machine clips: let the LIVE keyboard show through
+       *  wherever the wipe line has not reached (see WIPE_X). "reverse" plays
+       *  the same frames backwards. */
+      wipe?: "forward" | "reverse";
+      /** called once the overlay covers the screen (reverse): the moment the
+       *  page can be moved underneath it */
+      onCovered?: () => void;
     },
   ) => Promise<void>;
   /** Fade the held last frame away. */
@@ -194,6 +201,72 @@ function seamTransform(v: HTMLVideoElement): string {
   return `matrix(${a}, 0, 0, ${d}, ${e}, ${f})`;
 }
 
+/* ---- the live keyboard through the clip ---------------------------------
+   Brian, 2026-11-26: even baked (s21), the clip's keyboard was a little less
+   crisp than the real one - it is a 2560x1440 picture, scaled to the window
+   and stretched again by seamTransform, against a board WebGL draws at the
+   screen's own resolution. So where the clip shows the keyboard at all, it
+   is not shown: the video is masked out left of the wipe line, and the page
+   underneath - the live board - is what is seen. The line itself, the cream
+   world it uncovers, and the morph are the clip's.
+
+   The line is perfectly vertical and moves right to left over frames 17-64
+   of the forward clip (60 fps; measured from the master, 2560 px wide).
+   Before it, the clip is all keyboard (the mask hides all of it); after it,
+   none (no mask). Its red glow reaches ~200 px onto the keyboard, so the
+   mask ramps over that rather than cutting - the glow stays, over a board
+   the baked frames already hold in register. Frame-exact: the mask follows
+   the frame actually presented (requestVideoFrameCallback). */
+const WIPE_X: [number, number][] = [[17,2553.0],[18,2531.0],[19,2512.0],[20,2474.2],[21,2444.5],[22,2393.2],[23,2351.0],[24,2285.0],[25,2245.5],[26,2179.5],[27,2141.0],[28,2072.0],[29,2020.5],[30,1949.0],[31,1901.8],[32,1826.8],[33,1776.5],[34,1699.5],[35,1648.5],[36,1571.5],[37,1520.5],[38,1442.5],[39,1386.0],[40,1303.5],[41,1251.0],[42,1168.0],[43,1110.5],[44,1027.8],[45,978.0],[46,895.2],[47,834.5],[48,742.5],[49,689.5],[50,611.5],[51,561.2],[52,489.0],[53,428.0],[54,354.2],[55,309.5],[56,244.0],[57,202.8],[58,140.5],[59,104.5],[60,55.8],[61,27.8],[62,2.0],[63,1.2],[64,0.5]];
+const CLIP_FRAMES = 270; // the last frame index of both clips
+const CLIP_FPS = 60;
+const WIPE_GLOW = 200; // px of the 2560-wide frame
+/* The mask is a style change, painted on the main thread; the video's frames
+   reach the screen on their own (the compositor). So the mask shows up one
+   refresh after the frame it was set for - and by then the clip has moved on
+   by however many frames one refresh holds: 2 at 60 Hz and 2x, 1 at 120 Hz,
+   4 on a laptop throttled to 30. Forward, a mask behind the line hides the
+   line and shows footage where it should show the board (seen in testing),
+   so the mask is set for the frame one measured step + 1 ahead (the step
+   between the frames actually presented, not an assumed refresh rate). Too
+   far ahead only means a thin band just ahead of the line is the baked
+   keyboard (in register, colour-matched) instead of the live one. Backward,
+   the same lag leaves the mask behind the line - already that safe side - so
+   no lead. */
+/* ?wipe=off: show the clip's own keyboard (seam:check verifies its register) */
+const WIPE_OFF = typeof location !== "undefined" && new URLSearchParams(location.search).get("wipe") === "off";
+
+/** the line's x in the forward clip's frame n (px of 2560); +inf before it
+ *  enters (all keyboard), -inf after it leaves (no keyboard) */
+function wipeX(n: number): number {
+  if (n < WIPE_X[0][0]) return Infinity;
+  if (n > WIPE_X[WIPE_X.length - 1][0]) return -Infinity;
+  const i = WIPE_X.findIndex(([f]) => f >= n);
+  if (WIPE_X[i][0] === n || i === 0) return WIPE_X[i][1];
+  const [f0, x0] = WIPE_X[i - 1];
+  const [f1, x1] = WIPE_X[i];
+  return x0 + ((x1 - x0) * (n - f0)) / (f1 - f0);
+}
+
+/** the mask for the clip's frame n (forward numbering), in the element's own
+ *  box - cover-fitted like the video, so it moves with seamTransform */
+function wipeMask(v: HTMLVideoElement, n: number): string {
+  const x = wipeX(n);
+  if (x === -Infinity) return "none";
+  if (x === Infinity) return "linear-gradient(transparent, transparent)";
+  const w = v.clientWidth;
+  const h = v.clientHeight;
+  const cw = Math.max(w, (h * 16) / 9);
+  const k = cw / 2560;
+  const xe = (w - cw) / 2 + x * k;
+  return `linear-gradient(to right, transparent ${(xe - WIPE_GLOW * k).toFixed(1)}px, #000 ${(xe - 6 * k).toFixed(1)}px)`;
+}
+
+function setMask(v: HTMLVideoElement, m: string) {
+  v.style.maskImage = m;
+  v.style.webkitMaskImage = m;
+}
+
 /** Where the cover-fitted 16:9 image's top-left corner sits inside the video
  *  element. The element is the viewport; the image overflows whichever axis
  *  cover had to grow, so this is negative on that axis. */
@@ -216,6 +289,7 @@ const TransitionPlayer = forwardRef<TransitionHandle>(function TransitionPlayer(
       v.style.transition = "none";
       v.style.transform = "none";
       v.style.filter = "none";
+      setMask(v, "none");
       if (!v.src.endsWith(src)) {
         v.src = src;
         v.load();
@@ -274,6 +348,46 @@ const TransitionPlayer = forwardRef<TransitionHandle>(function TransitionPlayer(
         };
         v.addEventListener("ended", finish);
         v.addEventListener("error", finish);
+
+        /* the live keyboard through the clip (WIPE_X) */
+        /* only over the real thing: the 3D board mounted and placed (not the
+           flat list a machine without WebGL gets, nor a chunk still loading),
+           and - going forward, where it is on screen - standing, not
+           mid-rise. Otherwise the clip's own (baked) keyboard, as before. */
+        const wipe =
+          WIPE_OFF || !opts?.wipe || !boardPlacement() || (opts.wipe === "forward" && !boardStanding())
+            ? undefined
+            : opts.wipe;
+        if (wipe) {
+          /* clip frames per presented frame; until measured, a 60 Hz guess */
+          let step = rate;
+          let lastT = -1;
+          const sync = (t: number) => {
+            if (lastT >= 0 && t > lastT) step = Math.min(12, Math.max(1, (t - lastT) * CLIP_FPS));
+            lastT = t;
+            const r = Math.round(t * CLIP_FPS);
+            const n = wipe === "reverse" ? CLIP_FRAMES - r : r + Math.ceil(step) + 1;
+            setMask(v, wipeMask(v, n));
+          };
+          setMask(v, wipeMask(v, wipe === "reverse" ? CLIP_FRAMES : 0));
+          type RVFC = (cb: (now: number, meta: { mediaTime: number }) => void) => number;
+          const rvfc = (v as unknown as { requestVideoFrameCallback?: RVFC }).requestVideoFrameCallback?.bind(v);
+          if (rvfc) {
+            const onFrame = (_: number, meta: { mediaTime: number }) => {
+              if (done) return;
+              sync(meta.mediaTime);
+              rvfc(onFrame);
+            };
+            rvfc(onFrame);
+          } else {
+            const tickWipe = () => {
+              if (done) return;
+              sync(v.currentTime);
+              requestAnimationFrame(tickWipe);
+            };
+            requestAnimationFrame(tickWipe);
+          }
+        }
         v.currentTime = 0;
         /* after load(): the load algorithm resets playbackRate to the
            element default, so setting it earlier would not survive */
@@ -289,6 +403,8 @@ const TransitionPlayer = forwardRef<TransitionHandle>(function TransitionPlayer(
           h.classList.add("is-on");
           void h.offsetWidth;
           h.style.transition = prev;
+          /* covered: the caller may move the page underneath now */
+          if (opts?.onCovered) requestAnimationFrame(() => opts.onCovered?.());
         }
 
         const tick = () => {

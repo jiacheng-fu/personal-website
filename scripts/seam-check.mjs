@@ -133,7 +133,10 @@ try {
           document.head.append(st);
         });
       }, BAR_CSS);
-    await page.goto(`${base}/?rag=off`);
+    /* wipe=off: the clip's own keyboard, unmasked - the live board shows
+       through it in normal playback (TransitionPlayer WIPE_X), which would
+       hide exactly the register this checks */
+    await page.goto(`${base}/?rag=off&wipe=off`);
     await page.waitForTimeout(1500);
     const scrollbar = await page.evaluate(() => innerWidth - document.documentElement.clientWidth);
     await page.click('button[aria-label="craft"]');

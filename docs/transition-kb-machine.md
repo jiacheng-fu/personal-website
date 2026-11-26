@@ -1078,3 +1078,84 @@ CSS grade from commit 78d0af0.
 **Re-bake** when the keyboard's or the machine's look changes, such as new
 keys, lighting or colours. Their placement is followed live and needs no
 re-bake.
+
+## 22 · The live keyboard through the wipe (2026-11-26)
+
+Brian, after the bake: "the colors match etc, but the edges and lines arent
+as crisp as the real one". The deploy did not cause it; the served files are
+byte-identical. Two things did. The clip is a 2560x1440 picture, resampled to
+the window and again by the seam fit, and the bake's keyboard pixels were
+already a warped copy. On top of that, H.264 stores colour at quarter
+resolution (4:2:0). A video cannot be as sharp as WebGL drawing at the
+screen's own resolution.
+
+**So the clip's keyboard is not shown at all.** Both directions play with
+`wipe`. The video is masked out (`mask-image`) left of the wipe line, so
+there the page underneath shows, which is the live board. The line, its
+glow, the cream world and the morph are still the clip's.
+
+- **`WIPE_X`** gives the line's x for each forward frame, 17-64, in px of
+  2560. It was measured from the master: the line is perfectly vertical and
+  moves right to left. Before frame 17 the whole clip is masked. After 64
+  there is no mask.
+- **Glow.** The line's red glow reaches ~200 px onto the keyboard, so the
+  mask ramps over that span (`WIPE_GLOW`) rather than cutting. Inside the
+  ramp it blends over a board the baked frames already hold in register.
+- **Frame sync.** The mask follows the frame actually presented
+  (`requestVideoFrameCallback`, in Chrome, Safari and Firefox, with a
+  rAF/`currentTime` fallback). The mask is a main-thread style change. It
+  reaches the screen one refresh after the frame it was set for, and by
+  then the clip has moved on by however many frames one refresh holds.
+  Going forward, a mask behind the line hides the line and shows black
+  where the cream should be (seen in testing). So forward, the mask is set
+  for the frame one measured step + 1 ahead. The step is the measured gap
+  between presented frames, not an assumed refresh rate. Backward, the same
+  lag already leaves the mask on the safe side, so there is no lead.
+- **The reverse ends on the keyboard.** The page must already be standing
+  there when the mask opens. `onCovered` moves it there underneath the
+  instant cover: the section is lit, its copy held back, and the board
+  parked standing. The nav then lands on the same spot.
+- **Only over the real thing.** The wipe needs `boardPlacement()`, meaning
+  the 3D board is mounted. Without it (no WebGL, or the chunk still
+  loading) the clip shows its own baked keyboard, as before. Going forward,
+  the board must also be standing (`boardStanding()`), not mid-rise.
+- **`?wipe=off`** shows the clip unmasked. `seam:check` and the
+  forward-start probe load it, because the mask would hide exactly the
+  register they measure.
+
+**Also fixed here: a sliver at the left edge.** The seam fit scales the
+video box by 1.6-3.6% and shifts it. On windows narrower than 16:9 that
+left the box's left edge up to 2.4 px inside the window, where page showed
+beside the cream world while the fit eased off. It measured 0.01 px at
+16:9, 1.3 at 16:10, 2.3 at 3:2 and 3.5 at 2256x1504. The video now has
+`overflow: visible`, so its cover-cropped edges (the clip's own pixels)
+paint past the box. The overlay clips them (`overflow: clip`), so nothing
+reaches the letterbox bars. Nothing moved: `seam:check` read the same
+before and after.
+
+**Tested** (Chrome, plus Safari's engine and Firefox where noted):
+
+- `seam:check`: all 5 setups and both directions ok. The forward start is
+  dx 0, dy 0 at 3 sizes, against the unmasked clip.
+- Screen shapes, each a down-and-up round trip:
+  - Clip: 3:2 (1440x960, 2256x1504), 16:10 (1440x900, 1920x1200), 16:9
+    (1366x768 up to 3840x2160), and boxed 21:9 and 32:9.
+  - Cut, by policy: 4:3 (1024x768 up to 1600x1200), 5:4 and unboxed 21:9.
+  - Every landing exact, with 0 errors. Under the mask the line meets the
+    mask edge at 16:10, 1.45 and 2.04.
+- Engines: Chrome at 1x and 2x (Retina), WebKit at 1x and 2x, and Firefox
+  all play the wipe and land, with 0 errors.
+- Stress, each finishing exactly on a section with the board pixel-identical
+  to a clean load:
+  - spamming the key, reversing mid-clip both ways, and a wheel storm;
+  - resizing mid-clip both ways, and a tab frozen mid-clip;
+  - clip files blocked, clip files slow (2.5 s), and the CPU throttled 6x;
+  - four 48-step random soaks at 16:9, 16:10 and 4:3.
+- The red line was never hidden: 0 of 353 mid-wipe screen grabs, at CPU
+  1x, 2x, 4x and 6x, both directions.
+- Six round trips in a row: the clip and its mask play every time.
+- Phones (iPhone with Reduce Motion on and off, Pixel) and portrait iPad
+  play no clip. They take the CRT cut, unchanged, with 0 errors.
+
+**Undo.** In `App.tsx`, drop `wipe` (and `onCovered`) from the two
+`p.play` calls. The player then never masks, and plays exactly as in §21.

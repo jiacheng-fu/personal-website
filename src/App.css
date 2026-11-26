@@ -2648,6 +2648,8 @@ html:has(.rag.is-framing) .cursor {
   /* a dissolve, not a cut: the clip's first frames equal the live page, so
      the only thing that changes across this is sharpness */
   transition: opacity 0.4s ease-out;
+  /* the video paints past its own box (below): not past this one */
+  overflow: clip;
 }
 .transition.is-on {
   opacity: 1;
@@ -2664,6 +2666,13 @@ html:has(.rag.is-framing) .cursor {
      how it is rasterised against the live DOM underneath it - the last
      thing wanted at a landing that has to match the page exactly. */
   transform-origin: 50% 50%;
+  /* the frame's cover-cropped edges paint past the box. The seam correction
+     scales the box by ~1.6-3.6% and shifts it, which on windows narrower
+     than 16:9 left its left edge up to 2.4 px inside the window: a dark
+     sliver of page beside the cream world while the correction eased off
+     (measured 2026-11-26: 1.3 px at 16:10, 2.4 px at the 1.45 limit). The
+     cropped pixels are the clip's own, so they fill it; nothing moves. */
+  overflow: visible;
 }
 
 /* ---- the machine waking up after the clip ---- */

@@ -237,7 +237,10 @@ export default function App() {
           window.setTimeout(() => kbPanel?.classList.remove("is-departing"), 400);
           return;
         }
-        return p.play(CLIPS.kbToMachine).then(() => {
+        /* wipe: the live board shows through wherever the clip still has
+           the keyboard (TransitionPlayer WIPE_X) - it is right there,
+           underneath, until the nav lands */
+        return p.play(CLIPS.kbToMachine, { wipe: "forward" }).then(() => {
           bootedByClip.current = true;
           setBoot((n) => n + 1);
           hideAfterLand.current = true;
@@ -262,7 +265,23 @@ export default function App() {
          correction over the final 0.55 s, so the frame we hold is in
          register with the live board underneath. */
       setLeaving((n) => n + 1);
-      return p.play(CLIPS.machineToKb, { instantReveal: true, seamAtEnd: true }).then(() => {
+      /* The clip ends on the keyboard; to show the LIVE board through it as
+         the wipe uncovers it (TransitionPlayer WIPE_X), the page has to be
+         standing on the keyboard section by then. Once the overlay covers
+         the screen, the page is moved there underneath it - lit, its copy
+         held back, the board parked standing (Keyboard3D draws that frame
+         while off screen) - and the nav lands on the same spot at the end. */
+      return p.play(CLIPS.machineToKb, {
+        instantReveal: true,
+        seamAtEnd: true,
+        wipe: "reverse",
+        onCovered: () => {
+          const kb = kbPanel as HTMLElement | null;
+          if (!kb) return;
+          kb.classList.add("is-lit");
+          window.scrollTo(0, kb.offsetTop);
+        },
+      }).then(() => {
         /* hideAfterLand defers the next prime() to ~700 ms after landing;
            priming immediately swaps the video's frames while the overlay is
            still fading out - a visible flash of the forward clip's frame */
