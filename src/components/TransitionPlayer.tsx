@@ -1,5 +1,6 @@
 import { forwardRef, useImperativeHandle, useRef } from "react";
 import { setClipBusy } from "../lib/transitions";
+import { boardPlacement } from "../lib/boardState";
 
 /* ---------------------------------------------------------------------------
    Full-screen clip player for section transitions.
@@ -97,8 +98,14 @@ const SEAM_SCALE_Y = 1.0360;
    NEGATIVE: scaling about the frame's TOP edge already carries the board
    down by (scale x its distance from that edge), so the residual is taken
    back OFF that, not added to it. With the wrong sign it doubles the error
-   instead of cancelling it - measured -0.39 px right, +8.40 px wrong. */
-const SEAM_DY_PCT = -1.329;
+   instead of cancelling it - measured -0.39 px right, +8.40 px wrong.
+   2026-11-26: -1.329 -> -1.54. The live board had come to sit ~2px higher
+   than the clip's keyboard frames (0.2% of the height, at 1536x864, 1600x900
+   and 1920x1080 alike), at BOTH ends that show it: the forward cut (masked -
+   the board is moving by then) and the reverse clip's held last frame, where
+   it was the "slight shift" going back up from the machine (Brian, on a 16:9
+   monitor). One constant, so both directions move together. */
+const SEAM_DY_PCT = -1.54;
 
 /* The give-back is itself motion, so what matters is its RATE. At 0.55 s the
    old correction unwound at ~11 px/s, plainly visible - it turned one jump
@@ -131,6 +138,70 @@ const SEAM_RAMP_S = 1.8;
 const SEAM_EASE = "linear";
 const SEAM_EASE_IN = "linear";
 
+
+/* ---- the correction follows the live board -----------------------------
+   SEAM_* map the clip's keyboard onto the live board AS IT WAS PLACED when
+   they were measured: the standing board's box, as fractions of its canvas,
+   was N_REF (2026-11-26; the same at every 16:9 size, with or without a
+   scrollbar), and the canvas was exactly the clip's cover box. Anything
+   that has moved the live board since - a change to its pose or camera fit,
+   a canvas measured wrong, a surface laid out differently on some device -
+   used to show as a few pixels of shift at the seams, found by eye each time
+   and fixed by re-tuning SEAM_DY_PCT (2026-11-26: 2px, the way back up from
+   the machine). Now the board is asked where it is (lib/boardState.ts), and
+   the clip is fitted from where the reference board would be onto where the
+   live one is. With nothing moved that is the identity; the constants only
+   go stale if the VIDEO is re-rendered. */
+const N_REF = { x0: 0.23762, y0: 0.06059, x1: 0.78747, y1: 0.95091 };
+/* a measurement this far from the reference is not the board having moved,
+   it is something not laid out yet: ignore it, keep the calibrated fit */
+const FOLLOW_LIMIT = 0.12;
+
+/** The seam correction as one matrix (transform-origin 0 0): the calibrated
+ *  clip -> reference-board fit, then reference board -> live board. */
+function seamTransform(v: HTMLVideoElement): string {
+  const r = v.getBoundingClientRect();
+  const o = coverOrigin(v);
+  const cw = Math.max(r.width, (r.height * 16) / 9);
+  const ch = Math.max(r.height, (r.width * 9) / 16);
+  const sx = SEAM_SCALE_X;
+  const sy = SEAM_SCALE_Y;
+  const ty = (SEAM_DY_PCT / 100) * r.height;
+  /* calibrated: p' = O + S(p - O) + (0, ty) */
+  let kx = 1;
+  let ky = 1;
+  let lx = 0;
+  let ly = 0;
+  let ix = 0;
+  let iy = 0;
+  const b = boardPlacement();
+  if (b) {
+    const ideal = { x: o.x + N_REF.x0 * cw, y: o.y + N_REF.y0 * ch, w: (N_REF.x1 - N_REF.x0) * cw, h: (N_REF.y1 - N_REF.y0) * ch };
+    const live = {
+      x: b.canvas.x - r.left + b.n.x0 * b.canvas.w,
+      y: b.canvas.y - r.top + b.n.y0 * b.canvas.h,
+      w: (b.n.x1 - b.n.x0) * b.canvas.w,
+      h: (b.n.y1 - b.n.y0) * b.canvas.h,
+    };
+    const fx = live.w / ideal.w;
+    const fy = live.h / ideal.h;
+    const off = Math.max(Math.abs(live.x - ideal.x), Math.abs(live.y - ideal.y)) / Math.min(r.width, r.height);
+    if (Math.abs(fx - 1) < FOLLOW_LIMIT && Math.abs(fy - 1) < FOLLOW_LIMIT && off < FOLLOW_LIMIT) {
+      kx = fx;
+      ky = fy;
+      lx = live.x;
+      ly = live.y;
+      ix = ideal.x;
+      iy = ideal.y;
+    }
+  }
+  /* then: p'' = L + K(p' - I)  =>  p'' = K S p + L + K(O - S O + T - I) */
+  const a = kx * sx;
+  const d = ky * sy;
+  const e = lx + kx * (o.x - sx * o.x - ix);
+  const f = ly + ky * (o.y - sy * o.y + ty - iy);
+  return `matrix(${a}, 0, 0, ${d}, ${e}, ${f})`;
+}
 
 /** Where the cover-fitted 16:9 image's top-left corner sits inside the video
  *  element. The element is the viewport; the image overflows whichever axis
@@ -237,11 +308,10 @@ const TransitionPlayer = forwardRef<TransitionHandle>(function TransitionPlayer(
                to be ramped IN rather than out - arriving exactly as the last
                frame lands, so the frame we hold matches the live board. */
             seamArmed = true;
-            const o = coverOrigin(v);
-            v.style.transformOrigin = `${o.x}px ${o.y}px`;
+            v.style.transformOrigin = "0 0";
             v.style.transition =
               `transform ${rampS}s ${SEAM_EASE_IN}, filter ${rampS}s ${SEAM_EASE_IN}`;
-            v.style.transform = `translateY(${SEAM_DY_PCT}%) scale(${SEAM_SCALE_X}, ${SEAM_SCALE_Y})`;
+            v.style.transform = seamTransform(v);
             v.style.filter = `brightness(${SEAM_BRIGHTNESS})`;
           }
           if (hideBeforeEndS > 0) {
@@ -258,10 +328,9 @@ const TransitionPlayer = forwardRef<TransitionHandle>(function TransitionPlayer(
                one, and that half-transparent overlap is what reads as a
                lurch - the instant cut is the invisible one. The seam
                correction below makes the two boards actually coincide. */
-            const o = coverOrigin(v);
-            v.style.transformOrigin = `${o.x}px ${o.y}px`;
+            v.style.transformOrigin = "0 0";
             v.style.transition = "none";
-            v.style.transform = `translateY(${SEAM_DY_PCT}%) scale(${SEAM_SCALE_X}, ${SEAM_SCALE_Y})`;
+            v.style.transform = seamTransform(v);
             v.style.filter = `brightness(${SEAM_BRIGHTNESS})`;
             const prev = h.style.transition;
             h.style.transition = "none";

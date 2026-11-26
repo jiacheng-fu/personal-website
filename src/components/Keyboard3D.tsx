@@ -8,7 +8,7 @@ import { CAP_NOTES } from "../data/capNotes";
 import { studioMatcap } from "../data/matcap";
 import { useKeycapGeometry, capGeometry, HEIGHT_RATIO } from "../data/keycapGeometry";
 import { legendGeometry, legendExtrude, brandLogo } from "../data/legendGeometry";
-import { setBoardStanding } from "../lib/boardState";
+import { setBoardStanding, registerBoardPlacement } from "../lib/boardState";
 import { claimGesture } from "../lib/gesture";
 
 /* ---------------------------------------------------------------------------
@@ -1300,6 +1300,42 @@ function Board({
     [width, depth]
   );
   useEffect(() => () => caseGeo.dispose(), [caseGeo]);
+
+  /* Where the STANDING board is on screen, for the transition clips to fit
+     their keyboard onto (lib/boardState.ts, TransitionPlayer seamTransform).
+     The case's corners in the final pose, through the live camera - not the
+     current pose, so it is right while the board is parked off-screen too. */
+  useEffect(() => {
+    if (daylight) return;
+    const hw = (width + 1.15) / 2;
+    const hd = (depth + 1.15) / 2;
+    const world = new THREE.Matrix4().compose(POSE_POS, FINAL_Q, new THREE.Vector3(1, 1, 1));
+    const v = new THREE.Vector3();
+    registerBoardPlacement(() => {
+      const el = gl.domElement;
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height) return null;
+      const panel = el.closest(".panel")?.getBoundingClientRect();
+      camera.updateMatrixWorld();
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (const sx of [-1, 1])
+        for (const sy of [-1, 1])
+          for (const sz of [-1, 1]) {
+            v.set(sx * hw, -0.34 + sy * 0.475, sz * hd).applyMatrix4(world).project(camera);
+            const nx = (v.x + 1) / 2;
+            const ny = (1 - v.y) / 2;
+            x0 = Math.min(x0, nx); x1 = Math.max(x1, nx);
+            y0 = Math.min(y0, ny); y1 = Math.max(y1, ny);
+          }
+      return {
+        n: { x0, y0, x1, y1 },
+        /* x against the screen, y against the section: once the section is
+           the one in view, that is where the canvas will be */
+        canvas: { x: r.left, y: r.top - (panel?.top ?? 0), w: r.width, h: r.height },
+      };
+    });
+    return () => registerBoardPlacement(null);
+  }, [daylight, width, depth, gl, camera]);
 
   /* Re-entering a label already held moves it to the top rather than adding a
      duplicate: hovering a key you are already holding down should not need two

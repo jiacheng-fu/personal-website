@@ -17,7 +17,13 @@
    forced ON as well as off. A screenshot of the real thing is the test,
    not the code: see docs/transition-kb-machine.md s16 and s20.
 
-   Starts its own Vite server; needs Google Chrome installed. ~1 minute.
+   And the way back (2026-11-26): the machine -> keyboard clip ends on a
+   held frame of the board, then fades to the live one. It was 2-3px off
+   there - Brian's "slight shift" scrolling back up - and nothing checked it,
+   because only the forward seam had a guard. Each case now also plays the
+   reverse clip and compares its held last frame with the live board.
+
+   Starts its own Vite server; needs Google Chrome installed. ~2 minutes.
    --------------------------------------------------------------------------- */
 
 import { createServer } from "vite";
@@ -45,6 +51,45 @@ const server = await createServer({ logLevel: "error", server: { port: 5299, str
 await server.listen();
 const base = (server.resolvedUrls?.local?.[0] ?? "http://localhost:5299/").replace(/\/$/, "");
 const browser = await chromium.launch({ headless: true, channel: "chrome", ignoreDefaultArgs: ["--hide-scrollbars"] });
+
+/** best integer shift lining up two screenshots over a rect (minus `skip`) */
+const align = (page, A, C, R, skip) =>
+  page.evaluate(
+    async ([A, C, R, S]) => {
+      const gray = async (b64) => {
+        const img = new Image();
+        img.src = "data:image/png;base64," + b64;
+        await img.decode();
+        const cv = document.createElement("canvas");
+        cv.width = img.width;
+        cv.height = img.height;
+        const g = cv.getContext("2d");
+        g.drawImage(img, 0, 0);
+        const d = g.getImageData(0, 0, img.width, img.height).data;
+        const out = new Float32Array(img.width * img.height);
+        for (let i = 0; i < out.length; i++) out[i] = 0.3 * d[i * 4] + 0.59 * d[i * 4 + 1] + 0.11 * d[i * 4 + 2];
+        return { px: out, W: img.width };
+      };
+      const a = await gray(A);
+      const c = await gray(C);
+      const pts = [];
+      for (let y = Math.ceil(R.y); y < R.y + R.h; y += 2)
+        for (let x = Math.ceil(R.x); x < R.x + R.w; x += 2) {
+          if (S && x > S.x - 6 && x < S.x + S.w + 6 && y > S.y - 6 && y < S.y + S.h + 6) continue;
+          pts.push(y * c.W + x);
+        }
+      let best = { dx: 0, dy: 0, e: Infinity };
+      for (let dy = -24; dy <= 24; dy++)
+        for (let dx = -24; dx <= 24; dx++) {
+          let e = 0;
+          for (const i of pts) e += Math.abs(c.px[i] - a.px[i + dy * a.W + dx]);
+          e /= pts.length;
+          if (e < best.e) best = { dx, dy, e };
+        }
+      return best;
+    },
+    [A.toString("base64"), C.toString("base64"), R, skip ?? null],
+  );
 
 let failed = 0;
 try {
@@ -128,6 +173,29 @@ try {
       `${ok ? "ok  " : "FAIL"} ${w}x${h} ${bar ? "scrollbar " + scrollbar + "px" : "no scrollbar"}`.padEnd(34) +
         `clip vs machine: dx ${r.dx}, dy ${r.dy}`,
     );
+
+    /* the way back: the reverse clip's held last frame vs the live board it
+       fades to, over the board's middle (the copy is hidden: the clip has none) */
+    await page.waitForTimeout(3500);
+    await page.keyboard.press("ArrowUp");
+    await page.waitForFunction(
+      () => {
+        const v = document.querySelector(".transition video");
+        return v && v.ended && v.currentSrc.includes("kb-machine-rev");
+      },
+      null,
+      { timeout: 20000, polling: "raf" },
+    );
+    const held = await page.screenshot({ type: "png" });
+    await page.addStyleTag({
+      content: ".panel--void .section__label,.panel--void .field-note,.panel--void .kb__caption,.kb-swipehint,.nav,.dots{visibility:hidden!important}",
+    });
+    await page.waitForTimeout(2500);
+    const board = await page.screenshot({ type: "png" });
+    const back = await align(page, board, held, { x: w * 0.15, y: h * 0.12, w: w * 0.7, h: h * 0.76 });
+    const okBack = Math.abs(back.dx) <= TOLERANCE_PX && Math.abs(back.dy) <= TOLERANCE_PX;
+    if (!okBack) failed++;
+    console.log(`${okBack ? "ok  " : "FAIL"}`.padEnd(34) + `   back: clip vs board: dx ${back.dx}, dy ${back.dy}`);
     await page.close();
   }
 } finally {
