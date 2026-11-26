@@ -943,6 +943,11 @@
   }
 }
 
+/* the flat word field (Reduce Motion, no WebGL) has no keys to tap */
+.panel--void:has(.skillfield) .field-note .dim {
+  display: none;
+}
+
 /* the sound toggle, sitting just under the caption */
 .kb__sound {
   position: absolute;

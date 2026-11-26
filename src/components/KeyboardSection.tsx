@@ -79,9 +79,22 @@ export default function KeyboardSection({
     };
   }, [reduce, supported]);
 
+  /* The flat field has no lamp to strike, so it reports the light on as soon
+     as the section is entered. Without that, the section's own label and
+     note (shown only when lit) never appeared, and the blackout staged for
+     the lamp hid the nav and the dots for as long as the page was there
+     (Reduce Motion on an iPhone, 2026-11-25). A frame late, so it lands after
+     the scene's own entry effect, which is the one that stages the black. */
+  const flat = reduce || !supported || failed;
+  useEffect(() => {
+    if (!flat || !active) return;
+    const raf = requestAnimationFrame(() => onLight?.(true));
+    return () => cancelAnimationFrame(raf);
+  }, [flat, active, onLight]);
+
   // Anyone who prefers reduced motion, has no WebGL, or hits a chunk that
   // fails to load still gets the full list - just as the flat field.
-  if (reduce || !supported || failed) return <SkillField skills={skills} />;
+  if (flat) return <SkillField skills={skills} />;
 
   return (
     <div className="kb-host" ref={hostRef}>
