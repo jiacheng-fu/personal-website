@@ -943,6 +943,28 @@
   }
 }
 
+/* a swipe that started on the board stays the board's: where to swipe instead */
+.kb-swipehint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(6vh + 3.6rem);
+  z-index: 3;
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink);
+  opacity: 0;
+  transition: opacity 0.25s ease-out;
+  pointer-events: none;
+}
+.panel[data-swipe-hint] .kb-swipehint {
+  opacity: 0.8;
+}
+
 /* the flat word field (Reduce Motion, no WebGL) has no keys to tap */
 .panel--void:has(.skillfield) .field-note .dim {
   display: none;
@@ -2285,6 +2307,10 @@ html {
   border-radius: 8px;
   padding: 0.6rem 0.7rem;
   font-size: clamp(15px, 4.2vw, 19px);
+}
+/* never under 16px: iOS zooms the page into a smaller field on focus */
+.a2m--compact .a2-prompt input {
+  font-size: max(16px, 1em);
 }
 /* the boot menu runs past the glass on a phone: it scrolls, the prompt stays */
 .a2m--compact .a2-boot {

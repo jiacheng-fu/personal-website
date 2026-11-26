@@ -9,6 +9,7 @@ import { studioMatcap } from "../data/matcap";
 import { useKeycapGeometry, capGeometry, HEIGHT_RATIO } from "../data/keycapGeometry";
 import { legendGeometry, legendExtrude, brandLogo } from "../data/legendGeometry";
 import { setBoardStanding } from "../lib/boardState";
+import { claimGesture } from "../lib/gesture";
 
 /* ---------------------------------------------------------------------------
    Layout
@@ -1493,7 +1494,9 @@ function Board({
       </>
       )}
 
-      <group ref={boardGroup} quaternion={FINAL_Q} position={[0, 0.55, 0]} onPointerMissed={clear}>
+      {/* a press or swipe that lands on the board is the board's, never a
+          page turn (lib/gesture.ts) */}
+      <group ref={boardGroup} quaternion={FINAL_Q} position={[0, 0.55, 0]} onPointerMissed={clear} onPointerDown={claimGesture}>
         <mesh geometry={caseGeo} position={[0, -0.34, 0]} castShadow>
           <meshStandardMaterial color={WAY.case} roughness={0.36} metalness={KB_VARIANT === "white" ? 0.25 : 0.8} />
         </mesh>

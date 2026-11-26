@@ -90,6 +90,11 @@
    their own arrangement (each Item's `p`). The spare pins are placed in % of
    the wide board, so they go. */
 @media (max-aspect-ratio: 4/5) {
+  /* clear of the nav, and nothing under the board (App.css gives every
+     .section on a phone 3.5rem at both ends) */
+  .panel .nb {
+    padding-block: clamp(3.2rem, 7vh, 4.4rem) 0.5rem;
+  }
   .nb__stage {
     width: min(100%, calc((100dvh - 6.5rem) * 990 / 1530));
     aspect-ratio: 990 / 1530;

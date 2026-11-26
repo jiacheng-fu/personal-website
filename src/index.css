@@ -81,6 +81,34 @@ html::-webkit-scrollbar {
   }
 }
 
+/* A phone must never scroll the page itself: the sections move only when the
+   nav moves them. useSectionNav cancels every touchmove, but a cancel can be
+   missed - a touch that starts on something re-rendered mid-gesture (its
+   events stop reaching the window), or a box scrolled to its end handing the
+   rest of the swipe to the page - and then the page scrolled freely, "a
+   linear scroll instead of sections" (Brian, 2026-11-26). So the page refuses
+   one-finger panning outright (pinch zoom stays), nothing chains or rubber-
+   bands past an edge, and the boxes that do scroll say so. */
+html {
+  touch-action: pinch-zoom;
+}
+html,
+body {
+  overscroll-behavior: none;
+}
+[data-scrollable],
+[data-scroll-main] {
+  touch-action: pan-y pinch-zoom;
+}
+/* iOS zooms the page into any field set under 16px when it is focused, and
+   leaves it zoomed: the machine's prompt on a narrow phone was 15px */
+@media (hover: none) {
+  input,
+  textarea {
+    font-size: max(16px, 1em);
+  }
+}
+
 a {
   color: inherit;
   text-decoration: none;

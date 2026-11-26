@@ -105,6 +105,11 @@ function KeyboardScene({ active, skipIntro, parkStanding }: { active: boolean; s
     <div className="section shell field-section" ref={sceneRef}>
       <p className="section__label">What I work in</p>
       <KeyboardSection skills={skills} active={active} skipIntro={skipIntro} parkStanding={parkStanding} onLight={handleLight} />
+      {/* shown by useSectionNav (data-swipe-hint) when a swipe that started on
+          the board was left to the board */}
+      <p className="kb-swipehint" aria-hidden>
+        Swipe above or below the board to move on
+      </p>
       <p className="field-note">
         Every key is something I&rsquo;ve shipped with.{" "}
         <span className="dim">{typeof window !== "undefined" && !window.matchMedia("(hover: hover)").matches ? "Tap one." : "Hover one."}</span>
@@ -591,7 +596,8 @@ export default function App() {
 
         <Panel id="craft" active={index === 1} className="panel--void">
           {/* parkStanding: from below the keyboard, the next visit arrives from below and skips the intro */}
-          <KeyboardScene active={index === 1} skipIntro={kbFromBelow.current} parkStanding={index > 1} />
+          {/* reduced motion: always the arrival from below - lit, standing, no theatre */}
+          <KeyboardScene active={index === 1} skipIntro={kbFromBelow.current || !!reduce} parkStanding={index > 1 || !!reduce} />
         </Panel>
 
         <Panel id="ask" active={index === 2}>

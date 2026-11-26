@@ -602,3 +602,18 @@
 .hx--tall .hx__front {
   overflow: visible;
 }
+
+/* ---- touch: no hover at all ----
+   A tap leaves :hover stuck on whatever it landed on, so on a phone every tap
+   on the name (the doodle says "click for more") swapped a letter for its
+   drawing and back - BRIAN FU "blinking on and off" (Brian, 2026-11-26). The
+   taps still reach the section, which is what keeps the logos coming. */
+@media (hover: none) {
+  .hx__glyph,
+  .hx__glyphHit,
+  .hx__doodle,
+  .hx__doodle .hx__strokeHit,
+  .hx__doodle--bulb .hx__strokeHit {
+    pointer-events: none;
+  }
+}

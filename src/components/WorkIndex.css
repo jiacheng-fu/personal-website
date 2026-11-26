@@ -420,6 +420,10 @@
     height: 100dvh;
     justify-content: flex-start;
     gap: 0.8rem;
+  }
+  /* .panel-qualified: App.css gives every .section on a phone 3.5rem top and
+     bottom, at this specificity, which left 56px dead under the card */
+  .panel .wx {
     padding-block: 3.5rem 0.9rem;
   }
   .wx__body {
@@ -453,7 +457,7 @@
   /* one cap for the row and the frame in it (the frame sets its own above) */
   .wx__detail,
   .wx__detail .wx__frame {
-    --wx-cap: clamp(5rem, 22vh, 11rem);
+    --wx-cap: clamp(5rem, 28vh, 13rem);
   }
   .wx__frame {
     grid-row: 1;
@@ -465,24 +469,43 @@
   .wx__card {
     grid-row: 2;
   }
+  /* the selected row already shows the years, right above */
   .wx__yr--card {
-    margin-bottom: 0.45rem;
+    display: none;
   }
   .wx__blurb {
     font-size: 0.84rem;
     line-height: 1.5;
     margin-bottom: 0.8rem;
   }
+  /* the tags as one line of type, not two rows of pills: the room they
+     give back is the preview's (it was hidden under 700px tall, which is a
+     17 Pro with Safari's bars out - Brian missed it, 2026-11-25) */
   .wx__stack {
-    margin-bottom: 0.9rem;
+    display: block;
+    margin-bottom: 0.85rem;
+    line-height: 1.5;
+  }
+  .wx__stack li {
+    display: inline;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    font-size: 0.68rem;
+    white-space: normal;
+  }
+  .wx__stack li + li::before {
+    content: "\00b7";
+    margin: 0 0.55em;
+    color: var(--accent);
   }
   .wx__aside {
     display: none;
   }
 }
-/* a short phone (an SE, a big one with its toolbars out): the preview goes,
-   then the tags and a step off the titles, before any copy would */
-@media (max-width: 640px) and (max-aspect-ratio: 1/1) and (max-height: 700px) {
+/* the shortest phones (an SE): the preview goes, and a step off the titles,
+   before any copy would */
+@media (max-width: 640px) and (max-aspect-ratio: 1/1) and (max-height: 600px) {
   .wx__frame {
     display: none;
   }
@@ -492,13 +515,8 @@
   .wx__card {
     grid-row: 1;
   }
-}
-@media (max-width: 640px) and (max-aspect-ratio: 1/1) and (max-height: 600px) {
   .wx__title {
     font-size: clamp(1.1rem, 5.4vw, 1.3rem);
-  }
-  .wx__stack {
-    display: none;
   }
   .wx__blurb {
     font-size: 0.8rem;

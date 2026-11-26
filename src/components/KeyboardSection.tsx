@@ -53,7 +53,7 @@ export default function KeyboardSection({
 
   useEffect(() => {
     const host = hostRef.current;
-    if (!host || reduce || !supported) return;
+    if (!host || !supported) return;
 
     // Two thresholds off one observer: a wide margin to start the download
     // early, and the plain intersection to park the render loop when the
@@ -85,15 +85,17 @@ export default function KeyboardSection({
      the lamp hid the nav and the dots for as long as the page was there
      (Reduce Motion on an iPhone, 2026-11-25). A frame late, so it lands after
      the scene's own entry effect, which is the one that stages the black. */
-  const flat = reduce || !supported || failed;
+  const flat = !supported || failed;
   useEffect(() => {
     if (!flat || !active) return;
     const raf = requestAnimationFrame(() => onLight?.(true));
     return () => cancelAnimationFrame(raf);
   }, [flat, active, onLight]);
 
-  // Anyone who prefers reduced motion, has no WebGL, or hits a chunk that
-  // fails to load still gets the full list - just as the flat field.
+  /* No WebGL, or a chunk that fails to load: the full list, as the flat
+     field. Reduced motion used to land here too, but Brian (Reduce Motion on
+     his iPhone, 2026-11-25) wants the board: it gets the board, already
+     standing and lit - no intro - and Keyboard3D drops the parallax. */
   if (flat) return <SkillField skills={skills} />;
 
   return (
@@ -111,8 +113,8 @@ export default function KeyboardSection({
             <Suspense fallback={<KeyboardSkeleton />}>
               <Keyboard3D
                 paused={!visible || !active}
-                active={active && !reduce}
-                instant={skipIntro}
+                active={active}
+                instant={skipIntro || !!reduce}
                 hidden={!visible}
                 parkStanding={parkStanding}
                 onLight={onLight}

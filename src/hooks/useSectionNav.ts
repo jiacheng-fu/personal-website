@@ -1,5 +1,6 @@
 import { isNavLocked } from "../lib/transitions";
 import { isClipBusy } from "../lib/transitions";
+import { gestureClaimed } from "../lib/gesture";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /* ---------------------------------------------------------------------------
@@ -364,12 +365,16 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate, inst
        scrolls natively (momentum and all); a swipe on the screen off the
        text scrolls it by hand. */
     let touchY = 0;
+    let touchX = 0;
+    let touchAt = 0;
     let lastY = 0;
     let touchTarget: Element | null = null;
     let touchScrollers: HTMLElement[] = [];
     let boxMoved = false;
     const onTouchStart = (e: TouchEvent) => {
       touchY = lastY = e.touches[0].clientY;
+      touchX = e.touches[0].clientX;
+      touchAt = performance.now();
       touchTarget = e.target as Element | null;
       touchScrollers = scrollersAt(e.target);
       boxMoved = false;
@@ -388,9 +393,24 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate, inst
       }
       e.preventDefault();
     };
+    /* A page turn is a deliberate vertical swipe: 40px at least, and more up
+       or down than sideways - a drag across the keys, or across the board's
+       notes, is not one. A swipe the keyboard claimed (lib/gesture.ts) is
+       the keyboard's; it shows where to swipe instead. */
+    let hintTimer = 0;
     const onTouchEnd = (e: TouchEvent) => {
       const dy = touchY - (e.changedTouches[0]?.clientY ?? touchY);
-      if (boxMoved || busy.current || Math.abs(dy) < 40) return;
+      const dx = touchX - (e.changedTouches[0]?.clientX ?? touchX);
+      if (boxMoved || busy.current || Math.abs(dy) < 40 || Math.abs(dy) < Math.abs(dx) * 1.2) return;
+      if (gestureClaimed(touchAt)) {
+        const panel = document.querySelectorAll<HTMLElement>(".panel")[indexRef.current];
+        if (panel) {
+          panel.dataset.swipeHint = "";
+          window.clearTimeout(hintTimer);
+          hintTimer = window.setTimeout(() => delete panel.dataset.swipeHint, EDGE_HINT_MS);
+        }
+        return;
+      }
       goTo(indexRef.current + (dy > 0 ? 1 : -1));
     };
 
@@ -407,7 +427,17 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate, inst
        resize 250 ms into the notes ended on projects, not contact). The
        realign is owed instead, and paid the moment the lock lifts. */
     let realignOwed = false;
+    /* While a text field has focus a phone's keyboard is up, and iOS moves
+       the page itself to keep the field in view; snapping back to the
+       section top underneath it hid the field and fought the keyboard. The
+       realign waits until the field lets go. */
+    const typing = () => {
+      const a = document.activeElement as HTMLElement | null;
+      return !!a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA") && !window.matchMedia("(hover: hover)").matches;
+    };
+    const onFocusOut = () => window.setTimeout(() => !typing() && goTo(indexRef.current, false), 120);
     const onResize = () => {
+      if (typing()) return;
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() =>
         requestAnimationFrame(() => {
@@ -433,6 +463,7 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate, inst
        to whichever section the page had got nearest to. */
     let drift = 0;
     const follow = () => {
+      if (typing()) return;
       /* mid-move: look again once it is over, or focus tabbed onward during
          the move is never followed (the page ended on contact, dot on work) */
       if (busy.current || isClipBusy() || isNavLocked()) {
@@ -466,6 +497,7 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate, inst
     window.addEventListener("touchmove", onTouchMove, { passive: false });
     window.addEventListener("touchend", onTouchEnd);
     window.addEventListener("resize", onResize);
+    document.addEventListener("focusout", onFocusOut);
     // Fullscreen does not always emit a plain resize; these do.
     document.addEventListener("fullscreenchange", onResize);
     window.visualViewport?.addEventListener("resize", onResize);
@@ -474,11 +506,13 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate, inst
       window.clearTimeout(drift);
       window.removeEventListener("wheel", onWheel);
       window.clearTimeout(edgeTimer);
+      window.clearTimeout(hintTimer);
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("touchstart", onTouchStart);
       window.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("touchend", onTouchEnd);
       window.removeEventListener("resize", onResize);
+      document.removeEventListener("focusout", onFocusOut);
       document.removeEventListener("fullscreenchange", onResize);
       window.visualViewport?.removeEventListener("resize", onResize);
       cancelAnimationFrame(raf);
