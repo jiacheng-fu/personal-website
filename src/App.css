@@ -1693,7 +1693,13 @@ html {
   left: 0;
   transform-origin: 0 0;
   transition: transform 0.9s var(--ease-out);
-  will-change: transform;
+  /* No will-change: transform. With it Chrome drew the machine once, at the
+     scale the stage had when the layer was made, and stretched that bitmap
+     to the final 1.43x on a 1440p screen: the illustration came out soft
+     (edge energy 9.2 vs 15.4 without it, measured 2026-11-26) - softer than
+     the transition clip it hands over to. Without it the browser promotes
+     the layer only while the transform is animating and redraws it sharp
+     when it settles. */
 }
 .a2m__svg {
   display: block;
