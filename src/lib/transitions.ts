@@ -194,7 +194,7 @@ export function transitionAllowed() {
 
 /* bump CLIP_VERSION whenever the files change, so no browser or CDN serves
    an older cut under the same URL */
-const CLIP_VERSION = "22";
+const CLIP_VERSION = "23"; // 23: baked - live page at both ends (2026-11-26)
 export const CLIPS = {
   kbToMachine: `/transitions/kb-machine.mp4?v=${CLIP_VERSION}`,
   machineToKb: `/transitions/kb-machine-rev.mp4?v=${CLIP_VERSION}`,

@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# NOTE (2026-11-26): this builds the UN-baked master. The shipped clips are
+# baked afterwards (the live page at both ends, the middle graded) with
+# scripts/bake-transition/ - run that after this (see its README). Colour tags go
+# through -x264-params: the -color_trc flags this used to pass never reached
+# libx264, and Chrome then guessed BT.709 (docs/transition-kb-machine.md s21).
 # Builds public/transitions/kb-machine.mp4 (+ reversed copy) from the
 # accepted Higgsfield drafts. Reproducible: no ad-hoc commands.
 #
@@ -143,13 +148,13 @@ ffmpeg -v error -y \
 [ab][m]xfade=transition=fade:duration=$XF_TAIL:offset=$OFF_TAIL[v]" \
   -map "[v]" -an \
   -c:v libx264 -preset slow -crf ${CRF:-16} -pix_fmt yuv420p -movflags +faststart \
-  -colorspace bt709 -color_primaries bt709 -color_trc bt709 -color_range tv \
+  -x264-params "colorprim=bt709:transfer=iec61966-2-1:colormatrix=bt709:range=tv" \
   "$OUT/kb-machine.mp4"
 
 # Reversed copy for scroll-up. Encoded, not played backwards in the browser.
 ffmpeg -v error -y -i "$OUT/kb-machine.mp4" -vf reverse -an \
   -c:v libx264 -preset slow -crf ${CRF:-16} -pix_fmt yuv420p -movflags +faststart \
-  -colorspace bt709 -color_primaries bt709 -color_trc bt709 -color_range tv \
+  -x264-params "colorprim=bt709:transfer=iec61966-2-1:colormatrix=bt709:range=tv" \
   "$OUT/kb-machine-rev.mp4"
 
 for f in "$OUT/kb-machine.mp4" "$OUT/kb-machine-rev.mp4"; do

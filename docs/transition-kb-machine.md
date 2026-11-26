@@ -971,3 +971,110 @@ window setups, four with a scrollbar forced on, and fails past 1px. With the
 old `innerWidth` line put back it fails 4 of 5 at exactly the reported
 7-8px. Run it after touching anything in transitions.ts, Apple2Front's
 placement, the keyboard surface, TransitionPlayer, or page-wide CSS.
+
+## 21 · The way back, adaptive placement, and the live page baked in (2026-11-26)
+
+**The way back was never checked.** Brian, on a 16:9 monitor: going up from
+the machine there was "a slight shift". The reverse clip's held last frame
+sat 2px below the live board at every 16:9 size. Only the forward seam had a
+guard, and the board had moved since `SEAM_*` were measured. Now:
+
+- **Placement follows the live board.** Keyboard3D projects the standing
+  case through the live camera (`lib/boardState.ts`). TransitionPlayer's
+  `seamTransform` fits the clip from the reference board (`N_REF`) onto
+  that. In a test the board was moved 24px and scaled 4%, and the fit still
+  landed at 0px (23px off with it disabled). The constants only describe the
+  video file.
+- **`seam:check` plays both directions** and checks luminance at both ends
+  (4%), as well as position (1px).
+
+**Two live-page bugs found on the way.**
+
+- On 1440p and 4K screens the keyboard canvas measured itself mid-fade, so
+  the board rendered 1.7% small. The cause was getBoundingClientRect
+  counting the wrapper's `scale(0.98)` entrance. The canvas now uses
+  `resize={{ offsetSize: true }}`. It is the same fault as §16's plate shrink.
+- `.a2m__stage { will-change: transform }` froze the drawn machine's raster
+  at a smaller scale. On the live page it was soft: edge energy 9.2, against
+  15.4 without the hint.
+
+**Colour, the real cause.** The clips carried no transfer tag:
+build-transition.sh's `-color_trc` / `-color_primaries` never reach libx264.
+So Chrome's `<video>` path guessed BT.709 and showed them with about 7% more
+contrast than was encoded. A canvas `drawImage` of the same video does not
+guess, which hid this from every pixel test.
+
+| What was measured | Untagged / BT.709 | Tagged sRGB |
+|---|---|---|
+| Dark frame | encoded 16.4 shown 14.5 | shown as encoded (0.41/255) |
+| Bright frame | encoded 210 shown 212 | shown as encoded |
+
+Every brightness correction before this one, August's 1.07 and the CSS
+grades below, was partly fighting that guess. Both encoders now tag
+iec61966-2-1 through `-x264-params` (plus `setparams`), and the grades were
+refitted in true sRGB. In true sRGB the generated keyboard frame is barely
+off (b 1.038, c 1.002, s .979). The cream world really is darker and warmer:
+its paper is ~6 levels under the page (b 1.084, c .882, s .988), and it
+brightened visibly as the machine still faded in, a flicker the old clip had.
+
+**Colour, as first measured (superseded).** The keyboard end's
+`brightness(1.07)` (§16.1) had gone stale.
+The board itself now came out brighter than live, so the boost pushed it 9%
+over, and the machine end had no grade at all. Grades were fitted from
+pixel-aligned screenshots:
+
+| End | brightness | contrast | saturate |
+|---|---|---|---|
+| Keyboard | .960 | .968 | 1.066 |
+| Machine | .932 | 1.141 | 1.065 |
+
+These lived in CSS for one commit, then moved into the files (below).
+
+**The live page, baked into the clip** (Brian: "use the real thing as much
+as possible"; `scripts/bake-transition/`).
+
+- **Rebuilding.** `frames.sh` rebuilds the master's frames uncompressed, with
+  `build-transition.sh`'s own graph. They match the shipped file to about
+  0.5/255.
+- **References.** `capture.mjs` takes the live keyboard and the screen-off
+  machine at 2560x1440, plus the machine-less page for the machine's matte.
+- **`composite.py`, per frame:**
+  - The keyboard is static until the wipe crosses it (frames 0-64). Wherever
+    a pixel still equals frame 0 it becomes the live board, warped into the
+    clip's own coordinates by the inverse seam fit. The wipe's faint glow is
+    kept as a delta on top.
+  - Inside the machine's matte, wherever the frame already equals the final
+    frame, it becomes the live machine. That area is eroded away from
+    anything still moving, so a settling edge is never doubled.
+  - Everything generated is graded per world (the grades above), and its ink
+    lines are tightened by a luminance-only unsharp mask (σ1.2, 0.6, skips
+    flat areas).
+- **What failed first.** Patching the PAPER failed: the generated paper and
+  the live paper differ by gentle gradients, so any patchwork showed as
+  blotches. The paper stays generated and graded. The colour is now in the
+  pixels, so the player applies no filter.
+- **Encoding.** `encode.sh` encodes once, with the shipped files' tags
+  (BT.709 matrix, TV range, transfer and primaries unset). The clip version
+  is now 23.
+
+**Result** (1600x900, the seams as shown, no CSS filter):
+
+| Seam | v22 + 1.07 | CSS grade | Baked + tagged |
+|---|---|---|---|
+| Forward cut, board | 13.84 | 9.37 | 3.25 |
+| Forward cut, void | 3.38 | 1.67 | 0.29 |
+| Forward start, live vs clip | ~5.4 | n/a | ~1.0, dx 0 dy 0 at 3 sizes |
+| Machine case, mean RGB | ~5 levels off | ~1 | 0.2 |
+
+`seam:check` luminance agrees to 0.1 at both ends. The remaining 3-4/255
+mean error is the browser resampling 2560 down to the window, along edges,
+with no bias. The clips also got smaller: 5.5 / 5.4 MB, against 6.5 / 6.4.
+
+**Undo.** The originals are kept in `media/clips-v22-before-bake/` and
+`media/stable-v22/`, which are identical. Copy them back to
+`public/transitions/` and set `CLIP_VERSION` back to 22. Also restore the
+CSS grade from commit 78d0af0.
+
+**Re-bake** when the keyboard's or the machine's look changes, such as new
+keys, lighting or colours. Their placement is followed live and needs no
+re-bake.
