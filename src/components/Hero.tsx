@@ -46,6 +46,17 @@ const NAME_TOP_CLEAR = 0.04;
 /** ...and never under the fixed nav's links (CSS px), which on a short
  *  screen (a phone on its side) 4% of the height does not clear */
 const NAV_CLEAR_PX = 46;
+/** A window taller than about 0.87:1 (a phone held upright) does not get
+ *  the photo cover-fitted: that cropped it to his forehead, with the doodles
+ *  and the name's surroundings off both sides (Brian, 2026-11-25). The photo
+ *  is held at about two screen widths, anchored to the bottom, and the sky
+ *  above it is painted on (Hero.css). The name then has that sky to itself:
+ *  it is centred between the location rail and the photo's faded top edge,
+ *  and these are the rail's bottom (CSS px) and how far into the photo the
+ *  band may reach (photo px; the fade covers the top 20%). */
+const TALL_RAIL_CLEAR_PX = 104;
+const TALL_INTO_PHOTO = 120;
+
 /** Inter Tight's cap height, as a fraction of its size */
 const CAP = 0.727;
 /** the marker colour of the doodles (Brian: "doodle in yellow") */
@@ -77,7 +88,7 @@ type Line = {
   base: number;
   letters: { ch: string; x: number; x1: number; delay: number }[];
 };
-type Layout = Line & { sub: Line | null };
+type Layout = Line & { sub: Line | null; tall: boolean };
 
 /* Where a logo can sit on each letter, as fractions of the letter's advance
    box: the full top bar of B R F, the single stems of I, the two stems of N
@@ -144,7 +155,14 @@ export default function Hero({ active }: { active: boolean }) {
         letters.push({ ch: name[i], x, x1, delay: 0.2 + d * 1.1 });
       }
       const clear = Math.max(NAME_TOP_CLEAR * visH, NAV_CLEAR_PX / s);
-      const base = Math.max(PHOTO.crownY + fs * CAP * NAME_DROP, visTop + clear + fs * CAP);
+      /* the photo held narrower than cover-fit (Hero.css, a tall window) */
+      const tall = f.clientWidth < (sec.clientHeight * PHOTO.w) / PHOTO.h - 1;
+      const subFs = Math.max(fs * SUB_SIZE, SUB_MIN_PX / s);
+      const blockH = fs * CAP + fs * SUB_GAP + subFs * CAP;
+      const skyTop = visTop + TALL_RAIL_CLEAR_PX / s;
+      const base = tall
+        ? Math.max(skyTop, (skyTop + TALL_INTO_PHOTO) / 2 - blockH / 2) + fs * CAP
+        : Math.max(PHOTO.crownY + fs * CAP * NAME_DROP, visTop + clear + fs * CAP);
       ledges.current = letters.flatMap((l) =>
         (LEDGES[l.ch] ?? [[0.1, 0.9]]).map(([a, b]) => ({
           x0: l.x + (l.x1 - l.x) * a,
@@ -156,7 +174,7 @@ export default function Hero({ active }: { active: boolean }) {
       let sub: Line | null = null;
       const sp = subProbe.current;
       if (sp) {
-        const sfs = Math.max(fs * SUB_SIZE, SUB_MIN_PX / s);
+        const sfs = subFs;
         sp.setAttribute("font-size", String(sfs));
         const left = SUB_ALIGN === "left" && letters.length;
         sp.setAttribute("x", String(left ? letters[0].x : PHOTO.w / 2));
@@ -172,7 +190,7 @@ export default function Hero({ active }: { active: boolean }) {
         }
         sub = { fs: sfs, base: sbase, letters: sl };
       }
-      setLayout({ fs, base, letters, sub });
+      setLayout({ fs, base, letters, sub, tall });
     };
     /* ...and once more a couple of frames after every font is in: WebKit
        resolves fonts.load() before the SVG probe is laid out again in the
@@ -229,10 +247,16 @@ export default function Hero({ active }: { active: boolean }) {
   };
 
   const cap = layout ? layout.fs * CAP : 0;
+  /* the slots open from well above the name, wherever it is */
+  const slotTop = Math.min(-2 * PHOTO.h, layout ? layout.base - 3 * layout.fs : 0);
   const scap = layout?.sub ? layout.sub.fs * CAP : 0;
 
   return (
-    <section ref={section} className={`hx ${active ? "is-in" : ""}`} onPointerDown={onPointerDown}>
+    <section
+      ref={section}
+      className={`hx ${active ? "is-in" : ""} ${layout?.tall ? "hx--tall" : ""}`}
+      onPointerDown={onPointerDown}
+    >
       {/* the only real heading on the page; the drawn name is decoration */}
       <h1 className="hx__sr">{profile.name}</h1>
 
@@ -263,7 +287,9 @@ export default function Hero({ active }: { active: boolean }) {
           <defs>
             {/* the slot each letter rises out of: nothing below the baseline */}
             <clipPath id="hx-slot">
-              <rect x={0} y={0} width={PHOTO.w} height={layout ? layout.base + layout.fs * 0.03 : PHOTO.h} />
+              {/* from well above the photo: in a tall window the name sits in
+                  the painted sky over it, at negative photo y */}
+              <rect x={0} y={slotTop} width={PHOTO.w} height={Math.max(0, (layout ? layout.base + layout.fs * 0.03 : PHOTO.h) - slotTop)} />
             </clipPath>
             {/* the role is small enough to wash out over the sky; a tight,
                 faint shadow lifts it without changing its colour */}
@@ -272,7 +298,7 @@ export default function Hero({ active }: { active: boolean }) {
             </filter>
             {/* and the role's slot, under the name's */}
             <clipPath id="hx-slot-sub">
-              <rect x={0} y={0} width={PHOTO.w} height={layout?.sub ? layout.sub.base + layout.sub.fs * 0.03 : PHOTO.h} />
+              <rect x={0} y={slotTop} width={PHOTO.w} height={Math.max(0, (layout?.sub ? layout.sub.base + layout.sub.fs * 0.03 : PHOTO.h) - slotTop)} />
             </clipPath>
           </defs>
           {/* measures the name; never seen */}
@@ -353,7 +379,7 @@ export default function Hero({ active }: { active: boolean }) {
         />
 
         {/* marker on the print, over everything */}
-        <HeroDoodles color={DOODLE} />
+        <HeroDoodles color={DOODLE} tall={!!layout?.tall} />
 
         {/* logos that have cleared his hair come out in front */}
         <div className="hx__layer hx__front" ref={front} aria-hidden="true" />

@@ -20,8 +20,11 @@
   height: 100svh;
   height: 100dvh;
   overflow: hidden;
-  /* the sky, for the moment before the photo decodes */
-  background: #6f9fd6;
+  /* the sky: for the moment before the photo decodes, and in a tall window
+     the sky above the photo (the frame is 205vw wide, so its top edge is
+     115.4vw up from the bottom), continuing the photo's own top-edge blue
+     (#5984c5, sampled) a little deeper towards the zenith */
+  background: linear-gradient(#4a77bf 0%, #5381c4 50%, #5984c5 calc(100% - 115.4vw));
   color: #fff;
   /* the frame below sizes itself against this box */
   container-type: size;
@@ -44,7 +47,11 @@
   position: absolute;
   left: 50%;
   bottom: 0;
-  width: max(100cqw, 177.68cqh);
+  /* ...but never wider than about two screens: past that (a window taller
+     than ~0.87:1, a phone held upright) cover-fit crops him to the forehead
+     with every doodle off the sides. There the photo stops short of the top
+     and the sky above it is painted (.hx background, .hx--tall). */
+  width: min(max(100cqw, 177.68cqh), 205cqw);
   aspect-ratio: 1672 / 941;
   transform: translateX(-50%);
   container-type: inline-size;
@@ -583,4 +590,15 @@
   .hx__rail {
     transition: none;
   }
+}
+
+/* ---- a tall window (a phone held upright): the photo under a painted sky ----
+   Its top edge fades into the sky, and the logos may fly up out of it. */
+.hx--tall .hx__photo {
+  -webkit-mask-image: linear-gradient(transparent, rgba(0, 0, 0, 0.35) 12%, #000 30%);
+  mask-image: linear-gradient(transparent, rgba(0, 0, 0, 0.35) 12%, #000 30%);
+}
+.hx--tall .hx__spray,
+.hx--tall .hx__front {
+  overflow: visible;
 }

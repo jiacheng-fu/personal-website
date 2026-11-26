@@ -423,10 +423,14 @@
 /* Respect the OS setting. The shader and reveals are decorative; nobody should
    get motion sickness from a portfolio. */
 @media (prefers-reduced-motion: reduce) {
+  /* transitions 0s, not 0.01ms: see index.css - a token duration gives every
+     element a transition on `all`, and code that sets a size and reads it
+     back got the old one (the hero's name, piled into one spot) */
   * {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
     scroll-behavior: auto !important;
   }
   .proj-wrap {

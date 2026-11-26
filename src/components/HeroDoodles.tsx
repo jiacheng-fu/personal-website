@@ -51,6 +51,34 @@ const NOTES: { text: string; x: number; y: number; at: number; dur: number; rot:
   { text: "(click for more)", x: 1132, y: 512, at: 5.9, dur: 0.6, rot: -5, size: 40 },
 ];
 
+/* A tall window (a phone held upright) shows only the middle of the photo,
+   x ~430..1240 (Hero.css: the frame is ~two screens wide), so every note
+   above sat off one side or the other. There they move into the water and
+   the city above his head, with their arrows redrawn to match; the loop, the
+   sparks and the bulb stay where they are. Same indices as STROKES/NOTES. */
+const TALL_STROKES: Record<number, string> = {
+  /* "single-threaded" -> the crown */
+  10: "M560 420 C585 470 610 520 640 560",
+  11: "M640 560 l-3 -24 M640 560 l-22 -9",
+  /* "big brained" -> his head */
+  12: "M1010 492 C1000 515 985 535 958 552",
+  13: "M958 552 l24 -1 M958 552 l11 -21",
+  /* the wave under "(not Austin)", and its arrow out to the water */
+  14: "M447 274 q11 -9 22 0 t22 0 t22 0 t22 0 t22 0 t22 0 t22 0",
+  15: "M612 262 C640 268 660 280 676 300",
+  16: "M676 300 l-4 -24 M676 300 l-22 -9",
+  /* "don't look down" -> down */
+  17: "M1190 318 C1198 345 1195 370 1205 398",
+  18: "M1205 398 l4 -24 M1205 398 l-18 -16",
+};
+const TALL_NOTES: Record<number, { x: number; y: number; rot: number }> = {
+  0: { x: 440, y: 400, rot: -4 }, // single-threaded
+  1: { x: 980, y: 470, rot: 4 }, // big brained
+  2: { x: 445, y: 255, rot: -3 }, // (not Austin)
+  3: { x: 935, y: 300, rot: 3 }, // don't look down
+  4: { x: 600, y: 150, rot: -4 }, // (click for more)
+};
+
 /* Which strokes and notes hover together (indices into STROKES / NOTES). */
 const GROUPS: { strokes: number[]; notes: number[]; kind?: "bulb" }[] = [
   { strokes: [0], notes: [] }, // the loop
@@ -63,7 +91,9 @@ const GROUPS: { strokes: number[]; notes: number[]; kind?: "bulb" }[] = [
   { strokes: [], notes: [4] }, // (click for more)
 ];
 
-export default function HeroDoodles({ color }: { color: string }) {
+export default function HeroDoodles({ color, tall = false }: { color: string; tall?: boolean }) {
+  const d = (i: number) => (tall && TALL_STROKES[i]) || STROKES[i].d;
+  const note = (i: number) => ({ ...NOTES[i], ...(tall ? TALL_NOTES[i] : null) });
   return (
     <svg
       className="hx__layer hx__doodles"
@@ -78,19 +108,19 @@ export default function HeroDoodles({ color }: { color: string }) {
            a 5px marker line is too thin to find with a mouse */
         <g key={gi} className={`hx__doodle ${g.kind === "bulb" ? "hx__doodle--bulb" : ""}`} data-cursor="hover">
           {g.strokes.map((i) => (
-            <path key={`h${i}`} d={STROKES[i].d} className="hx__strokeHit" />
+            <path key={`h${i}`} d={d(i)} className="hx__strokeHit" />
           ))}
           {g.strokes.map((i) => (
             <path
               key={i}
-              d={STROKES[i].d}
+              d={d(i)}
               pathLength={1}
               className="hx__stroke"
               style={{ animationDelay: `${STROKES[i].at}s`, animationDuration: `${STROKES[i].dur}s` }}
             />
           ))}
           {g.notes.map((i) => {
-            const n = NOTES[i];
+            const n = note(i);
             return (
               <text
                 key={`n${i}`}

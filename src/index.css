@@ -107,10 +107,17 @@ a {
   html {
     scroll-behavior: auto;
   }
+  /* Transitions are 0s, not a token 0.001ms: with the default property
+     `all`, 0.001ms gave EVERY element a transition, so a style set from code
+     and read back at once (the hero sizing its name from the font's own
+     metrics) read the old value - the letters were measured at one size and
+     drawn at another, piled into one spot (2026-11-25). Nothing here waits
+     for a transitionend. */
   *,
   *::before,
   *::after {
     animation-duration: 0.001ms !important;
-    transition-duration: 0.001ms !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
   }
 }
