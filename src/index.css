@@ -90,7 +90,15 @@ html::-webkit-scrollbar {
    one-finger panning outright (pinch zoom stays), nothing chains or rubber-
    bands past an edge, and the boxes that do scroll say so. */
 html {
+  touch-action: none; /* where pinch-zoom is not understood */
   touch-action: pinch-zoom;
+  /* iOS (Safari and Chrome alike - both are WebKit) flashes a grey highlight
+     over whatever it thinks was tapped. React listens for clicks on the root
+     element, so to iOS the whole page is one button: every touch anywhere
+     greyed the entire screen for a moment, the white name over the sky most
+     of all - "BRIAN FU blinking every time I touch the screen" (Brian, Chrome
+     on an iPhone, 2026-11-26). Inherited, so this is everywhere. */
+  -webkit-tap-highlight-color: transparent;
 }
 html,
 body {
