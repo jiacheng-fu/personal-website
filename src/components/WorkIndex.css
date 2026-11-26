@@ -408,6 +408,103 @@
   }
 }
 
+/* A phone held upright. Centred, the column ran off both ends - the label
+   under the nav, the card's link and the aside below the screen. Here it
+   hangs from under the nav and the six titles keep their full size, since
+   they are the buttons; the selected project gets the rest of the screen and
+   scrolls in it when its copy is longer than the room (a swipe reads it to
+   the end first, then turns the page). The aside goes: GitHub is in the nav. */
+@media (max-width: 640px) and (max-aspect-ratio: 1/1) {
+  .wx {
+    height: 100svh;
+    height: 100dvh;
+    justify-content: flex-start;
+    gap: 0.8rem;
+    padding-block: 3.5rem 0.9rem;
+  }
+  .wx__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: clamp(0.7rem, 2vh, 1.1rem);
+  }
+  .wx__list {
+    flex: none;
+  }
+  .wx__title {
+    font-size: clamp(1.25rem, 5.8vw, 1.55rem);
+  }
+  .wx__row {
+    padding: clamp(0.36rem, 1vh, 0.55rem) 0;
+  }
+  /* The copy is never cut: it takes the height it needs, and the preview
+     gets what is left, up to its cap - smaller on a shorter phone, and gone
+     on the shortest (below). Grid, so the preview's row can shrink to 0. */
+  .wx__detail {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: minmax(0, var(--wx-cap)) auto;
+    align-content: start;
+    gap: 0.75rem;
+  }
+  /* one cap for the row and the frame in it (the frame sets its own above) */
+  .wx__detail,
+  .wx__detail .wx__frame {
+    --wx-cap: clamp(5rem, 22vh, 11rem);
+  }
+  .wx__frame {
+    grid-row: 1;
+    height: 100%;
+    width: auto;
+    max-width: 100%;
+    justify-self: start;
+  }
+  .wx__card {
+    grid-row: 2;
+  }
+  .wx__yr--card {
+    margin-bottom: 0.45rem;
+  }
+  .wx__blurb {
+    font-size: 0.84rem;
+    line-height: 1.5;
+    margin-bottom: 0.8rem;
+  }
+  .wx__stack {
+    margin-bottom: 0.9rem;
+  }
+  .wx__aside {
+    display: none;
+  }
+}
+/* a short phone (an SE, a big one with its toolbars out): the preview goes,
+   then the tags and a step off the titles, before any copy would */
+@media (max-width: 640px) and (max-aspect-ratio: 1/1) and (max-height: 700px) {
+  .wx__frame {
+    display: none;
+  }
+  .wx__detail {
+    grid-template-rows: auto;
+  }
+  .wx__card {
+    grid-row: 1;
+  }
+}
+@media (max-width: 640px) and (max-aspect-ratio: 1/1) and (max-height: 600px) {
+  .wx__title {
+    font-size: clamp(1.1rem, 5.4vw, 1.3rem);
+  }
+  .wx__stack {
+    display: none;
+  }
+  .wx__blurb {
+    font-size: 0.8rem;
+  }
+}
+
 /* A phone on its side (844x390, 932x430) or a tiny window. The rule above
    still stacked six rows over the card, which cannot fit 400px of height:
    centred, the label and the first two titles went up past the top edge,

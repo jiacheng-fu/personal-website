@@ -112,9 +112,12 @@ function scrollersAt(t: EventTarget | null): HTMLElement[] {
 const wheelPx = (e: WheelEvent) => e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? window.innerHeight : 1);
 const EDGE_HINT_MS = 1600;
 
-export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
+/** `instant`: every move is a cut, never a glide (prefers-reduced-motion). */
+export function useSectionNav(count: number, enabled: boolean, gate?: Gate, instant = false) {
   const [index, setIndex] = useState(0);
   const busy = useRef(false);
+  const instantRef = useRef(instant);
+  instantRef.current = instant;
   const indexRef = useRef(0);
   indexRef.current = index;
 
@@ -173,7 +176,7 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
       }
 
       setIndex(i);
-      if (!animate) {
+      if (!animate || instantRef.current) {
         window.scrollTo(0, to);
         return;
       }
@@ -354,21 +357,33 @@ export function useSectionNav(count: number, enabled: boolean, gate?: Gate) {
     /* A swipe works like the wheel: a box on the glass keeps it while it can
        scroll, and a swipe that scrolled a box does not ALSO turn the page
        (it used to do both: the fragments list moved and the section flipped). */
+    /* On the machine's screen a swipe reads the answer, as the wheel does
+       (zoneOf) - but where the wheel then stops, a swipe at the end of the
+       text turns the page: on a phone the screen is most of the page, and
+       there is no "outside" left to swipe on. The text under the finger
+       scrolls natively (momentum and all); a swipe on the screen off the
+       text scrolls it by hand. */
     let touchY = 0;
     let lastY = 0;
-    let touchBox: HTMLElement | null = null;
+    let touchTarget: Element | null = null;
+    let touchScrollers: HTMLElement[] = [];
     let boxMoved = false;
     const onTouchStart = (e: TouchEvent) => {
       touchY = lastY = e.touches[0].clientY;
-      touchBox = boxOf(e.target);
+      touchTarget = e.target as Element | null;
+      touchScrollers = scrollersAt(e.target);
       boxMoved = false;
     };
     const onTouchMove = (e: TouchEvent) => {
       const y = e.touches[0]?.clientY ?? lastY;
       const dy = lastY - y; // > 0: the finger goes up, the content down
       lastY = y;
-      if (touchBox && dy && roomIn(touchBox, dy) > 1) {
+      const roomy = dy ? touchScrollers.find((el) => roomIn(el, dy) > 1) : undefined;
+      if (roomy && !busy.current && !isClipBusy() && !isNavLocked()) {
         boxMoved = true;
+        if (touchTarget && roomy.contains(touchTarget)) return; // the browser scrolls it
+        e.preventDefault();
+        roomy.scrollTop += dy;
         return;
       }
       e.preventDefault();

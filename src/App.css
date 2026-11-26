@@ -55,9 +55,16 @@
 .nav__links a:hover::after {
   width: 100%;
 }
+/* A phone keeps the links - they are the only contact on the page outside
+   the board at the very end - smaller, and spread across the bar. */
 @media (max-width: 640px) {
+  .nav {
+    padding: 0.95rem 1rem;
+  }
   .nav__links {
-    display: none;
+    gap: 1.1rem;
+    font-size: 0.64rem;
+    letter-spacing: 0.06em;
   }
 }
 
@@ -1024,13 +1031,15 @@ html {
 .panel--void ~ .dots .dots__dot {
   border-color: var(--ink-dim);
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .panel {
-    height: auto;
-    min-height: 100svh;
-    min-height: 100dvh;
-    padding-block: 4rem;
+/* a phone: smaller, in the page's own right margin, clear of the content */
+@media (max-width: 640px) {
+  .dots {
+    right: 5px;
+    gap: 0.6rem;
+  }
+  .dots__dot {
+    width: 7px;
+    height: 7px;
   }
 }
 
@@ -2182,6 +2191,120 @@ html {
   .a2-frags {
     grid-template-columns: repeat(2, 1fr);
   }
+}
+
+/* ---- a phone: the machine is its monitor (Apple2Front machineCompact) ----
+   The drawing scaled the glass to fit, which on a phone set the terminal at
+   6px. Here the monitor is CSS around the live screen at its real size, and
+   the screen takes the whole stage: case, bezel, the chin with the badge and
+   the LED - the same machine, closer up. */
+.rag:has(.a2m--compact) {
+  flex: 1 1 auto;
+  min-height: 0;
+  /* the shell's own 4% margins are the gutter; the dots sit in the right one */
+  padding-inline: 0;
+  /* clear of the fixed nav */
+  padding-top: clamp(3.4rem, 9vh, 4.4rem);
+  padding-bottom: clamp(0.8rem, 2.4vh, 1.4rem);
+}
+.rag:has(.a2m--compact) .section__label {
+  margin-bottom: 0.8rem;
+}
+.rag:has(.a2m--compact) .rag__scene {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+}
+.rag:has(.a2m--compact) .rag__foot {
+  font-size: 0.66rem;
+  line-height: 1.5;
+  max-width: 46ch;
+}
+.rag:has(.a2m--compact) .rag__foot .dim {
+  display: none;
+}
+.a2m--compact {
+  display: flex;
+}
+.a2m__case {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  padding: 9px;
+  background: linear-gradient(#ece3cc, #dcd2b6 60%, #cbc0a2);
+  border: 1px solid rgba(22, 21, 15, 0.38);
+  border-radius: 16px;
+  box-shadow: 0 18px 30px -18px rgba(60, 45, 20, 0.55);
+}
+.a2m__bezel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 6px 6px 0;
+  background: #57503f;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  border-radius: 12px;
+}
+.a2m--compact .a2m__screen {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  width: auto;
+  height: auto;
+  padding: 5px;
+  background: #211f18;
+  border-radius: 10px;
+}
+.a2m--compact .a2-crt {
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+  font-size: clamp(15px, 4.2vw, 19px);
+}
+/* the boot menu runs past the glass on a phone: it scrolls, the prompt stays */
+.a2m--compact .a2-boot {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.a2m--compact .a2-boot::-webkit-scrollbar {
+  display: none;
+}
+.a2m__chin {
+  flex: 0 0 30px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 2.5px;
+  color: rgba(236, 227, 204, 0.78);
+}
+.a2m__badge {
+  width: 17px;
+  height: 17px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 0.8px rgba(0, 0, 0, 0.35);
+  background: linear-gradient(
+    #61bb46 0 16.7%,
+    #fdb827 0 33.3%,
+    #f5821f 0 50%,
+    #e03a3e 0 66.7%,
+    #963d97 0 83.3%,
+    #009ddc 0
+  );
+}
+.a2m__chinLed {
+  margin-left: auto;
+  width: 9px;
+  height: 9px;
+  overflow: visible;
 }
 
 /* ---- keycap caption: name on one line, a plain-words note under it ---- */

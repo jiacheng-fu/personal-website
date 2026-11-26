@@ -82,7 +82,14 @@ export default function WorkIndex({
                 aria-current={n === i}
                 onMouseEnter={() => setI(n)}
                 onFocus={() => setI(n)}
-                onClick={() => window.open(p.repo, "_blank", "noopener")}
+                /* With a mouse, hover selects and a click opens the repo. A
+                   phone has no hover: there a tap is the selection, and the
+                   repo is the card's own link (Brian, 2026-11-25: tapping a
+                   project "sends you straight to github"). */
+                onClick={() => {
+                  if (window.matchMedia("(hover: hover)").matches) window.open(p.repo, "_blank", "noopener");
+                  else setI(n);
+                }}
               >
                 <span className="wx__num">{pad(n)}</span>
                 <span className="wx__title">{p.title}</span>

@@ -742,11 +742,20 @@ export default function RagSection({ active, boot = 0, leaving = 0 }: { active: 
       /* the wheel on the screen scrolls the answer, never the page
          (useSectionNav zoneOf) */
       data-scroll-zone
-      onClick={() => inputRef.current?.focus()}
+      /* a click on the glass is a click into the prompt - with a mouse. On a
+         phone it popped the on-screen keyboard over the answer at every tap,
+         a menu pick included: there only the prompt line itself focuses. */
+      onClick={() => {
+        if (window.matchMedia("(hover: hover)").matches) inputRef.current?.focus();
+      }}
     >
       {/* boot screen */}
       {!performing && (
-        <div className={`a2-boot ${bootPhase === "typing" ? "a2-boot--typing" : ""} ${bootPhase === "off" || bootPhase === "on" || bootPhase === "loading" ? "a2-boot--blank" : ""}`}>
+        <div
+          className={`a2-boot ${bootPhase === "typing" ? "a2-boot--typing" : ""} ${bootPhase === "off" || bootPhase === "on" || bootPhase === "loading" ? "a2-boot--blank" : ""}`}
+          /* scrolls on a phone, where the menu runs past the glass */
+          data-scrollable
+        >
           <p className="a2-boot__title">FU ][ PERSONAL ARCHIVE</p>
           <p className="a2-boot__sub">RETRIEVAL TERMINAL · REV 1</p>
           <p className="a2-boot__line">

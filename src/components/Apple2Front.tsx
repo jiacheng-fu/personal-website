@@ -25,6 +25,23 @@ const DESIGN_H = 600;
 const SCR = { x: 95, y: 62, w: 510, h: 340 };
 /* the smallest glass worth keeping the side cards for (a 1366x768 laptop's is 390) */
 const MIN_GLASS = 380;
+/* Below this scale the drawing puts the glass's type under ~12px (it is
+   18.9px at SCREEN_W, drawn at SCR.w/SCREEN_W of the fit): a phone held
+   either way, a narrow window. There the machine is just its monitor - the
+   case and the bezel in CSS around the live screen at its real size, filling
+   the stage - and the screen reads at phone size instead of 6px
+   (Brian, 2026-11-25: "mobile right now is an absolute shitshow"). */
+const COMPACT_FIT = 0.75;
+
+/** The machine as a bare monitor (see COMPACT_FIT). From the viewport, not
+ *  the stage: the stage grows to fill the panel in this mode, and deciding
+ *  from its size would flip the mode back. Never with clips: they need the
+ *  drawn machine exactly where the clip leaves it. */
+export function machineCompact(): boolean {
+  if (typeof window === "undefined" || transitionAllowed()) return false;
+  const f = viewportFrame();
+  return Math.min((f.w * 0.92) / DESIGN_W, (f.h * 0.74) / DESIGN_H) < COMPACT_FIT;
+}
 
 /* palette: paper family, three light levels + ink hairlines */
 const TOP = "#ece3cc";
@@ -243,6 +260,28 @@ export default function Apple2Front({
       window.removeEventListener("resize", measure);
     };
   }, []);
+
+  /* a phone: the monitor alone, its screen at real size (COMPACT_FIT). Same
+     host element either way, so the size observer above keeps watching it.
+     Plate renders (monitor/fall/blob/screenOff) are always the drawing. */
+  const plate = monitor !== 1 || screenOff || fall !== undefined || blob > 0;
+  if (!plate && machineCompact())
+    return (
+      <div className="a2m a2m--compact" ref={hostRef} data-cards="off">
+        <div className="a2m__case">
+          <div className="a2m__bezel">
+            <div className="a2m__screen">{screen}</div>
+            <div className="a2m__chin" aria-hidden>
+              <i className="a2m__badge" />
+              <span>FU ][</span>
+              <svg className="a2m__chinLed" viewBox="0 0 10 10">
+                <circle className={`a2m__led a2m__led--${led}`} cx="5" cy="5" r="4.5" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
 
   /* the div onto the drawn glass: one uniform scale, no skew */
   const s = SCR.w / SCREEN_W; // == SCR.h / SCREEN_H

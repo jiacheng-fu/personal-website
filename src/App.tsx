@@ -256,8 +256,16 @@ export default function App() {
     return null;
   }, []);
 
-  // Reduced motion keeps native scrolling; hijacking it would be hostile.
-  const { index, goTo } = useSectionNav(SECTIONS.length, !reduce, gate);
+  /* Reduced motion keeps the five screens and drops the motion between them:
+     every move is an instant cut, with no glide and no scene. It used to hand
+     the page back to native scrolling instead, but every section waits to be
+     made active - the board lit, the machine booted, the index drawn - so
+     the page scrolled past five sections that never started (Brian, on an
+     iPhone with Reduce Motion on, 2026-11-25: "everything broke"). */
+  const reduceRef = useRef(!!reduce);
+  reduceRef.current = !!reduce;
+  const gated = useCallback<typeof gate>((from, to) => (reduceRef.current ? null : gate(from, to)), [gate]);
+  const { index, goTo } = useSectionNav(SECTIONS.length, true, gated, !!reduce);
 
   /* The model's download starts the instant the site is landed on, and the
      rest follows as soon as the visitor moves past the hero (ragEngine.ts,
