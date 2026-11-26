@@ -1133,6 +1133,16 @@ paint past the box. The overlay clips them (`overflow: clip`), so nothing
 reaches the letterbox bars. Nothing moved: `seam:check` read the same
 before and after.
 
+The first live check found that the sliver was still there for ~5 frames,
+because a CSS mask clips painting to the box. After the line left the
+screen (cropped windows) and before the mask ended, the mask was opaque
+everywhere inside the box, but it still clipped the overflow. The player
+now drops the mask as soon as it would be opaque across the whole box
+(`wipeMask`), which looks the same inside the box. Edge sweep: 0 slivers in
+~1,430 grabs where the cream reached the left edge, at 1.45, 16:10 and 3:2.
+At 16:9 the only darker column-0 pixels are the clip's own, the red line
+leaving through x = 0 (frames 62-65 of the file).
+
 **Tested** (Chrome, plus Safari's engine and Firefox where noted):
 
 - `seam:check`: all 5 setups and both directions ok. The forward start is

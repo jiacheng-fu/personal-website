@@ -259,6 +259,12 @@ function wipeMask(v: HTMLVideoElement, n: number): string {
   const cw = Math.max(w, (h * 16) / 9);
   const k = cw / 2560;
   const xe = (w - cw) / 2 + x * k;
+  /* opaque across the whole box already: no mask at all, which is the same
+     inside the box - and lets the video's cover-cropped edge paint past it
+     (App.css). A mask clips painting to the box, and on windows narrower
+     than 16:9 that showed a 1-3 px sliver of page at the left edge in the
+     few frames between the line leaving the screen and the mask ending. */
+  if (xe - 6 * k <= 0) return "none";
   return `linear-gradient(to right, transparent ${(xe - WIPE_GLOW * k).toFixed(1)}px, #000 ${(xe - 6 * k).toFixed(1)}px)`;
 }
 
