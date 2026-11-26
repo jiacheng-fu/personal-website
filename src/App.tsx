@@ -107,7 +107,7 @@ function KeyboardScene({ active, skipIntro, parkStanding }: { active: boolean; s
       <KeyboardSection skills={skills} active={active} skipIntro={skipIntro} parkStanding={parkStanding} onLight={handleLight} />
       <p className="field-note">
         Every key is something I&rsquo;ve shipped with.{" "}
-        <span className="dim">Hover one.</span>
+        <span className="dim">{typeof window !== "undefined" && !window.matchMedia("(hover: hover)").matches ? "Tap one." : "Hover one."}</span>
       </p>
     </div>
   );
@@ -181,6 +181,34 @@ export default function App() {
       if (from === 1 && to === 0) return c.irisUp();
       if (from === 3 && to === 4) return c.notes("down");
       if (from === 4 && to === 3) return c.notes("up");
+      /* Where the 16:9 clip cannot play - a phone, a portrait window - the
+         keyboard <-> machine move is the tube's own power on and off. Both
+         used to be a bare scroll there, and the terminal handoff below never
+         ran at all, because everything after the clip check was skipped
+         (Brian, 2026-11-25: on a phone only the iris and the notes played). */
+      if (!transitionAllowed()) {
+        if (from === 1 && to === 2) return c.crt("on");
+        if (from === 2 && to === 1) return c.crt("off");
+      }
+    }
+    if (transitionsEnabled() && !frameModeRef.current && handoff.current) {
+      if (from === 2 && to === 3) {
+        return handoff.current.run().then(() => {
+          handoffOut.current = "down";
+          setHanded(true);
+        });
+      }
+      /* Back up is a different scene, not this one rewound: the black only has
+         to cover the jump, and the terminal it lands on is played out
+         afterwards (the machine cannot be revealed until the page is in front
+         of it). Self-contained: it lands the page itself under the black and
+         holds the nav lock for the whole scene, so there is nothing to do
+         afterwards. */
+      if (from === 3 && to === 2) {
+        setHanded(false);
+        setLifting(true);
+        return handoff.current.runBack().finally(() => setLifting(false));
+      }
     }
     if (!transitionAllowed() || !player.current) return null;
     const p = player.current;
@@ -211,22 +239,6 @@ export default function App() {
         });
       });
       });
-    }
-    if (from === 2 && to === 3 && handoff.current) {
-      return handoff.current.run().then(() => {
-        handoffOut.current = "down";
-        setHanded(true);
-      });
-    }
-    /* Back up is a different scene, not this one rewound: the black only has
-       to cover the jump, and the terminal it lands on is played out afterwards
-       (the machine cannot be revealed until the page is in front of it). */
-    if (from === 3 && to === 2 && handoff.current) {
-      /* Self-contained: it lands the page itself under the black and holds the
-         nav lock for the whole scene, so there is nothing to do afterwards. */
-      setHanded(false);
-      setLifting(true);
-      return handoff.current.runBack().finally(() => setLifting(false));
     }
     if (from === 2 && to === 1) {
       /* This one covers the screen the instant it starts, so an unbuffered

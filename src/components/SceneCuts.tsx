@@ -26,6 +26,9 @@ export type CutsHandle = {
   irisDown: () => Promise<void>;
   irisUp: () => Promise<void>;
   notes: (dir: "down" | "up") => Promise<void>;
+  /** keyboard <-> machine where the 16:9 clip cannot play (a phone, a
+   *  portrait window): the monitor's own power on, and off */
+  crt: (dir: "on" | "off") => Promise<void>;
   /** stop forcing the bulb lit (the hero has gone off screen) */
   releaseBulb: () => void;
 };
@@ -296,10 +299,120 @@ export default forwardRef<CutsHandle>(function SceneCuts(_, ref) {
     return covered;
   };
 
+  /* ---- the CRT: keyboard <-> machine without the clip ----
+     The clip is a 16:9 film and cannot play on a phone held upright, where
+     the move used to be a bare scroll (Brian, 2026-11-25). Instead the tube
+     does what tubes did. On: the stage lamp goes out, and in the dark the
+     screen comes on as a dot, a line, then the raster - which then gives way
+     to the machine's own warm-up underneath. Off: the screen collapses to a
+     line and a dot while the room goes dark, and the keyboard's spotlight
+     strikes. */
+  const crtBox = useRef<HTMLDivElement>(null);
+  const crtDark = useRef<HTMLDivElement>(null);
+  const beam = useRef<HTMLDivElement>(null);
+  const placeBeam = () => {
+    const b = beam.current;
+    if (!b) return;
+    const r = document.querySelector<HTMLElement>("#ask .a2-crt")?.getBoundingClientRect();
+    const box = r && r.width && r.bottom > 0 && r.top < window.innerHeight
+      ? r
+      : { left: window.innerWidth * 0.08, top: window.innerHeight * 0.2, width: window.innerWidth * 0.84, height: window.innerHeight * 0.55 };
+    Object.assign(b.style, { left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px` });
+  };
+  const crtDone = () => {
+    [crtDark.current, beam.current].forEach((e) => e?.getAnimations().forEach((a) => a.cancel()));
+    if (crtBox.current) crtBox.current.style.display = "none";
+  };
+  const crt = (dir: "on" | "off") => {
+    const unlock = lock();
+    const host = crtBox.current;
+    const dark = crtDark.current;
+    const b = beam.current;
+    if (!host || !dark || !b) {
+      unlock();
+      return Promise.resolve();
+    }
+    crtDone();
+    host.style.display = "block";
+    const DOT = "scale(0.015, 0.006)";
+    const LINE = "scale(1, 0.006)";
+    if (dir === "on") {
+      b.style.opacity = "0";
+      const covered = dark
+        .animate([{ opacity: 0 }, { opacity: 1 }], { duration: 300, easing: "ease-in", fill: "forwards" })
+        .finished.then(() => wait(140));
+      void covered
+        .then(settled)
+        .then(async () => {
+          placeBeam();
+          await b.animate(
+            [
+              { opacity: 0, transform: DOT },
+              { opacity: 1, transform: DOT, offset: 0.15 },
+              { opacity: 1, transform: LINE, offset: 0.5 },
+              { opacity: 1, transform: "scale(1, 1)" },
+            ],
+            { duration: 440, easing: "cubic-bezier(0.55, 0, 0.25, 1)", fill: "forwards" },
+          ).finished;
+          /* the room comes up around the screen, and the flash sinks into
+             the machine's own dark-then-bloom warm-up */
+          const fade = { duration: 420, easing: "ease-out", fill: "forwards" } as const;
+          dark.animate([{ opacity: 1 }, { opacity: 0 }], fade);
+          await b.animate([{ opacity: 1, transform: "scale(1, 1)" }, { opacity: 0, transform: "scale(1, 1)" }], fade).finished;
+        })
+        .catch(() => {})
+        .finally(() => {
+          crtDone();
+          unlock();
+        });
+      return covered;
+    }
+    placeBeam();
+    dark.style.opacity = "0";
+    dark.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 380, easing: "ease-in", fill: "forwards" });
+    const covered = b
+      .animate(
+        [
+          { opacity: 0, transform: "scale(1, 1)" },
+          { opacity: 1, transform: "scale(1, 1)", offset: 0.15 },
+          { opacity: 1, transform: LINE, offset: 0.5 },
+          { opacity: 1, transform: DOT, offset: 0.8 },
+          { opacity: 0, transform: DOT },
+        ],
+        { duration: 560, easing: "cubic-bezier(0.6, 0, 0.4, 1)", fill: "forwards" },
+      )
+      .finished.then(() => wait(160));
+    void covered
+      .then(settled)
+      .then(async () => {
+        /* the board was left lit and standing: the lamp strikes on it */
+        await dark
+          .animate(
+            [
+              { opacity: 1 },
+              { opacity: 0.45, offset: 0.12 },
+              { opacity: 0.95, offset: 0.22 },
+              { opacity: 0.3, offset: 0.4 },
+              { opacity: 0.7, offset: 0.5 },
+              { opacity: 0 },
+            ],
+            { duration: 460, easing: "linear", fill: "forwards" },
+          )
+          .finished;
+      })
+      .catch(() => {})
+      .finally(() => {
+        crtDone();
+        unlock();
+      });
+    return covered;
+  };
+
   useImperativeHandle(ref, () => ({
     irisDown,
     irisUp,
     notes,
+    crt,
     releaseBulb: () => root().remove("cut-bulb", "cut-glow", "cut-off"),
   }));
 
@@ -307,6 +420,10 @@ export default forwardRef<CutsHandle>(function SceneCuts(_, ref) {
     <>
       <div className="cut-iris" ref={iris} aria-hidden="true" style={{ background: INK }} />
       <div className="cut-board" ref={board} aria-hidden="true" />
+      <div className="cut-crt" ref={crtBox} aria-hidden="true">
+        <div className="cut-crt__dark" ref={crtDark} style={{ background: INK }} />
+        <div className="cut-crt__beam" ref={beam} />
+      </div>
     </>
   );
 });

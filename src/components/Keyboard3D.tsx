@@ -1647,7 +1647,8 @@ export default function Keyboard3D({
             <span>{CAP_NOTES[label]}</span>
           </>
         ) : (
-          "Hover a key."
+          /* a phone has no hover: a tap names the key */
+          typeof window !== "undefined" && !window.matchMedia("(hover: hover)").matches ? "Tap a key." : "Hover a key."
         )}
       </p>
       )}

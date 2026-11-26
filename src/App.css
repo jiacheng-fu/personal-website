@@ -926,6 +926,19 @@
   text-align: right;
 }
 
+/* A phone: the caption (hidden under 720px when the board shared a squat
+   16:9 box) goes under the section label, where a tapped key is named. */
+@media (max-width: 720px) {
+  .panel--void .kb__caption {
+    display: block;
+    right: auto;
+    left: min(5vw, 3rem);
+    top: calc(8vh + 2.2rem);
+    text-align: left;
+    max-width: 82vw;
+  }
+}
+
 /* the sound toggle, sitting just under the caption */
 .kb__sound {
   position: absolute;

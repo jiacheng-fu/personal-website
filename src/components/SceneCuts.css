@@ -2,7 +2,8 @@
    of every transition, like the clips (.transition, z 40). */
 
 .cut-iris,
-.cut-board {
+.cut-board,
+.cut-crt {
   position: fixed;
   inset: 0;
   z-index: 41;
@@ -54,4 +55,21 @@ html.cut-off .hx__doodle--bulb .hx__stroke {
   transition: none;
   filter: none;
   stroke: #6f6a58;
+}
+
+/* ---- the CRT power on and off (keyboard <-> machine without the clip) ---- */
+.cut-crt__dark {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+/* the raster: phosphor, brightest at the middle, with its own glow */
+.cut-crt__beam {
+  position: absolute;
+  opacity: 0;
+  border-radius: 8px;
+  transform-origin: 50% 50%;
+  background: radial-gradient(120% 90% at 50% 50%, #f4fff6 0%, #b9ffc9 45%, #6cff8e 100%);
+  box-shadow: 0 0 18px 4px rgba(108, 255, 142, 0.75), 0 0 60px 10px rgba(108, 255, 142, 0.35);
+  will-change: transform, opacity;
 }
