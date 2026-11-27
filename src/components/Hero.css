@@ -587,6 +587,108 @@
   top: clamp(64px, 9.5vh, 96px);
 }
 
+/* ---- the way on: one line, bottom-left (Hero.tsx) ----
+   Same white mono as the rail, a step quieter, and it waits for the name to
+   finish rising before it comes in. */
+.hx__hint {
+  position: absolute;
+  z-index: 5;
+  left: var(--gutter);
+  bottom: clamp(14px, 3.4vh, 34px);
+  margin: 0;
+  /* a bigger target than the type */
+  padding: 10px 0;
+  border: 0;
+  background: none;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: var(--hx-meta);
+  font-weight: 500;
+  /* the rail's own line, so on a phone the two sit on one baseline */
+  line-height: 1.6;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-shadow: var(--hx-shadow);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+.hx.is-in .hx__hint {
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 1.2s ease 2.2s;
+}
+/* the corner it sits in is the railing and the city, far busier than the
+   sky the rail is set on: a soft shade under the words, gone with them */
+.hx__hint::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: calc(-1 * var(--gutter));
+  bottom: calc(-1 * clamp(14px, 3.4vh, 34px));
+  width: calc(100% + 2 * var(--gutter) + 80px);
+  height: calc(100% + clamp(14px, 3.4vh, 34px) + 60px);
+  background: radial-gradient(ellipse 100% 100% at 0% 100%, rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0.2) 45%, transparent 75%);
+  pointer-events: none;
+}
+/* A tall window (a phone held upright) has his face across the whole
+   bottom edge, and sky to spare at the top: the hint moves up onto the
+   location's line, at the other end of it. */
+.hx--tall .hx__hint {
+  top: calc(clamp(64px, 9.5vh, 96px) - 10px);
+  bottom: auto;
+}
+.hx--tall .hx__hint::before {
+  display: none;
+}
+/* ...where a narrow phone (360 px) would run it into the location: the
+   short form there (.hx is a size container) */
+@container (max-width: 389px) {
+  .hx__hint-x {
+    display: none;
+  }
+}
+.hx.is-in .hx__hint:hover,
+.hx.is-in .hx__hint:focus-visible {
+  opacity: 1;
+  transition-delay: 0s;
+}
+.hx__hint:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.8);
+  outline-offset: 4px;
+}
+.hx__hint i {
+  display: inline-block;
+  margin-left: 0.35em;
+  font-style: normal;
+  letter-spacing: 0;
+  animation: hx-hint-bob 2s ease-in-out 3.4s infinite;
+}
+.hx__hint--touch i {
+  animation-name: hx-hint-bob-up;
+}
+@keyframes hx-hint-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(0.28em); }
+}
+@keyframes hx-hint-bob-up {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-0.28em); }
+}
+/* the words for the input there is: a wheel or trackpad, or a finger */
+.hx__hint--touch {
+  display: none;
+}
+@media (hover: none) {
+  .hx__hint--mouse {
+    display: none;
+  }
+  .hx__hint--touch {
+    display: inline;
+  }
+}
+
 
 @media (max-width: 640px) {
   .hx__rail {
@@ -600,6 +702,13 @@
   }
   .hx__rail {
     transition: none;
+  }
+  .hx__hint,
+  .hx.is-in .hx__hint {
+    transition: none;
+  }
+  .hx__hint i {
+    animation: none;
   }
 }
 

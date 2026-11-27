@@ -22,7 +22,7 @@ const p = await ctx.newPage();
 const errs = []; p.on("pageerror", (e) => errs.push(e.message.slice(0, 90)));
 await p.goto(URL, { waitUntil: "load" }); await sleep(3000);
 for (const s of [1, 2, 3, 4]) {
-  await p.locator(`.dots__dot[aria-label="${NAMES[s]}"]`).click({ force: true }); await sleep(9000);
+  await p.locator(`.dots__dot[data-section="${NAMES[s]}"]`).click({ force: true }); await sleep(9000);
   await p.reload({ waitUntil: "load" }); await sleep(7000);
   const r = await look(p);
   const live = s === 1 ? r.kbLit : s === 2 ? /ARCHIVE|ASK|FU/.test(r.glass) : s === 3 ? r.rows : true;
@@ -33,7 +33,7 @@ console.log(`new tab -> starts on ${NAMES[(await look(p2)).i]}`); await p2.close
 const p3 = await ctx.newPage(); await p3.goto(URL + "?frame=kb", { waitUntil: "load" }); await sleep(4000);
 console.log(`?frame=kb plate -> on ${NAMES[(await look(p3)).i]} (want craft)`); await p3.close();
 if (W) {
-  await p.locator('.dots__dot[aria-label="ask"]').click({ force: true }); await sleep(9000);
+  await p.locator('.dots__dot[data-section="ask"]').click({ force: true }); await sleep(9000);
   const f = `${W}/src/components/WorkIndex.tsx`; const orig = fs.readFileSync(f, "utf8");
   fs.writeFileSync(f, orig + `\n// save probe ${Date.now()}\n`); await sleep(8000); fs.writeFileSync(f, orig); await sleep(8000);
   const r = await look(p);

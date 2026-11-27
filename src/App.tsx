@@ -127,6 +127,8 @@ function KeyboardScene({ active, skipIntro, parkStanding }: { active: boolean; s
 /* --------------------------------- app ----------------------------------- */
 
 const SECTIONS = ["top", "craft", "ask", "work", "contact"] as const;
+/* what each progress dot says on hover: each section's own label */
+const SECTION_NAMES = ["Home", "What I work in", "Ask the machine", "Selected work", "Notice board"];
 
 export default function App() {
   const reduce = useReducedMotion();
@@ -612,7 +614,7 @@ export default function App() {
         </motion.nav>
 
         <Panel id="top" active={index === 0}>
-          <Hero active={index === 0} />
+          <Hero active={index === 0} onNext={() => goTo(1)} />
         </Panel>
 
         <Panel id="craft" active={index === 1} className="panel--void">
@@ -640,7 +642,8 @@ export default function App() {
             <button
               key={s}
               className={`dots__dot ${i === index ? "is-on" : ""}`}
-              aria-label={s}
+              aria-label={SECTION_NAMES[i]}
+              data-section={s}
               aria-current={i === index}
               data-cursor="hover"
               onClick={() => goTo(i)}

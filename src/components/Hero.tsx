@@ -110,7 +110,10 @@ const LEDGES: Record<string, [number, number][]> = {
   U: [[0.1, 0.24], [0.76, 0.9]],
 };
 
-export default function Hero({ active }: { active: boolean }) {
+/** where to go from here (the hint's button); App's goTo(1) */
+type Props = { active: boolean; onNext?: () => void };
+
+export default function Hero({ active, onNext }: Props) {
   const section = useRef<HTMLElement>(null);
   const frame = useRef<HTMLDivElement>(null);
   const probe = useRef<SVGTextElement>(null);
@@ -443,6 +446,29 @@ export default function Hero({ active }: { active: boolean }) {
       <div className="hx__rail hx__rail--top">
         <span>{profile.location}</span>
       </div>
+
+      {/* How to move on. A first-time visitor (2026-11-26) was "a little
+          lost" on the first screen: nothing said the page goes anywhere.
+          Small, in the rails' own mono, bottom-left - the bottom centre is
+          Brian's face - or, on a phone held upright, top-left on the
+          location's line (Hero.css). The words follow the input (CSS: hover
+          or not), and it is a button too, for anyone who would rather click
+          than scroll. */}
+      <button
+        type="button"
+        className="hx__hint"
+        data-cursor="hover"
+        aria-label="Go to the next section"
+        tabIndex={active ? 0 : -1}
+        onClick={onNext}
+      >
+        <span className="hx__hint--mouse">
+          Scroll to explore <i aria-hidden="true">&darr;</i>
+        </span>
+        <span className="hx__hint--touch">
+          Swipe up<span className="hx__hint-x"> to explore</span> <i aria-hidden="true">&uarr;</i>
+        </span>
+      </button>
 
     </section>
   );

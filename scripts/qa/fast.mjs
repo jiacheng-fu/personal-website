@@ -86,7 +86,7 @@ async function check(name, p, expectIdx, opts = {}) {
   return s;
 }
 function info(line) { console.log(`      ${line}`); }
-const dot = (p, i) => p.locator(`.dots__dot[aria-label="${NAMES[i]}"]`).click({ force: true });
+const dot = (p, i) => p.locator(`.dots__dot[data-section="${NAMES[i]}"]`).click({ force: true });
 const goto = async (p, i) => { await dot(p, i); await sleep(SETTLE); };
 const center = (p) => { const v = p.viewportSize(); return p.mouse.move(Math.round(v.width * 0.93), Math.round(v.height * 0.9)); }; // off the machine's screen (a scroll zone since dc45ec8)
 /* a mouse wheel spun hard: same-size notches, very fast */

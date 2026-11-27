@@ -127,7 +127,7 @@ async function fresh() {
   await p.goto(BASE, { waitUntil: "load" }); await sleep(2500);
   return p;
 }
-const dot = (p, i) => p.locator(`.dots__dot[aria-label="${NAMES[i]}"]`).click({ force: true });
+const dot = (p, i) => p.locator(`.dots__dot[data-section="${NAMES[i]}"]`).click({ force: true });
 async function film(p, name, ms, every = 250) {
   const files = [];
   const g = name.replace(/[^a-z0-9]+/gi, "-").slice(0, 60);

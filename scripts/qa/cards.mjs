@@ -8,7 +8,7 @@ const ctx = await b.newContext({ viewport: { width: 1920, height: 1080 } });
 const p = await ctx.newPage();
 await p.goto(BASE, { waitUntil: "load" }); await new Promise(r => setTimeout(r, 2000));
 if (await p.locator(".framechoice").count()) await p.getByRole("button", { name: /Full width/ }).click();
-await p.locator('.dots__dot[aria-label="ask"]').click({ force: true }); await new Promise(r => setTimeout(r, 6000));
+await p.locator('.dots__dot[data-section="ask"]').click({ force: true }); await new Promise(r => setTimeout(r, 6000));
 for (const [w, h] of sizes) {
   await p.setViewportSize({ width: w, height: h }); await new Promise(r => setTimeout(r, 1200));
   const o = await p.evaluate(() => {

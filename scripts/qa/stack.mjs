@@ -65,23 +65,23 @@ await scenario("arrive by the clip, scroll halfway through the menu typing", asy
   await p.waitForSelector(".a2-boot--typing", { timeout: 20000 }); await sleep(650);
 });
 await scenario("dot jump to the machine, scroll while the tube is still warming", async (p) => {
-  await p.locator('.dots__dot[aria-label="ask"]').click({ force: true });
+  await p.locator('.dots__dot[data-section="ask"]').click({ force: true });
   await p.waitForSelector(".a2-crt--off, .a2-crt--bloom", { timeout: 20000 }); await sleep(1200);
 });
 await scenario("ask a question, scroll while it is answering", async (p) => {
-  await p.locator('.dots__dot[aria-label="ask"]').click({ force: true });
+  await p.locator('.dots__dot[data-section="ask"]').click({ force: true });
   await p.waitForSelector(".rag.is-booting", { timeout: 30000 }); await p.waitForSelector(".rag:not(.is-booting) .a2-prompt input", { timeout: 30000 }); await sleep(800);
   await p.locator(".a2-prompt input").fill("what did brian do at his compiler internship"); await p.locator(".a2-prompt input").press("Enter");
   await sleep(1500);
 });
 await scenario("ask a question, scroll right after the answer lands", async (p) => {
-  await p.locator('.dots__dot[aria-label="ask"]').click({ force: true });
+  await p.locator('.dots__dot[data-section="ask"]').click({ force: true });
   await p.waitForSelector(".rag.is-booting", { timeout: 30000 }); await p.waitForSelector(".rag:not(.is-booting) .a2-prompt input", { timeout: 30000 }); await sleep(800);
   await p.locator(".a2-prompt input").fill("tell me about axle"); await p.locator(".a2-prompt input").press("Enter");
   await sleep(4200);
 });
 await scenario("settled machine (control)", async (p) => {
-  await p.locator('.dots__dot[aria-label="ask"]').click({ force: true });
+  await p.locator('.dots__dot[data-section="ask"]').click({ force: true });
   await p.waitForSelector(".rag.is-booting", { timeout: 30000 }); await p.waitForSelector(".rag:not(.is-booting) .a2-prompt input", { timeout: 30000 }); await sleep(1500);
 });
 await b.close();

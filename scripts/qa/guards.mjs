@@ -8,7 +8,7 @@ const NAMES = ["top", "craft", "ask", "work", "contact"];
 const p = await (await b.newContext({ viewport: { width: 1512, height: 860 } })).newPage();
 const errs = []; p.on("pageerror", (e) => errs.push(e.message));
 const st = () => p.evaluate(() => { const i = [...document.querySelectorAll(".dots__dot")].findIndex((d) => d.classList.contains("is-on")); const t = document.querySelectorAll(".panel")[i]?.offsetTop; return { i, y: Math.round(scrollY), t, ok: Math.abs(scrollY - t) < 3, fallback: !!document.querySelector('[role="alert"]') }; });
-const dot = (i) => p.locator(`.dots__dot[aria-label="${NAMES[i]}"]`).click({ force: true });
+const dot = (i) => p.locator(`.dots__dot[data-section="${NAMES[i]}"]`).click({ force: true });
 await p.goto(URL, { waitUntil: "load" }); await sleep(2500);
 console.log("load:", JSON.stringify(await st()));
 // dot click while a scroll glide is in flight (work -> contact is a plain 850ms glide)
@@ -19,7 +19,7 @@ let s = await st(); console.log(`dot click mid-glide: landed ${NAMES[s.i]} align
 await dot(1); await sleep(9000);
 await p.keyboard.press("ArrowDown");
 const t0 = Date.now();
-await p.waitForFunction(() => document.querySelector('.dots__dot[aria-label="ask"]').classList.contains("is-on"), null, { timeout: 15000 });
+await p.waitForFunction(() => document.querySelector('.dots__dot[data-section="ask"]').classList.contains("is-on"), null, { timeout: 15000 });
 await sleep(150); await p.keyboard.press("ArrowDown"); // lands while the clip overlay is still fading
 await sleep(9000);
 s = await st(); console.log(`key during clip fade: on ${NAMES[s.i]} aligned=${s.ok} (want ask: no handoff started over the clip)`);

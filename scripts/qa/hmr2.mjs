@@ -36,7 +36,7 @@ async function run(name, target, act, expect = target, more = () => []) {
   const p = await ctx.newPage();
   const errs = []; p.on("pageerror", (e) => errs.push(e.message.slice(0, 100)));
   await p.goto(URL, { waitUntil: "load" }); await sleep(3500);
-  if (target > 0) { await p.locator(`.dots__dot[aria-label="${NAMES[target]}"]`).click({ force: true }); await sleep(9000); }
+  if (target > 0) { await p.locator(`.dots__dot[data-section="${NAMES[target]}"]`).click({ force: true }); await sleep(9000); }
   const undo = await act(p);
   await sleep(9000);
   if (undo) { undo(); await sleep(9000); }

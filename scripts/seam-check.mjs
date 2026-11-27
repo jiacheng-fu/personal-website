@@ -139,7 +139,7 @@ try {
     await page.goto(`${base}/?rag=off&wipe=off`);
     await page.waitForTimeout(1500);
     const scrollbar = await page.evaluate(() => innerWidth - document.documentElement.clientWidth);
-    await page.click('button[aria-label="craft"]');
+    await page.click('.dots__dot[data-section="craft"]');
     await page.waitForTimeout(4500);
     await page.keyboard.press("ArrowDown");
     await page.waitForFunction(

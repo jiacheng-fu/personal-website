@@ -12,7 +12,7 @@ const hide = ".panel--void .section__label,.panel--void .field-note,.panel--void
 const browser = await chromium.launch({ headless: true, channel: "chrome" });
 let page = await browser.newPage({ viewport: { width: 2560, height: 1440 } });
 await page.goto(`${BASE}/?rag=off&dpr=2`); await page.waitForTimeout(1500);
-await page.click('button[aria-label="craft"]'); await page.waitForTimeout(6000);
+await page.click('.dots__dot[data-section="craft"]'); await page.waitForTimeout(6000);
 await page.addStyleTag({ content: hide }); await page.waitForTimeout(500);
 const fill = await page.evaluate(() => { const c = document.querySelector(".panel--void canvas").getBoundingClientRect(); return c.width; });
 if (Math.abs(fill - 2560) > 1) throw new Error(`keyboard canvas ${fill}px wide, not 2560: the board would be baked mis-sized`);

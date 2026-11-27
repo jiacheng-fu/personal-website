@@ -302,7 +302,7 @@ async function liveSuite() {
     const p = await fresh(3440, 1440);
     if (await p.locator(".framechoice").count()) await p.getByRole("button", { name: /Full width/ }).click();
     for (const b of [2, 3, 4]) {
-      await p.locator(`.dots__dot[aria-label="${NAMES[b]}"]`).click({ force: true }); await sleep(CUT + 2000);
+      await p.locator(`.dots__dot[data-section="${NAMES[b]}"]`).click({ force: true }); await sleep(CUT + 2000);
       await p.reload({ waitUntil: "load" }); await sleep(4000);
       const s = await step(p, `D reload on ${NAMES[b]} at 21:9 (full width) comes back to ${NAMES[b]}`, b, { shot: true });
       if (s.prompt) report(`D prompt came back after reload on ${NAMES[b]}`, ["prompt shown again"]);
@@ -362,7 +362,7 @@ async function boxedSuite() {
     montage(`boxed-${tag}`, files);
     for (let i = 3; i >= 0; i--) { await p.keyboard.press("ArrowUp"); await sleep(SETTLE); report(`boxed ${tag}: up into ${NAMES[i]}`, problemsOf(await state(p), i)); }
     // reload keeps the frame and does not ask again
-    await p.locator('.dots__dot[aria-label="work"]').click({ force: true }); await sleep(SETTLE);
+    await p.locator('.dots__dot[data-section="work"]').click({ force: true }); await sleep(SETTLE);
     await p.reload({ waitUntil: "load" }); await sleep(4000);
     s = await state(p);
     const rp = problemsOf(s, 3);
